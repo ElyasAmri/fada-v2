@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Local files
+*.local*
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# ML/Data Science
+mlruns/
+*.pth
+*.h5
+*.pkl
+checkpoints/
+logs/
+
+# Data
+/data/
+
+# Documents 
+*.pdf
+
+# Markdown files in info/
+info/*.md
+
+# Keep papers markdown files
+!papers/*.md
+
+# Keep these files
+!README.md
+!CLAUDE.md
+
+# Environment
+.env
+*.log
+
+# Model outputs
+outputs/
+results/
+
+# Cache
+.cache/
+.pytest_cache/
