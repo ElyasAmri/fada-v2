@@ -22,7 +22,6 @@ venv\Scripts\python.exe    # WRONG - will fail in bash
 
 # Activate virtual environment
 source venv/Scripts/activate  # Git Bash/WSL
-venv\Scripts\activate         # Windows CMD
 
 # Install all dependencies (includes PyTorch with CUDA 12.8)
 pip install -r requirements.txt
@@ -105,19 +104,11 @@ data/Fetal Ultrasound/
 - Git Bash requires Unix-style paths
 - Use `source` not `.` for activation in Git Bash
 
-### Limited Data Challenges
-- Use pretrained models (ImageNet or RadImageNet)
-- Heavy augmentation (rotation, brightness, contrast, noise)
-- Start with simple CNN baseline, then EfficientNet-B0
-- Consider few-shot learning techniques if accuracy < 60%
-
-### Model Selection Strategy
-Test architectures in this order:
-1. Simple CNN (baseline)
-2. EfficientNet-B0 (primary)
-3. ResNet18 (proven 74% on similar data)
-4. DenseNet121 (if compute allows)
-5. Vision Transformer (if > 70% accuracy needed)
+### Model Selection and Training
+- **Model selection strategy**: See `info/spec.md` Section 4 for complete model architecture zoo and testing order
+- **Expected performance**: 85-90% accuracy with full annotations
+- **Training approach**: Heavy augmentation, pretrained models, focal loss for imbalance
+- **Implementation note**: System designed to work seamlessly when Excel annotations are updated - just replace the Excel file and retrain
 
 ## MCP Tools Usage
 
@@ -168,9 +159,11 @@ mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", 
 - Always test both pretrained and from-scratch
 - Always document every step for potential paper
 - Always include "research prototype" disclaimers
+- Always clean up temporary files after use
 - Never claim clinical accuracy
 - Never skip augmentation (critical for small dataset)
 - Never retrain backbone when adding capabilities
 - Never put .md files outside info/ or paper/ (except README)
 - Never commit PDFs or image files
 - Never use emojis in code, documentation, or communication (unprofessional)
+- Never create copies of existing files with modifications. Always modify original files to achieve the desired task.
