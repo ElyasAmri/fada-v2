@@ -81,7 +81,10 @@ class FetalUltrasoundClassifier12(nn.Module):
 
         # Create backbone
         if backbone == 'efficientnet_b0':
-            self.backbone = models.efficientnet_b0(pretrained=pretrained)
+            if pretrained:
+                self.backbone = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = models.efficientnet_b0(weights=None)
             # Modify classifier head
             in_features = self.backbone.classifier[1].in_features
             self.backbone.classifier = nn.Sequential(
@@ -91,7 +94,10 @@ class FetalUltrasoundClassifier12(nn.Module):
             self.features_dim = in_features
 
         elif backbone == 'resnet18':
-            self.backbone = models.resnet18(pretrained=pretrained)
+            if pretrained:
+                self.backbone = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = models.resnet18(weights=None)
             in_features = self.backbone.fc.in_features
             self.backbone.fc = nn.Sequential(
                 nn.Dropout(p=dropout_rate),
@@ -100,7 +106,10 @@ class FetalUltrasoundClassifier12(nn.Module):
             self.features_dim = in_features
 
         elif backbone == 'densenet121':
-            self.backbone = models.densenet121(pretrained=pretrained)
+            if pretrained:
+                self.backbone = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = models.densenet121(weights=None)
             in_features = self.backbone.classifier.in_features
             self.backbone.classifier = nn.Sequential(
                 nn.Dropout(p=dropout_rate),
@@ -109,7 +118,10 @@ class FetalUltrasoundClassifier12(nn.Module):
             self.features_dim = in_features
 
         elif backbone == 'mobilenet_v2':
-            self.backbone = models.mobilenet_v2(pretrained=pretrained)
+            if pretrained:
+                self.backbone = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = models.mobilenet_v2(weights=None)
             in_features = self.backbone.classifier[1].in_features
             self.backbone.classifier = nn.Sequential(
                 nn.Dropout(p=dropout_rate),

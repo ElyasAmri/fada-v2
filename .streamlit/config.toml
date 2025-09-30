@@ -1,0 +1,26 @@
+[theme]
+# Primary color for interactive elements
+primaryColor = "#0066CC"
+
+# Background color for main content area
+backgroundColor = "#FFFFFF"
+
+# Background color for sidebar and widgets
+secondaryBackgroundColor = "#F0F2F6"
+
+# Text color
+textColor = "#262730"
+
+# Font family
+font = "sans serif"
+
+[server]
+# Enable fast reruns
+fastReruns = true
+
+# Max upload size (MB)
+maxUploadSize = 10
+
+[browser]
+# Tab title
+gatherUsageStats = false
