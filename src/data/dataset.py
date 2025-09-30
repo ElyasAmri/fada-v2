@@ -208,7 +208,8 @@ class FetalDataModule12Class:
         num_workers: int = 4,
         val_split: float = 0.15,
         test_split: float = 0.15,
-        random_state: int = 42
+        random_state: int = 42,
+        subset_fraction: float = 1.0
     ):
         """
         Initialize data module with stratified splitting
@@ -220,6 +221,7 @@ class FetalDataModule12Class:
             val_split: Validation split ratio
             test_split: Test split ratio
             random_state: Random seed for reproducibility
+            subset_fraction: Fraction of dataset to use (e.g., 0.1 for 10%)
         """
         self.data_root = data_root
         self.batch_size = batch_size
@@ -227,6 +229,7 @@ class FetalDataModule12Class:
         self.val_split = val_split
         self.test_split = test_split
         self.random_state = random_state
+        self.subset_fraction = subset_fraction
 
         self.train_dataset = None
         self.val_dataset = None
@@ -247,6 +250,17 @@ class FetalDataModule12Class:
         # Get all labels for stratification
         all_labels = full_dataset.labels
         all_indices = list(range(len(all_labels)))
+
+        # Apply subset sampling if requested
+        if self.subset_fraction < 1.0:
+            from sklearn.model_selection import train_test_split
+            all_indices, _, all_labels, _ = train_test_split(
+                all_indices, all_labels,
+                train_size=self.subset_fraction,
+                stratify=all_labels,
+                random_state=self.random_state
+            )
+            logger.info(f"Using {self.subset_fraction*100:.0f}% of dataset: {len(all_indices)} samples")
 
         # First split: separate test set
         train_val_indices, test_indices, train_val_labels, test_labels = train_test_split(

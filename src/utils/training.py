@@ -218,6 +218,28 @@ class ModelCheckpoint:
         else:
             self.best = float('-inf')
 
+    def __call__(self, score: float, model: nn.Module, optimizer: optim.Optimizer, epoch: int) -> bool:
+        """
+        Callable interface for checkpoint saving
+
+        Args:
+            score: Current metric value
+            model: Model to save
+            optimizer: Optimizer to save
+            epoch: Current epoch
+
+        Returns:
+            True if saved
+        """
+        state = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            self.monitor: score,
+            'best_score': self.best
+        }
+        return self.save_checkpoint(state, score)
+
     def save_checkpoint(self, state: dict, score: float) -> bool:
         """
         Save checkpoint if improved
