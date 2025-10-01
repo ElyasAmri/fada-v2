@@ -29,12 +29,6 @@ logs/
 # Documents 
 *.pdf
 
-# Markdown files in info/
-info/*.md
-
-# Keep papers markdown files
-!papers/*.md
-
 # Keep these files
 !README.md
 !CLAUDE.md

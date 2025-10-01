@@ -5,3 +5,4 @@ from .classifier import (
     create_model,
     ModelWithTTA
 )
+from .vqa_model import UltrasoundVQA
