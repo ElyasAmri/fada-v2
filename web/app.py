@@ -21,11 +21,29 @@ import random
 sys.path.append(str(Path(__file__).parent.parent))
 
 # Import model components
+import sys
+
+# Try importing classifier separately
 try:
     from src.models.classifier import FetalUltrasoundClassifier12
     MODEL_AVAILABLE = True
-except ImportError:
+    sys.stderr.write("✓ Classifier import successful\n")
+    sys.stderr.flush()
+except ImportError as e:
     MODEL_AVAILABLE = False
+    sys.stderr.write(f"✗ Classifier import failed: {e}\n")
+    sys.stderr.flush()
+
+# Try importing VQA separately
+try:
+    from src.models.vqa_model import UltrasoundVQA
+    VQA_AVAILABLE = True
+    sys.stderr.write("✓ VQA import successful\n")
+    sys.stderr.flush()
+except ImportError as e:
+    VQA_AVAILABLE = False
+    sys.stderr.write(f"✗ VQA import failed (non-critical): {e}\n")
+    sys.stderr.flush()
 
 # Page configuration
 st.set_page_config(
@@ -50,6 +68,12 @@ if "messages" not in st.session_state:
 if "model" not in st.session_state:
     st.session_state.model = None
 
+if "vqa_model" not in st.session_state:
+    st.session_state.vqa_model = None
+
+if "vqa_enabled" not in st.session_state:
+    st.session_state.vqa_enabled = False
+
 if "analyzing" not in st.session_state:
     st.session_state.analyzing = False
 
@@ -61,6 +85,12 @@ if "current_image" not in st.session_state:
 
 if "last_uploaded_file" not in st.session_state:
     st.session_state.last_uploaded_file = None
+
+if "last_classification" not in st.session_state:
+    st.session_state.last_classification = None
+
+if "debug_info" not in st.session_state:
+    st.session_state.debug_info = []
 
 # Load model function
 @st.cache_resource
@@ -105,7 +135,26 @@ def load_model():
                 return model
 
         return None
-    except Exception:
+    except Exception as e:
+        st.error(f"Failed to load classification model: {str(e)}")
+        return None
+
+@st.cache_resource
+def load_vqa_model():
+    """Load the VQA model (lazy loading)"""
+    if not VQA_AVAILABLE:
+        return None
+
+    try:
+        # Create VQA instance but don't load model yet
+        vqa = UltrasoundVQA(
+            model_path="outputs/blip2_1epoch/final_model",
+            device="auto"
+        )
+        # Model will be loaded on first use via answer_question()
+        return vqa
+    except Exception as e:
+        print(f"VQA initialization failed: {e}")
         return None
 
 def preprocess_image(image):
@@ -125,23 +174,14 @@ def preprocess_image(image):
 def analyze_ultrasound(image, model=None):
     """Analyze ultrasound image and return results"""
     if model is None:
-        # Simulated analysis for demo
-        organs = ["Brain", "Heart", "Abdomen", "Femur", "Thorax",
-                 "Spine", "Kidney", "Face", "Bladder", "Cervix",
-                 "Placenta", "Other"]
-        selected_organ = random.choice(organs[:5])
-        confidence = random.uniform(0.7, 0.95)
-        is_normal = random.choice([True, True, True, False])  # 75% normal
-        quality = random.choice(["Good", "Fair", "Poor"])
-        orientation = random.choice(["Axial", "Sagittal", "Coronal", "Oblique"])
-
+        st.error("Classification model not loaded. Check console for errors.")
         return {
-            "organ": selected_organ,
-            "confidence": confidence,
-            "is_normal": is_normal,
-            "quality": quality,
-            "orientation": orientation,
-            "processing_time": random.uniform(0.2, 0.5)
+            "organ": "Error",
+            "confidence": 0.0,
+            "is_normal": False,
+            "quality": "Unknown",
+            "orientation": "Unknown",
+            "processing_time": 0.0
         }
 
     # Real model inference
@@ -268,9 +308,14 @@ def generate_response(analysis_results):
 
     return response
 
-# Load model once at startup
+# Load models once at startup
 if MODEL_AVAILABLE and st.session_state.model is None:
     st.session_state.model = load_model()
+    if st.session_state.model is None:
+        st.error("⚠️ Classification model failed to load.")
+
+if VQA_AVAILABLE and st.session_state.vqa_model is None:
+    st.session_state.vqa_model = load_vqa_model()
 
 # Header
 st.markdown("# FADA - Fetal Anomaly Detection Algorithm")
@@ -278,15 +323,14 @@ st.markdown("# FADA - Fetal Anomaly Detection Algorithm")
 # Top metrics row
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("System Status", "Active" if st.session_state.model else "Demo Mode")
-with col2:
     st.metric("Total Analyses", st.session_state.total_analyses)
+with col2:
+    st.metric("Classification", "EfficientNet-B0")
 with col3:
-    model_status = "EfficientNet-B0 (12-class)" if st.session_state.model else "Simulated"
-    st.metric("Model", model_status)
+    st.metric("Test Accuracy", "90%")
 with col4:
-    accuracy = "85.8%" if st.session_state.model else "N/A"
-    st.metric("Test Accuracy", accuracy)
+    vqa_status = "Enabled" if st.session_state.vqa_model else "Disabled"
+    st.metric("VQA", vqa_status)
 
 st.divider()
 
@@ -328,16 +372,35 @@ with tab1:
         if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
 
-            # Generate response
-            if "explain" in prompt.lower() or "what" in prompt.lower():
-                response = "The analysis uses deep learning models trained on fetal ultrasound data. "
-                response += "Each anatomical view has specific features that the model identifies."
-            elif "measure" in prompt.lower() or "size" in prompt.lower():
-                response = "Biometric measurements vary by anatomical view and gestational age. "
-                response += "The system provides classification and confidence scores."
+            # Check if VQA is enabled and question is medical-related
+            if st.session_state.vqa_enabled and st.session_state.vqa_model and st.session_state.current_image:
+                # Use VQA for medical questions about the image
+                medical_keywords = ["what", "which", "where", "how", "describe", "identify", "assess", "evaluate", "measure", "show", "visible"]
+                if any(keyword in prompt.lower() for keyword in medical_keywords):
+                    with st.spinner("Loading VQA model and analyzing image..."):
+                        try:
+                            answer = st.session_state.vqa_model.answer_question(
+                                st.session_state.current_image,
+                                prompt
+                            )
+                            response = answer
+                        except Exception as e:
+                            response = f"VQA error: {str(e)}"
+                else:
+                    # Fallback to general response
+                    response = "Upload an ultrasound image for detailed analysis. "
+                    response += "You can ask specific medical questions about the image."
             else:
-                response = "Upload an ultrasound image for detailed analysis. "
-                response += "The system can identify anatomical views and detect patterns."
+                # Generate standard response
+                if "explain" in prompt.lower() or "what" in prompt.lower():
+                    response = "The analysis uses deep learning models trained on fetal ultrasound data. "
+                    response += "Each anatomical view has specific features that the model identifies."
+                elif "measure" in prompt.lower() or "size" in prompt.lower():
+                    response = "Biometric measurements vary by anatomical view and gestational age. "
+                    response += "The system provides classification and confidence scores."
+                else:
+                    response = "Upload an ultrasound image for detailed analysis. "
+                    response += "The system can identify anatomical views and detect patterns."
 
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
@@ -368,6 +431,25 @@ with tab1:
                     analysis_results = analyze_ultrasound(image, st.session_state.model)
                     response = generate_response(analysis_results)
 
+                    # Store debug info (keeping for Help tab)
+                    st.session_state.debug_info.append({
+                        'image': uploaded_file.name,
+                        'organ': analysis_results.get('organ'),
+                        'confidence': analysis_results.get('confidence', 0),
+                        'model_available': st.session_state.model is not None
+                    })
+
+                    # Store classification for VQA check
+                    st.session_state.last_classification = analysis_results.get("organ", "")
+
+                    # Check if VQA is available for this image type
+                    if st.session_state.vqa_model and "Non-standard NT" in st.session_state.last_classification:
+                        st.session_state.vqa_enabled = True
+                        response += "\n\n---\n\n### Visual Question Answering Available\n"
+                        response += "This image type supports detailed medical Q&A. Click the question buttons below or ask your own questions in the chat."
+                    else:
+                        st.session_state.vqa_enabled = False
+
                     st.session_state.messages.append({
                         "role": "assistant",
                         "content": response
@@ -381,22 +463,59 @@ with tab1:
         st.markdown("### Current Analysis")
 
         if st.session_state.current_image:
-            st.image(st.session_state.current_image, use_container_width=True)
+            st.image(st.session_state.current_image, width='stretch')
+
+            # VQA Question Buttons (if enabled)
+            if st.session_state.vqa_enabled and st.session_state.vqa_model:
+                st.markdown("#### Ask Medical Questions")
+
+                vqa_shortcuts = st.session_state.vqa_model.get_question_shortcuts()
+
+                with st.expander("Standard Questions", expanded=True):
+                    for short_name, full_question in vqa_shortcuts.items():
+                        if st.button(short_name, key=f"vqa_btn_{short_name}", width='stretch'):
+                            # Add question to chat
+                            st.session_state.messages.append({
+                                "role": "user",
+                                "content": full_question
+                            })
+
+                            # Get VQA answer
+                            with st.spinner(f"Loading VQA model and answering: {short_name}..."):
+                                try:
+                                    answer = st.session_state.vqa_model.answer_question(
+                                        st.session_state.current_image,
+                                        full_question
+                                    )
+
+                                    st.session_state.messages.append({
+                                        "role": "assistant",
+                                        "content": f"**{short_name}**\n\n{answer}"
+                                    })
+                                except Exception as e:
+                                    st.session_state.messages.append({
+                                        "role": "assistant",
+                                        "content": f"Error loading VQA model: {str(e)}"
+                                    })
+
+                            st.rerun()
 
             # Quick actions
             st.markdown("#### Quick Actions")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("Clear", use_container_width=True):
+                if st.button("Clear", width='stretch'):
                     st.session_state.messages = [{
                         "role": "assistant",
                         "content": "Chat cleared. Upload a new image to begin."
                     }]
                     st.session_state.current_image = None
                     st.session_state.last_uploaded_file = None
+                    st.session_state.vqa_enabled = False
+                    st.session_state.last_classification = None
                     st.rerun()
             with col2:
-                if st.button("Export", use_container_width=True):
+                if st.button("Export", width='stretch'):
                     st.info("Export feature coming soon")
         else:
             # Placeholder when no image
@@ -432,14 +551,25 @@ with tab2:
         ### Key Features
         - **Automated Analysis**: Instant classification of ultrasound views
         - **Multi-Class Detection**: Supports 12 different anatomical views
+        - **Visual Question Answering**: Ask medical questions about Non-standard NT images
         - **Confidence Scoring**: Provides reliability metrics for each prediction
         - **Interactive Interface**: Chat-based interaction for ease of use
 
         ### Technical Architecture
-        - **Model**: EfficientNet-B0 backbone with custom classification heads
-        - **Framework**: PyTorch for deep learning, Streamlit for interface
-        - **Input**: 224x224 RGB ultrasound images
-        - **Output**: View classification with confidence scores
+        **Phase 1 - Classification**:
+        - Model: EfficientNet-B0 backbone with custom classification heads
+        - Accuracy: ~90% on 12-class ultrasound view classification
+
+        **Phase 2 - Visual Question Answering (VQA)**:
+        - Model: BLIP-2 OPT-2.7B with LoRA fine-tuning
+        - Supports 8 medical questions for Non-standard NT images
+        - Trained on 50 annotated images with expert annotations
+
+        ### Framework
+        - PyTorch for deep learning
+        - Streamlit for web interface
+        - Input: 224x224 RGB ultrasound images
+        - Output: Classification + medical Q&A
         """)
 
     with col2:
@@ -448,11 +578,11 @@ with tab2:
         # System info container
         info_container = st.container(border=True)
         with info_container:
-            st.markdown("**Version:** 3.0")
-            st.markdown("**Model:** EfficientNet-B0")
+            st.markdown("**Version:** 3.1")
+            st.markdown("**Classification:** EfficientNet-B0")
+            st.markdown("**VQA:** BLIP-2 OPT-2.7B")
             st.markdown("**Classes:** 12")
-            st.markdown("**Status:** Demo Mode")
-            st.markdown("**Updated:** December 2024")
+            st.markdown("**Updated:** October 2025")
 
         st.markdown("### Performance Metrics")
         col1, col2 = st.columns(2)
@@ -464,6 +594,20 @@ with tab2:
 with tab3:
     st.markdown("## Help & Documentation")
 
+    # Debug section
+    with st.expander("Debug Information", expanded=False):
+        st.markdown("### Model Status")
+        st.write(f"Classification model loaded: {st.session_state.model is not None}")
+        st.write(f"VQA model loaded: {st.session_state.vqa_model is not None}")
+
+        if st.session_state.debug_info:
+            st.markdown("### Recent Classifications")
+            for idx, info in enumerate(st.session_state.debug_info[-5:]):  # Last 5
+                st.write(f"**{idx+1}. {info['image']}**")
+                st.write(f"   - Organ: {info['organ']}")
+                st.write(f"   - Confidence: {info['confidence']:.1%}")
+                st.write(f"   - Model: {'✓' if info['model_available'] else '✗'}")
+
     # Create expandable sections for help
     with st.expander("Getting Started", expanded=True):
         st.markdown("""
@@ -471,7 +615,15 @@ with tab3:
         1. **Upload an Image**: Click the "Upload Image" button in the Analysis tab
         2. **Wait for Processing**: The system will analyze the ultrasound automatically
         3. **Review Results**: Check the detected view, confidence score, and assessment
-        4. **Ask Questions**: Use the chat input to ask about the analysis
+        4. **Ask Questions**: Use the chat input or question buttons (if VQA is enabled)
+
+        ### Using Visual Question Answering (VQA)
+        When you upload a Non-standard NT image:
+        - VQA mode will be automatically enabled
+        - 8 standard medical question buttons will appear on the right
+        - Click any button to get instant answers
+        - Or type your own medical questions in the chat
+        - VQA provides detailed medical analysis beyond classification
         """)
 
     with st.expander("Supported Image Formats"):
@@ -529,7 +681,7 @@ footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
 with footer_col2:
     st.markdown(
         "<p style='text-align: center; color: gray; font-size: 12px;'>"
-        "FADA v3.0 - Educational Demonstration"
+        "FADA v3.1"
         "</p>",
         unsafe_allow_html=True
     )

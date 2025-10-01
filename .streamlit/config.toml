@@ -15,9 +15,6 @@ textColor = "#262730"
 font = "sans serif"
 
 [server]
-# Enable fast reruns
-fastReruns = true
-
 # Max upload size (MB)
 maxUploadSize = 10
 
