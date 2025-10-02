@@ -28,29 +28,29 @@ import json
 # Category configurations with dataset sizes
 CATEGORIES = {
     "Non_standard_NT": {
-        "notebook": "notebooks/train_blip2_1epoch.ipynb",
+        "notebook": "notebooks/blip2_training/train_blip2_1epoch.ipynb",
         "num_images": 487,
-        "output": "notebooks/train_blip2_non_standard_nt_full.ipynb"
+        "output": "notebooks/blip2_training/train_blip2_non_standard_nt_full.ipynb"
     },
     "Abdomen": {
-        "notebook": "notebooks/train_blip2_abdomen.ipynb",
+        "notebook": "notebooks/blip2_training/train_blip2_abdomen.ipynb",
         "num_images": 2424,
-        "output": "notebooks/train_blip2_abdomen_full.ipynb"
+        "output": "notebooks/blip2_training/train_blip2_abdomen_full.ipynb"
     },
     "Femur": {
-        "notebook": "notebooks/train_blip2_femur.ipynb",
+        "notebook": "notebooks/blip2_training/train_blip2_femur.ipynb",
         "num_images": 1165,
-        "output": "notebooks/train_blip2_femur_full.ipynb"
+        "output": "notebooks/blip2_training/train_blip2_femur_full.ipynb"
     },
     "Thorax": {
-        "notebook": "notebooks/train_blip2_thorax.ipynb",
+        "notebook": "notebooks/blip2_training/train_blip2_thorax.ipynb",
         "num_images": 1793,
-        "output": "notebooks/train_blip2_thorax_full.ipynb"
+        "output": "notebooks/blip2_training/train_blip2_thorax_full.ipynb"
     },
     "Standard_NT": {
-        "notebook": "notebooks/train_blip2_standard_nt.ipynb",
+        "notebook": "notebooks/blip2_training/train_blip2_standard_nt.ipynb",
         "num_images": 1508,
-        "output": "notebooks/train_blip2_standard_nt_full.ipynb"
+        "output": "notebooks/blip2_training/train_blip2_standard_nt_full.ipynb"
     },
 }
 
