@@ -64,11 +64,21 @@ class UltrasoundVQA:
         self.processor = Blip2Processor.from_pretrained(self.base_model)
 
         # Load base model with 8-bit quantization
-        base = Blip2ForConditionalGeneration.from_pretrained(
-            self.base_model,
-            load_in_8bit=True,
-            device_map=self.device if self.device == "auto" else {"": self.device}
-        )
+        try:
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+            base = Blip2ForConditionalGeneration.from_pretrained(
+                self.base_model,
+                quantization_config=quantization_config,
+                device_map=self.device if self.device == "auto" else {"": self.device}
+            )
+        except ImportError:
+            # Fallback to old method
+            base = Blip2ForConditionalGeneration.from_pretrained(
+                self.base_model,
+                load_in_8bit=True,
+                device_map=self.device if self.device == "auto" else {"": self.device}
+            )
 
         # Load LoRA adapters if they exist
         if self.model_path.exists():
@@ -113,13 +123,17 @@ class UltrasoundVQA:
             return_tensors="pt"
         ).to(self.device)
 
-        # Generate answer
+        # Generate answer with conservative parameters for fine-tuned model
         with torch.no_grad():
             generated_ids = self.model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
+                min_new_tokens=5,
                 num_beams=3,
-                do_sample=False
+                no_repeat_ngram_size=3,
+                repetition_penalty=1.2,
+                do_sample=False,  # Deterministic generation for medical model
+                early_stopping=True
             )
 
         # Decode answer
@@ -129,7 +143,48 @@ class UltrasoundVQA:
         if answer.startswith(prompt):
             answer = answer[len(prompt):].strip()
 
+        # Post-process to remove repetitive phrases
+        answer = self._clean_repetitions(answer)
+
         return answer
+
+    def _clean_repetitions(self, text: str) -> str:
+        """
+        Clean repetitive patterns from generated text
+
+        Args:
+            text: Generated text that may contain repetitions
+
+        Returns:
+            Cleaned text with repetitions removed
+        """
+        # Split into sentences
+        sentences = text.split('. ')
+
+        # Remove consecutive duplicate phrases
+        cleaned = []
+        for sentence in sentences:
+            # Check if this sentence is already in cleaned (avoid exact duplicates)
+            if sentence not in cleaned:
+                # Check for repetitive patterns within the sentence
+                words = sentence.split()
+                if len(words) > 5:
+                    # Look for repeating sequences of 3+ words
+                    for i in range(3, min(10, len(words)//2)):
+                        pattern = ' '.join(words[:i])
+                        rest = ' '.join(words[i:])
+                        if rest.startswith(pattern):
+                            # Found repetition, keep only first occurrence
+                            sentence = pattern
+                            break
+                cleaned.append(sentence)
+
+        # Rejoin sentences
+        result = '. '.join(cleaned)
+        if not result.endswith('.'):
+            result += '.'
+
+        return result
 
     def answer_all_questions(self,
                             image: Union[Image.Image, str, Path],

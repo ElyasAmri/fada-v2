@@ -27,22 +27,24 @@ import sys
 try:
     from src.models.classifier import FetalUltrasoundClassifier12
     MODEL_AVAILABLE = True
-    sys.stderr.write("✓ Classifier import successful\n")
+    sys.stderr.write("Classifier import successful\n")
     sys.stderr.flush()
 except ImportError as e:
     MODEL_AVAILABLE = False
-    sys.stderr.write(f"✗ Classifier import failed: {e}\n")
+    sys.stderr.write(f"Classifier import failed: {e}\n")
     sys.stderr.flush()
 
 # Try importing VQA separately
 try:
     from src.models.vqa_model import UltrasoundVQA
     VQA_AVAILABLE = True
-    sys.stderr.write("✓ VQA import successful\n")
+    sys.stderr.write("VQA import successful\n")
     sys.stderr.flush()
-except ImportError as e:
+except Exception as e:
     VQA_AVAILABLE = False
-    sys.stderr.write(f"✗ VQA import failed (non-critical): {e}\n")
+    sys.stderr.write(f"VQA import failed (non-critical): {e}\n")
+    import traceback
+    sys.stderr.write(traceback.format_exc())
     sys.stderr.flush()
 
 # Page configuration
@@ -596,9 +598,20 @@ with tab3:
 
     # Debug section
     with st.expander("Debug Information", expanded=False):
+        st.markdown("### Import Status")
+        st.write(f"MODEL_AVAILABLE: {MODEL_AVAILABLE}")
+        st.write(f"VQA_AVAILABLE: {VQA_AVAILABLE}")
+
         st.markdown("### Model Status")
         st.write(f"Classification model loaded: {st.session_state.model is not None}")
-        st.write(f"VQA model loaded: {st.session_state.vqa_model is not None}")
+        st.write(f"VQA model instance: {st.session_state.vqa_model is not None}")
+
+        # Test VQA import directly
+        try:
+            from src.models.vqa_model import UltrasoundVQA as TestVQA
+            st.success("VQA module can be imported directly")
+        except Exception as e:
+            st.error(f"VQA import error: {e}")
 
         if st.session_state.debug_info:
             st.markdown("### Recent Classifications")
