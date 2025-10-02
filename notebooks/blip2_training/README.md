@@ -4,20 +4,19 @@ This directory contains all BLIP-2 Visual Question Answering training notebooks 
 
 ## Contents
 
-### Training Notebooks (Templates)
+### Training Notebooks
 - `train_blip2_1epoch.ipynb` - Original Non_standard_NT training (487 images)
-- `train_blip2_abdomen.ipynb` - Abdomen training template (2424 images)
-- `train_blip2_femur.ipynb` - Femur training template (1165 images)
-- `train_blip2_thorax.ipynb` - Thorax training template (1793 images)
-- `train_blip2_standard_nt.ipynb` - Standard_NT training template (1508 images)
-- `train_blip2_cervix.ipynb` - Cervix template (awaiting labeled data)
-- `train_blip2_trans_cerebellum.ipynb` - Trans-cerebellum template (awaiting labeled data)
-- `train_blip2_trans_thalamic.ipynb` - Trans-thalamic template (awaiting labeled data)
-- `train_blip2_trans_ventricular.ipynb` - Trans-ventricular template (awaiting labeled data)
+- `train_blip2_abdomen.ipynb` - Abdomen training (2424 images)
+- `train_blip2_femur.ipynb` - Femur training (1165 images)
+- `train_blip2_thorax.ipynb` - Thorax training (1793 images)
+- `train_blip2_standard_nt.ipynb` - Standard_NT training (1508 images)
+- `train_blip2_cervix.ipynb` - Cervix (awaiting labeled data)
+- `train_blip2_trans_cerebellum.ipynb` - Trans-cerebellum (awaiting labeled data)
+- `train_blip2_trans_thalamic.ipynb` - Trans-thalamic (awaiting labeled data)
+- `train_blip2_trans_ventricular.ipynb` - Trans-ventricular (awaiting labeled data)
+- `train_blip2_non_standard_nt_full.ipynb` - Full-scale training attempt
 
-### Executed Notebooks (Results)
-- `*_executed.ipynb` - Executed versions with training results
-- `*_full.ipynb` - Full-scale training results (when available)
+**Note**: Notebooks retain execution history from training runs. Use "Clear All Outputs" before running to start fresh.
 
 ## Quick Start
 

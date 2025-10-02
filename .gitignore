@@ -9,6 +9,8 @@ venv/
 
 # Jupyter Notebooks
 .ipynb_checkpoints
+*_executed.ipynb
+*_output.ipynb
 
 # IDE
 .idea/

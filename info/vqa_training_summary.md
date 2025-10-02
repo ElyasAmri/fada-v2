@@ -98,21 +98,18 @@ All trained models successfully:
 ## Files Generated
 
 **Training Notebooks** (in `notebooks/blip2_training/`):
-- `train_blip2_1epoch.ipynb` (original)
-- `train_blip2_abdomen.ipynb`
-- `train_blip2_femur.ipynb`
-- `train_blip2_thorax.ipynb`
-- `train_blip2_standard_nt.ipynb`
-- `train_blip2_trans_cerebellum.ipynb` (not trainable yet)
-- `train_blip2_trans_thalamic.ipynb` (not trainable yet)
-- `train_blip2_trans_ventricular.ipynb` (not trainable yet)
-- `train_blip2_cervix.ipynb` (not trainable yet)
+- `train_blip2_1epoch.ipynb` - Non_standard_NT (original, with execution history)
+- `train_blip2_abdomen.ipynb` - Abdomen (with execution history)
+- `train_blip2_femur.ipynb` - Femur (with execution history)
+- `train_blip2_thorax.ipynb` - Thorax (with execution history)
+- `train_blip2_standard_nt.ipynb` - Standard_NT (with execution history)
+- `train_blip2_trans_cerebellum.ipynb` - Trans-cerebellum (not trainable yet)
+- `train_blip2_trans_thalamic.ipynb` - Trans-thalamic (not trainable yet)
+- `train_blip2_trans_ventricular.ipynb` - Trans-ventricular (not trainable yet)
+- `train_blip2_cervix.ipynb` - Cervix (not trainable yet)
+- `train_blip2_non_standard_nt_full.ipynb` - Full-scale training attempt
 
-**Executed Notebooks** (in `notebooks/blip2_training/`):
-- `train_blip2_abdomen_executed.ipynb`
-- `train_blip2_femur_executed.ipynb`
-- `train_blip2_thorax_executed.ipynb`
-- `train_blip2_standard_nt_executed.ipynb`
+**Note**: Executed notebooks have been consolidated with originals. Each notebook retains its execution history.
 
 **Model Outputs**:
 - `outputs/blip2_1epoch/` (Non_standard_NT)
