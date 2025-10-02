@@ -46,3 +46,18 @@ results/
 # Cache
 .cache/
 .pytest_cache/
+
+# External model repositories (for comparison/testing)
+FetalCLIP/
+FetalCLIP_weights.pt
+fetalclip_quick_test_results.csv
+
+# TinyGPT-V
+TinyGPT-V/
+
+# Test artifacts and temporary files
+extra/
+test_*.py
+*_test_results.json
+*_quick_test_results.json
+vlm_accuracy_*.json
