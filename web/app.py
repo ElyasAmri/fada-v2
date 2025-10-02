@@ -159,6 +159,52 @@ def load_vqa_model():
         print(f"VQA initialization failed: {e}")
         return None
 
+def get_vqa_model_for_category(category):
+    """Get VQA model path for a specific organ category"""
+    # Map 12-class labels to VQA model directories
+    category_mapping = {
+        "Abodomen": "abdomen",
+        "Femur": "femur",
+        "Thorax": "thorax",
+        "Standard_NT": "standard_nt",
+        "Non_standard_NT": "1epoch",  # Original model
+        # Brain categories - fallback to Non_standard_NT for now
+        "Trans-cerebellum": "1epoch",
+        "Trans-thalamic": "1epoch",
+        "Trans-ventricular": "1epoch",
+        # Other categories - fallback to Non_standard_NT
+        "Other_Brain": "1epoch",
+        "Heart_four_chamber": "1epoch",
+        "Kidneys": "1epoch",
+        "Lips": "1epoch",
+    }
+
+    model_key = category_mapping.get(category, "1epoch")
+    model_path = f"outputs/blip2_{model_key}/final_model"
+
+    # Check if model exists
+    if Path(model_path).exists():
+        return model_path
+    else:
+        # Fallback to original model
+        return "outputs/blip2_1epoch/final_model"
+
+def load_category_vqa(category):
+    """Load VQA model for specific category"""
+    if not VQA_AVAILABLE:
+        return None
+
+    try:
+        model_path = get_vqa_model_for_category(category)
+        vqa = UltrasoundVQA(model_path=model_path, device="auto")
+        sys.stderr.write(f"Loading VQA for {category}: {model_path}\n")
+        sys.stderr.flush()
+        return vqa
+    except Exception as e:
+        sys.stderr.write(f"Failed to load VQA for {category}: {e}\n")
+        sys.stderr.flush()
+        return None
+
 def preprocess_image(image):
     """Preprocess image for model input"""
     transform = transforms.Compose([
@@ -444,11 +490,23 @@ with tab1:
                     # Store classification for VQA check
                     st.session_state.last_classification = analysis_results.get("organ", "")
 
-                    # Check if VQA is available for this image type
-                    if st.session_state.vqa_model and "Non-standard NT" in st.session_state.last_classification:
-                        st.session_state.vqa_enabled = True
-                        response += "\n\n---\n\n### Visual Question Answering Available\n"
-                        response += "This image type supports detailed medical Q&A. Click the question buttons below or ask your own questions in the chat."
+                    # Load category-specific VQA model if available
+                    detected_category = st.session_state.last_classification
+                    if VQA_AVAILABLE and detected_category:
+                        try:
+                            # Load VQA model for this specific category
+                            category_vqa = load_category_vqa(detected_category)
+                            if category_vqa:
+                                st.session_state.vqa_model = category_vqa
+                                st.session_state.vqa_enabled = True
+                                response += "\n\n---\n\n### Visual Question Answering Available\n"
+                                response += f"Loaded specialized VQA model for {detected_category}. Click the question buttons below or ask your own questions in the chat."
+                            else:
+                                st.session_state.vqa_enabled = False
+                        except Exception as e:
+                            sys.stderr.write(f"VQA loading error: {e}\n")
+                            sys.stderr.flush()
+                            st.session_state.vqa_enabled = False
                     else:
                         st.session_state.vqa_enabled = False
 
