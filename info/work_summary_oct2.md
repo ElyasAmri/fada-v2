@@ -154,10 +154,9 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 
 ## Files Created/Modified
 
-### New Files (19):
+### New Files (20):
 - `notebooks/blip2_training/` (directory)
-  - `train_blip2_*.ipynb` (8 notebooks)
-  - `*_executed.ipynb` (5 executed notebooks)
+  - `train_blip2_*.ipynb` (10 notebooks with execution history)
   - `README.md` (directory documentation)
 - `test_vqa_category.py`
 - `evaluate_all_vqa.py`
