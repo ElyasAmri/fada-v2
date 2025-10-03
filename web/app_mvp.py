@@ -236,7 +236,7 @@ with col1:
         st.session_state.current_image = image
 
         # Display image
-        st.image(image, caption=uploaded_file.name, use_column_width=True)
+        st.image(image, caption=uploaded_file.name, use_container_width=True)
 
         # Classify image
         if st.session_state.detected_type is None:
