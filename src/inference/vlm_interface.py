@@ -159,6 +159,12 @@ class LocalVLM(VLMInterface):
         if not self._loaded:
             raise RuntimeError(f"Model {self.display_name} is not loaded")
 
+        if self.model is None:
+            raise RuntimeError(f"Model {self.display_name} loaded but model object is None")
+
+        if self.tokenizer is None:
+            raise RuntimeError(f"Model {self.display_name} loaded but tokenizer is None")
+
         # Prepare message based on model type
         if "minicpm" in self.model_id.lower():
             # MiniCPM-V format
@@ -189,6 +195,16 @@ class LocalVLM(VLMInterface):
                     pixel_values=pixel_values,
                     question=question,
                     generation_config=dict(max_new_tokens=512)
+                )
+        elif "moondream" in self.model_id.lower():
+            # Moondream2 format
+            # Convert image for Moondream
+            image_embeds = self.model.encode_image(image)
+            with torch.no_grad():
+                response = self.model.answer_question(
+                    image_embeds=image_embeds,
+                    question=question,
+                    tokenizer=self.tokenizer
                 )
         else:
             raise NotImplementedError(f"Model type {self.model_id} not yet supported")
