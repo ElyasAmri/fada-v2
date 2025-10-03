@@ -88,22 +88,39 @@ class LocalVLM(VLMInterface):
         if self._loaded:
             return
 
+        # Special handling for different model types
+        is_qwen2vl = "qwen2-vl" in self.model_id.lower()
+
         if self.use_4bit:
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-                bnb_4bit_use_double_quant=True
-            )
+            if is_qwen2vl:
+                # Qwen2-VL needs CPU offload for some modules
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    llm_int8_enable_fp32_cpu_offload=True
+                )
+                device_map = "auto"
+            else:
+                # Standard 4-bit config for other models
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True
+                )
+                device_map = "auto"
         else:
             quantization_config = None
+            device_map = "auto"
 
         # Load model
         self.model = AutoModel.from_pretrained(
             self.model_id,
             trust_remote_code=True,
             quantization_config=quantization_config,
-            device_map="auto",
+            device_map=device_map,
             low_cpu_mem_usage=True,
             torch_dtype=torch.bfloat16,
             _attn_implementation="eager"
