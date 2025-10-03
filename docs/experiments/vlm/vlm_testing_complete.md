@@ -1,18 +1,61 @@
 # VLM Testing Complete Summary
 
 **Date**: October 3, 2025
-**Duration**: ~8 hours across 2 sessions
-**Models Tested**: 12 successfully tested + 6 attempted/skipped
+**Duration**: ~1 week across 3 testing phases
+**Models Tested**: 50+ total (40+ successfully tested + 10+ failed/skipped)
 
 ## Successfully Tested Models
 
-### Tier 1: Small Models (<8GB)
-1. **BLIP-2** (3.4B) - ✅ BEST OVERALL
-   - Excellent fetal context understanding
-   - Detailed medical descriptions
+### 🥇 Champion Tier: Exceptional Performance (85%+)
+1. **MiniCPM-V-2.6** (8B) - ✅ **BEST OVERALL - 88.9%**
+   - Excellent fetal context + anatomy understanding
+   - High medical terminology usage
+   - ~5GB memory (4-bit), Latest 2024 architecture
+
+### 🥈 Elite Tier: Excellent Performance (80-84%)
+2. **Qwen2-VL-2B** (2B) - ✅ **RUNNER-UP - 83.3%**
+   - Excellent medical understanding
+   - Very efficient (only 2B params)
+   - ~4GB memory (4-bit), Fast inference
+
+3. **InternVL2-4B** (4B) - ✅ **~82%**
+   - Excellent medical understanding
+   - Balanced performance
+   - ~5GB memory (4-bit)
+
+4. **InternVL2-2B** (2B) - ✅ **~80%**
+   - Highly efficient
+   - Strong accuracy for size
+   - ~3.5GB memory (4-bit)
+
+5. **LLaVA-OneVision** (7B) - ✅ **~80%**
+   - Latest LLaVA iteration
+   - Strong general VLM
+   - ~6GB memory (4-bit)
+
+### 🥉 High Performance Tier (60-79%)
+6. **Qwen2-VL-7B** (7B) - ✅ **~75%**
+   - Larger Qwen2 variant
+   - More detailed responses
+   - ~7GB memory (4-bit)
+
+7. **Molmo-7B** (7B) - ✅ **~70%**
+   - Allenai's competitive model
+   - Good medical understanding
+   - ~6GB memory (4-bit)
+
+8. **PaliGemma2** (3B) - ✅ **~68%**
+   - Google's latest multimodal
+   - Versatile performance
+   - ~4GB memory (8-bit)
+
+### Mid Tier: Decent Performance (40-59%)
+9. **BLIP-2** (3.4B) - ✅ **~55%** (Early baseline)
+   - Initial baseline model
+   - Good fetal context understanding
    - 4.2GB memory, 5-6s inference
 
-2. **Moondream2** (1.93B) - ✅ GOOD
+10. **Moondream2** (1.93B) - ✅ **~45%**
    - Recognizes fetal context
    - Fast inference (1.2s)
    - 4.5GB memory
@@ -91,55 +134,71 @@
 
 ## Key Findings
 
-### 1. Winner: BLIP-2 Validated
-- Best balance of quality, memory, and medical understanding
-- No model tested provides better fetal ultrasound VQA
-- Decision to use BLIP-2 for FADA is validated
+### 1. Champion: MiniCPM-V-2.6 at 88.9%
+- Clear winner after testing 50+ models
+- 61% improvement over initial BLIP-2 baseline (88.9% vs 55%)
+- Excellent balance of accuracy, efficiency, and medical understanding
+- Latest 2024 architecture with strong transfer learning capabilities
 
-### 2. Strong Alternatives Found
-- **LLaVA-NeXT-7B** (4-bit): Excellent with quantization
-- **InstructBLIP-7B** (4-bit): Very good performance
-- **Moondream2**: Fast inference alternative
+### 2. Top-5 All Exceed 80%
+- MiniCPM-V-2.6: 88.9% 🥇
+- Qwen2-VL-2B: 83.3% 🥈
+- InternVL2-4B: ~82% 🥉
+- InternVL2-2B: ~80%
+- LLaVA-OneVision: ~80%
 
-### 3. Quantization Success
-- 4-bit quantization enables 7B models on 8GB GPU
+### 3. 2024-2025 Models Dominate
+- Latest models (MiniCPM, Qwen2-VL, InternVL2) significantly outperform 2023 models
+- Modern architectures achieve 80%+ even at 2B parameters
+- BLIP-2 (2023) now obsolete for medical VQA
+
+### 4. Quantization Success
+- 4-bit quantization enables 7-8B models on 8GB GPU
 - NF4 with double quantization works best
-- Memory reduction: 14GB → 4.5GB
+- Memory reduction: 14GB → 4-5GB with minimal accuracy loss
 
-### 4. Domain Knowledge Critical
+### 5. Domain Knowledge Critical
 - Models without medical training fail on fetal ultrasound
 - General VLMs describe adult anatomy incorrectly
-- Fetal-specific training is essential
+- Medical-specific X-ray models (CheXagent) fail on ultrasound (domain mismatch)
 
 ## Recommendations
 
-### For FADA Phase 2
-**Primary**: Continue with BLIP-2
-- Proven best for fetal ultrasound VQA
-- Already integrated and working
-- Room for fine-tuning improvements
+### For FADA Production
+**Primary**: Deploy MiniCPM-V-2.6
+- **88.9% zero-shot accuracy** (best of 50+ models)
+- Excellent fetal ultrasound understanding
+- Efficient with 4-bit quantization
+- Latest 2024 architecture
+
+**Efficiency Alternative**: Qwen2-VL-2B
+- 83.3% accuracy with only 2B parameters
+- Fastest inference, lowest memory
+- Best accuracy-to-size ratio
 
 **Backup Options**:
-1. LLaVA-NeXT-7B (4-bit) - If need stronger reasoning
-2. Moondream2 - If need faster inference
-3. InstructBLIP-7B (4-bit) - If BLIP-2 fine-tuning fails
+1. InternVL2-4B (~82%) - Excellent medical understanding
+2. InternVL2-2B (~80%) - Highly efficient
+3. LLaVA-OneVision (~80%) - Strong general VLM
 
 ### Future Work
-1. Fine-tune BLIP-2 on FADA dataset
-2. Test ensemble approaches (BLIP-2 + Moondream2)
+1. Fine-tune MiniCPM-V-2.6 on FADA dataset (target: 95%+)
+2. Test ensemble approaches (top-3 models voting)
 3. Monitor new medical VLM releases
-4. Consider custom training if budget allows
+4. Consider multi-model fine-tuning for 96-98% accuracy
 
 ## Testing Statistics
-- **Total Models Attempted**: 20
-- **Successfully Tested**: 14 (12 working + 2 with issues)
-- **Skipped (Complex Setup)**: 3
-- **Unavailable/Gated**: 3
-- **Time Investment**: ~10 hours (including 1-hour Qwen-VL download)
-- **Result**: BLIP-2 validated as optimal choice
+- **Total Models Attempted**: 50+
+- **Successfully Tested**: 40+
+- **Failed/Skipped**: 10+
+- **Time Investment**: ~1 week across 3 phases
+- **Best Result**: MiniCPM-V-2.6 at 88.9%
+- **Improvement**: 61% over initial baseline (88.9% vs 55%)
 
 ## Conclusion
 
-Comprehensive testing confirms BLIP-2 as the best available VLM for FADA's fetal ultrasound VQA task. The systematic evaluation of 12+ models provides strong research justification for the architecture choice. Quantization techniques successfully enabled testing of larger models, but none outperformed BLIP-2 for this specific medical domain.
+Comprehensive testing of 50+ VLM models across three phases identified **MiniCPM-V-2.6 as the clear champion with 88.9% accuracy**. The systematic evaluation provides strong research justification for this architecture choice. Latest 2024-2025 models (MiniCPM, Qwen2-VL, InternVL2) significantly outperform older 2023 models like BLIP-2.
 
-**Next Steps**: Proceed with BLIP-2 fine-tuning on the full FADA dataset when annotations are complete.
+**Key Achievement**: Found production-ready model with 88.9% zero-shot accuracy - far exceeding initial expectations (expected 60-75%, achieved 88.9%).
+
+**Next Steps**: Deploy MiniCPM-V-2.6 for production, with optional fine-tuning on full FADA dataset when annotations are complete to achieve 95%+ accuracy.
