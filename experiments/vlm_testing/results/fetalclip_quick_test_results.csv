@@ -1,0 +1,16 @@
+image,true,predicted,confidence,correct
+Abodomen_001.png,Abodomen,Thorax,0.6062590479850769,False
+Abodomen_002.png,Abodomen,Thorax,0.7027743458747864,False
+Abodomen_003.png,Abodomen,Brain,0.440665602684021,False
+Aorta_001.png,Aorta,Brain,0.5918669104576111,False
+Aorta_002.png,Aorta,Heart,0.5029643177986145,False
+Aorta_003.png,Aorta,Brain,0.4589872658252716,False
+Cervical_001.png,Cervical,Cervix,0.9999257326126099,False
+Cervical_002.png,Cervical,Cervix,0.9994015693664551,False
+Cervical_003.png,Cervical,Cervix,0.9997081160545349,False
+Cervix_001.png,Cervix,Cervix,0.701862633228302,True
+Cervix_002.png,Cervix,Cervix,0.9999532699584961,True
+Cervix_003.png,Cervix,Cervix,0.999618649482727,True
+Femur_001.png,Femur,Femur,0.4162403345108032,True
+Femur_002.png,Femur,Femur,0.9413800239562988,True
+Femur_003.png,Femur,Femur,0.999839186668396,True

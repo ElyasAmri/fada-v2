@@ -1,0 +1,37 @@
+[
+  {
+    "image": "Abodomen_001.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "The anatomical structures visible in this ultrasound image include the uterus, cervix, and fallopian tubes.",
+    "time": 2.8664040565490723
+  },
+  {
+    "image": "Abodomen_002.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "The anatomical structures visible in this ultrasound image include the heart, lungs, and other organs.",
+    "time": 1.691563367843628
+  },
+  {
+    "image": "Abodomen_003.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "The anatomical structures visible in this ultrasound image include the uterus, cervix, and fallopian tubes.",
+    "time": 1.8461675643920898
+  },
+  {
+    "image": "Aorta_001.png",
+    "category": "Aorta",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "The image contains a human heart. The heart is depicted in a cross-sectional view, showing the different chambers and structures within it. The heart is centrally located in the image, with the superior vena cava (SVC) vein and the aorta (the main artery) visible on the left side of the image. The right atrium (RA) and the right ventricle (RV) are also visible on the right side of the image. The superior vena cava and the aorta",
+    "time": 8.02863597869873
+  },
+  {
+    "image": "Aorta_002.png",
+    "category": "Aorta",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "The image contains a human heart. The heart is depicted in a cross-sectional view, showing the different chambers and structures within it. The heart is depicted in a black and white color scheme, which makes it easier to distinguish the various parts of the heart.\n\n### Detailed Description:\n1. **Heart Structure**:\n   - **Atria**: The heart has two atria, which are the upper chambers.\n   - **Ventricles**: The heart has two ventricles, which are",
+    "time": 8.240417718887329
+  }
+]

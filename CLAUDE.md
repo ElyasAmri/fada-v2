@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 FADA (Fetal Anomaly Detection Algorithm) is a research prototype for ultrasound image analysis using deep learning. The goal is to build a conversational chatbot website where users upload ultrasound images and receive analysis. NOT for clinical use.
 
 ### Key Project Files to Review First
-1. `info/project.md` - Original project description
-2. `info/spec.md` - Detailed specifications and requirements
-3. `info/modular_architecture.md` - System architecture (classification → captioning evolution)
-4. `info/APPROACH_VALIDATION.md` - Critical decisions and validation points
+1. `docs/project/project.md` - Original project description
+2. `docs/project/spec.md` - Detailed specifications and requirements
+3. `docs/project/modular_architecture.md` - System architecture (classification → captioning evolution)
+4. `docs/project/APPROACH_VALIDATION.md` - Critical decisions and validation points
 
 ## Key Commands
 
@@ -105,7 +105,7 @@ data/Fetal Ultrasound/
 - Use `source` not `.` for activation in Git Bash
 
 ### Model Selection and Training
-- **Model selection strategy**: See `info/spec.md` Section 4 for complete model architecture zoo and testing order
+- **Model selection strategy**: See `docs/project/spec.md` Section 4 for complete model architecture zoo and testing order
 - **Expected performance**: 85-90% accuracy with full annotations
 - **Training approach**: Heavy augmentation, pretrained models, focal loss for imbalance
 - **Implementation note**: System designed to work seamlessly when Excel annotations are updated - just replace the Excel file and retrain
@@ -127,7 +127,7 @@ mcp__paper-search__search_arxiv(query="ultrasound deep learning", max_results=10
 mcp__paper-search__search_pubmed(query="fetal anomaly detection", max_results=10)
 
 # Download papers
-mcp__paper-search__download_arxiv(paper_id="2506.08623", save_path="./papers")
+mcp__paper-search__download_arxiv(paper_id="2506.08623", save_path="./docs/papers/pdfs")
 ```
 
 ### Documentation Lookup:
@@ -138,11 +138,11 @@ mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", 
 ```
 
 ## Important Files
-- `info/spec.md` - Detailed project specifications
-- `info/APPROACH_VALIDATION.md` - Complete validation checklist
-- `info/modular_architecture.md` - System design details
-- `papers/literature_review.md` - Research findings and papers (15+ papers analyzed)
-- `papers/bibliography.md` - Paper references and findings
+- `docs/project/spec.md` - Detailed project specifications
+- `docs/project/APPROACH_VALIDATION.md` - Complete validation checklist
+- `docs/project/modular_architecture.md` - System design details
+- `docs/papers/literature_review.md` - Research findings and papers (15+ papers analyzed)
+- `docs/papers/bibliography.md` - Paper references and findings
 
 ## Next Steps (When Ready)
 1. ~~Install PyTorch with CUDA support~~ ✓ (Completed)
@@ -163,7 +163,7 @@ mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", 
 - Never claim clinical accuracy
 - Never skip augmentation (critical for small dataset)
 - Never retrain backbone when adding capabilities
-- Never put .md files outside info/ or paper/ (except README)
+- Never put .md files outside docs/ (except README and CLAUDE)
 - Never commit PDFs or image files
 - Never use emojis in code, documentation, or communication (unprofessional)
 - Never create copies of existing files with modifications. Always modify original files to achieve the desired task.
