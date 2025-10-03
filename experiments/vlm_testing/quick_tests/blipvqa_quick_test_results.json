@@ -1,0 +1,37 @@
+[
+  {
+    "image": "Abodomen_001.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "torso",
+    "time": 0.6895005702972412
+  },
+  {
+    "image": "Abodomen_002.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "torso",
+    "time": 0.11439275741577148
+  },
+  {
+    "image": "Abodomen_003.png",
+    "category": "Abodomen",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "stomach",
+    "time": 0.09853696823120117
+  },
+  {
+    "image": "Aorta_001.png",
+    "category": "Aorta",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "teeth",
+    "time": 0.09621930122375488
+  },
+  {
+    "image": "Aorta_002.png",
+    "category": "Aorta",
+    "question": "What anatomical structures can you see in this ultrasound image?",
+    "response": "teeth",
+    "time": 0.09752511978149414
+  }
+]

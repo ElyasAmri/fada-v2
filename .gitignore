@@ -18,18 +18,18 @@ venv/
 .DS_Store
 
 # ML/Data Science
-mlruns/
 *.pth
 *.h5
 *.pkl
-checkpoints/
-logs/
+*.log
 
 # Data
 /data/
 
-# Documents 
+# Documents
 *.pdf
+# Keep documentation PDFs
+!docs/papers/pdfs/*.pdf
 
 # Keep these files
 !README.md
@@ -37,27 +37,16 @@ logs/
 
 # Environment
 .env
-*.log
-
-# Model outputs
-outputs/
-results/
 
 # Cache
 .cache/
 .pytest_cache/
 
-# External model repositories (for comparison/testing)
-FetalCLIP/
-FetalCLIP_weights.pt
-fetalclip_quick_test_results.csv
+# Artifacts - training outputs and models (gitignored, kept locally)
+/artifacts/
 
-# TinyGPT-V
-TinyGPT-V/
-
-# Test artifacts and temporary files
-extra/
-test_*.py
-*_test_results.json
-*_quick_test_results.json
-vlm_accuracy_*.json
+# Experiments - all experimental work (tracked in git)
+# Note: Large files within experiments/ are handled by other rules
+# External model repositories (cloned repos with .git directories)
+experiments/external_models/FetalCLIP/
+experiments/external_models/TinyGPT-V/
