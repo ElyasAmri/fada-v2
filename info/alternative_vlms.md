@@ -152,7 +152,7 @@ These are CLIP-style models (image-text embedding) rather than full VQA models, 
 | **FetalCLIP** | Unknown | Unknown | ✅ Yes | ✅ FETAL | ⚠️ Check | **INVESTIGATE** |
 | **LLAUS** | Unknown | ✅ Yes | ✅ Yes | ✅ US | ⚠️ Check | **INVESTIGATE** |
 | **MedGemma** | 5.0 GB | ❌ No | ✅ Yes | ❌ No | ✅ Accessible | **SKIP** |
-| **Florence-2** | Unknown | ❌ Error | ❌ No | ❌ No | ❌ Broken | **SKIP** |
+| **Florence-2** | 1.55 GB | ✅ Yes | ✅ Yes | ⚠️ Fair | ✅ Working* | **TESTED** |
 | **LLaVA-1.5** | >8 GB | ✅ Yes | ❌ No | ❌ No | ❌ Too large | **SKIP** |
 
 ---
