@@ -101,7 +101,12 @@ class LocalVLM(VLMInterface):
                     bnb_4bit_use_double_quant=True,
                     llm_int8_enable_fp32_cpu_offload=True
                 )
-                device_map = "auto"
+                # Custom device map to allow CPU offload
+                device_map = {
+                    "": "cuda:0",  # Default to GPU
+                    "visual": "cuda:0",
+                    "model": "auto",  # Let it offload LLM parts if needed
+                }
             else:
                 # Standard 4-bit config for other models
                 quantization_config = BitsAndBytesConfig(
@@ -313,7 +318,7 @@ class VLMManager:
 
 
 # Preset configurations for top models
-def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: str = None) -> VLMManager:
+def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: str = None, gpu_8gb: bool = True) -> VLMManager:
     """
     Create VLM manager with top-3 models
 
@@ -321,6 +326,7 @@ def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: st
         use_api: Whether to use API endpoints instead of local inference
         api_endpoint: API endpoint URL (if use_api=True)
         api_key: API key (if use_api=True)
+        gpu_8gb: Whether using 8GB GPU (use smaller models if True)
 
     Returns:
         VLMManager with registered models
@@ -334,32 +340,51 @@ def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: st
             api_key=api_key,
             model_name="MiniCPM-V-2.6"
         ))
-        manager.register_model("qwen2vl", APIVLM(
-            api_endpoint=f"{api_endpoint}/qwen2vl",
+        manager.register_model("internvl2_2b", APIVLM(
+            api_endpoint=f"{api_endpoint}/internvl2_2b",
             api_key=api_key,
-            model_name="Qwen2-VL-2B"
+            model_name="InternVL2-2B"
         ))
-        manager.register_model("internvl2", APIVLM(
-            api_endpoint=f"{api_endpoint}/internvl2",
+        manager.register_model("moondream", APIVLM(
+            api_endpoint=f"{api_endpoint}/moondream",
             api_key=api_key,
-            model_name="InternVL2-4B"
+            model_name="Moondream2"
         ))
     else:
         # Local GPU models
-        manager.register_model("minicpm", LocalVLM(
-            model_id="openbmb/MiniCPM-V-2_6",
-            display_name="MiniCPM-V-2.6",
-            use_4bit=True
-        ))
-        manager.register_model("qwen2vl", LocalVLM(
-            model_id="Qwen/Qwen2-VL-2B-Instruct",
-            display_name="Qwen2-VL-2B",
-            use_4bit=True
-        ))
-        manager.register_model("internvl2", LocalVLM(
-            model_id="OpenGVLab/InternVL2-4B",
-            display_name="InternVL2-4B",
-            use_4bit=True
-        ))
+        if gpu_8gb:
+            # Use models that fit comfortably in 8GB
+            manager.register_model("minicpm", LocalVLM(
+                model_id="openbmb/MiniCPM-V-2_6",
+                display_name="MiniCPM-V-2.6",
+                use_4bit=True
+            ))
+            manager.register_model("internvl2_2b", LocalVLM(
+                model_id="OpenGVLab/InternVL2-2B",
+                display_name="InternVL2-2B",
+                use_4bit=True
+            ))
+            manager.register_model("moondream", LocalVLM(
+                model_id="vikhyatk/moondream2",
+                display_name="Moondream2",
+                use_4bit=False  # Small enough without quantization
+            ))
+        else:
+            # Use larger models if GPU has more memory
+            manager.register_model("minicpm", LocalVLM(
+                model_id="openbmb/MiniCPM-V-2_6",
+                display_name="MiniCPM-V-2.6",
+                use_4bit=True
+            ))
+            manager.register_model("qwen2vl", LocalVLM(
+                model_id="Qwen/Qwen2-VL-2B-Instruct",
+                display_name="Qwen2-VL-2B",
+                use_4bit=True
+            ))
+            manager.register_model("internvl2", LocalVLM(
+                model_id="OpenGVLab/InternVL2-4B",
+                display_name="InternVL2-4B",
+                use_4bit=True
+            ))
 
     return manager
