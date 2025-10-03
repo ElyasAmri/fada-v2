@@ -28,8 +28,6 @@ venv/
 
 # Documents
 *.pdf
-# Keep documentation PDFs
-!docs/papers/pdfs/*.pdf
 
 # Keep these files
 !README.md
