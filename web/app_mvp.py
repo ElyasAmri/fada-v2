@@ -236,7 +236,7 @@ with col1:
         st.session_state.current_image = image
 
         # Display image
-        st.image(image, caption=uploaded_file.name, use_container_width=True)
+        st.image(image, caption=uploaded_file.name, width='stretch')
 
         # Classify image
         if st.session_state.detected_type is None:
@@ -253,7 +253,7 @@ with col1:
         st.session_state.detected_type = selected_type
 
         # Run analysis button
-        if st.button("🚀 Run Multi-Model Analysis", type="primary", use_container_width=True):
+        if st.button("🚀 Run Multi-Model Analysis", type="primary", width='stretch'):
             with st.spinner("Running analysis on 3 models..."):
                 # Load questions
                 question_loader = get_question_loader()
@@ -326,7 +326,7 @@ with col2:
             st.markdown("---")
 
         # Submit button
-        if st.button("📊 Submit Selections", type="primary", use_container_width=True):
+        if st.button("📊 Submit Selections", type="primary", width='stretch'):
             # Save selections
             filename = save_user_selections(
                 image_name=uploaded_file.name if uploaded_file else "unknown",
@@ -348,7 +348,7 @@ with col2:
                 {"Model": "Moondream2 (45%)", "Selected": selection_counts.get("moondream", 0)},
             ])
 
-            st.dataframe(summary_df, use_container_width=True)
+            st.dataframe(summary_df, width='stretch')
 
             # Reset button
             if st.button("🔄 Analyze Another Image"):
