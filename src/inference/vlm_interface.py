@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 from PIL import Image
 import torch
-from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+import torchvision.transforms as T
+from torchvision.transforms.functional import InterpolationMode
 
 
 class VLMInterface(ABC):
@@ -90,6 +92,7 @@ class LocalVLM(VLMInterface):
 
         # Special handling for different model types
         is_qwen2vl = "qwen2-vl" in self.model_id.lower()
+        is_moondream = "moondream" in self.model_id.lower()
 
         if self.use_4bit:
             if is_qwen2vl:
@@ -120,16 +123,25 @@ class LocalVLM(VLMInterface):
             quantization_config = None
             device_map = "auto"
 
-        # Load model
-        self.model = AutoModel.from_pretrained(
-            self.model_id,
-            trust_remote_code=True,
-            quantization_config=quantization_config,
-            device_map=device_map,
-            low_cpu_mem_usage=True,
-            torch_dtype=torch.bfloat16,
-            _attn_implementation="eager"
-        )
+        # Load model - Moondream uses AutoModelForCausalLM
+        if is_moondream:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                trust_remote_code=True,
+                quantization_config=quantization_config if self.use_4bit else None,
+                device_map=device_map if self.use_4bit else "cuda",
+                torch_dtype=torch.float16 if not self.use_4bit else None
+            )
+        else:
+            self.model = AutoModel.from_pretrained(
+                self.model_id,
+                trust_remote_code=True,
+                quantization_config=quantization_config,
+                device_map=device_map,
+                low_cpu_mem_usage=True,
+                torch_dtype=torch.bfloat16,
+                _attn_implementation="eager"
+            )
 
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -187,8 +199,23 @@ class LocalVLM(VLMInterface):
                     tokenizer=self.tokenizer
                 )
         elif "internvl" in self.model_id.lower():
-            # InternVL format
-            pixel_values = self.model.load_image(image).to(self.model.device)
+            # InternVL2 format - requires specific preprocessing
+            # Build transform to resize image to 448x448
+            IMAGENET_MEAN = (0.485, 0.456, 0.406)
+            IMAGENET_STD = (0.229, 0.224, 0.225)
+
+            def build_transform(input_size):
+                transform = T.Compose([
+                    T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
+                    T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
+                    T.ToTensor(),
+                    T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+                ])
+                return transform
+
+            transform = build_transform(input_size=448)
+            pixel_values = transform(image).unsqueeze(0).to(self.model.device).to(torch.bfloat16)
+
             with torch.no_grad():
                 response = self.model.chat(
                     tokenizer=self.tokenizer,
