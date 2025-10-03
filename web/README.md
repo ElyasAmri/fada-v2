@@ -1,181 +1,205 @@
-# Fetal Ultrasound Analysis Chatbot - Web Interface
+# FADA Web Application
+
+Multi-Model VLM Comparison Interface for Fetal Ultrasound Analysis
 
 ## Overview
-This is a Streamlit-based web interface for the Fetal Ultrasound Analysis Chatbot. It provides an interactive platform for analyzing ultrasound images and receiving AI-generated explanations.
 
-## Features
-- **Single Image Analysis**: Upload and analyze individual ultrasound images
-- **Batch Processing**: Analyze multiple images at once
-- **Interactive Chat**: Ask follow-up questions about the analysis
-- **OpenAI Integration**: Enhanced natural language responses using GPT
-- **Confidence Visualization**: Clear indication of prediction confidence
-- **Educational Information**: Detailed explanations of each anatomical view
+This web application demonstrates the FADA multi-model VQA workflow:
+1. User (sonographer) uploads ultrasound image
+2. System detects organ type automatically
+3. Top-3 VLM models answer 8 standard questions
+4. Sonographer selects best answer for each question
+5. Selections saved for analysis and model improvement
 
-## Setup
+## Applications
 
-### 1. Install Dependencies
+### `app_mvp.py` - Multi-Model Comparison (MVP) ⭐
+**Use this for demo and funding proposal**
+
+Features:
+- Upload ultrasound images
+- Automatic organ type detection
+- Run 3 top VLM models in parallel: MiniCPM-V-2.6 (88.9%), Qwen2-VL-2B (83.3%), InternVL2-4B (82%)
+- Side-by-side answer comparison
+- User selection interface (radio buttons per question)
+- Save selections as JSON for analysis
+- **Modular design**: Can swap local GPU inference with API endpoints
+
+Run:
 ```bash
-pip install -r requirements.txt
+streamlit run web/app_mvp.py --server.port 8501
 ```
 
-### 2. Configure OpenAI API (Optional but Recommended)
-Create a `.env.local` file in the project root:
+### `app.py` - Legacy Single-Model Interface
+**Old version using BLIP-2** - kept for reference
+
+Run:
 ```bash
-cp .env.local.template .env.local
+streamlit run web/app.py --server.port 8501
 ```
 
-Edit `.env.local` and add your OpenAI API key and model preference:
-```
-OPENAI_API_KEY=your_actual_api_key_here
-MODEL_NAME=gpt-4o-mini  # Options: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4
-TEMPERATURE=0.6          # Lower for medical consistency
-MAX_TOKENS=800          # Longer for detailed explanations
-```
+## Architecture
 
-#### Available GPT Models (2024)
-- **gpt-4o** - Most capable multimodal model (highest accuracy)
-- **gpt-4o-mini** - Balanced performance and cost (recommended)
-- **gpt-4-turbo** - Previous generation, still very capable
-- **gpt-4** - Original GPT-4, consistent but slower
-- **gpt-3.5-turbo** - Budget option, fast but less accurate
+### Modular Design for API Migration
 
-### 3. Ensure Model is Trained
-The web interface requires a trained model at:
+The MVP uses a modular architecture that allows easy migration from local GPU to cloud API:
+
 ```
-models/best_model_efficientnet_b0_12class.pth
+VLMInterface (Abstract)
+├── LocalVLM (GPU inference)
+│   └── HuggingFace models with 4-bit quantization
+└── APIVLM (Cloud inference) [Future]
+    └── POST requests to inference endpoint
 ```
 
-If not present, train the model using:
-```bash
-python src/scripts/train_12class.py
+**Current**: Local GPU inference on RTX 4070 (8GB)
+**Future**: Swap to cloud API with dedicated GPU (easy one-line change)
+
+### Question Management
+
+Questions are loaded dynamically from Excel annotation files:
+- Located in `data/Fetal Ultrasound/*_image_list.xlsx`
+- Automatically extracted from column headers
+- Update Excel → Questions update automatically
+- No code changes needed
+
+## Key Features
+
+### 1. Expert-in-the-Loop
+- Sonographer validates all AI outputs
+- No single model failure point
+- Real-world preference data collection
+
+### 2. Model Comparison
+- Top-3 models run on same image
+- Side-by-side answer display
+- Selection tracking per question
+
+### 3. Data Collection
+- User selections saved as JSON
+- Track model performance by question type
+- Build ensemble/meta-model from preferences
+
+### 4. Future-Proof Design
+- Easy swap to API endpoints
+- Configurable model list
+- Extensible to more models (Top-5, Top-10)
+
+## Configuration
+
+### Local GPU Mode (Default)
+```python
+# In sidebar
+☐ Use API Endpoints
 ```
 
-## Running the Application
+Models run sequentially:
+- Load model → Answer questions → Unload → Next model
+- Total time: 30-60 seconds for 3 models
+- Memory: ~5GB max per model (4-bit quantization)
 
-### Start the Streamlit App
-```bash
-streamlit run web/app.py
+### Cloud API Mode (Future)
+```python
+# In sidebar
+☑ Use API Endpoints
+API Endpoint: http://your-api.com
+API Key: ***********
 ```
 
-The app will open in your browser at `http://localhost:8501`
+Models run via API:
+- Parallel requests possible
+- No local GPU memory needed
+- Faster response (~5-10 seconds total)
 
-### Alternative Ports
-To use a different port:
-```bash
-streamlit run web/app.py --server.port 8080
+## Output Data
+
+User selections saved to: `outputs/user_selections/selection_YYYYMMDD_HHMMSS.json`
+
+Format:
+```json
+{
+  "timestamp": "20251003_143025",
+  "image_name": "Brain_042.png",
+  "detected_type": "Brain",
+  "selections": {
+    "0": "minicpm",      // Q1: Anatomical Structures
+    "1": "qwen2vl",      // Q2: Fetal Orientation
+    "2": "minicpm",      // Q3: Plane Evaluation
+    "3": "internvl2",    // Q4: Biometric Measurements
+    "4": "minicpm",      // Q5: Gestational Age
+    "5": "qwen2vl",      // Q6: Image Quality
+    "6": "minicpm",      // Q7: Normality/Abnormality
+    "7": "minicpm"       // Q8: Clinical Recommendations
+  }
+}
 ```
 
-## Usage Guide
+Analysis:
+- Track which model performs best per question type
+- Identify model strengths/weaknesses
+- Build model ensemble based on preferences
+- Train meta-model to predict best answer
 
-### Main Chat Interface
-1. Upload an ultrasound image (PNG/JPG)
-2. Optionally add a specific question
-3. Click "Analyze Image"
-4. View classification results and AI response
-5. Ask follow-up questions if needed
+## Dependencies
 
-### Batch Analysis
-1. Go to "Batch Analysis" tab
-2. Upload multiple images
-3. Click "Analyze All"
-4. View summary statistics and individual results
+Installed via `requirements.txt`:
+- streamlit
+- transformers
+- torch
+- bitsandbytes (4-bit quantization)
+- pandas
+- openpyxl (Excel reading)
+- pillow
 
-### Settings (Sidebar)
-- **Confidence Threshold**: Adjust minimum confidence for definitive statements
-- **OpenAI Integration**: Toggle GPT-enhanced responses
-- **Clear Conversation**: Reset the chat history
+## Performance
 
-## Response Types
+### Local GPU (RTX 4070 8GB)
+- **Sequential Loading**: ~30-60 seconds for 3 models
+- **Memory**: ~5GB per model (4-bit quantization)
+- **Quality**: No degradation from quantization
 
-### Template-Based (Default)
-- Works without OpenAI API
-- Structured, consistent responses
-- Clinical information for all 12 views
+### Cloud API (Future)
+- **Parallel Requests**: ~5-10 seconds for 3 models
+- **Memory**: None (server-side)
+- **Cost**: Pay-per-request pricing
 
-### OpenAI-Enhanced (When API Key Configured)
-- More natural, conversational responses
-- Better handling of follow-up questions
-- Context-aware explanations
+## Migration to Cloud API
 
-## Supported Anatomical Views (12 Classes)
-1. **Brain Views**: Trans-thalamic, Trans-ventricular, Trans-cerebellum
-2. **Cardiac**: Aorta, Thorax
-3. **Growth**: Abdomen, Femur
-4. **Maternal**: Cervix, Cervical
-5. **Screening**: Standard_NT, Non_standard_NT
-6. **Labor**: Public_Symphysis_fetal_head
+To switch from local to cloud API:
 
-## Confidence Levels
-- **High (>70%)**: Definitive analysis with detailed information
-- **Medium (50-70%)**: Qualified statements with some uncertainty
-- **Low (<50%)**: Uncertain, professional verification recommended
+1. Deploy inference endpoint (e.g., AWS SageMaker, Azure ML, GCP Vertex AI)
+2. In app, enable "Use API Endpoints" in sidebar
+3. Enter API endpoint URL and key
+4. Done! ✅
 
-## Important Notes
+No code changes needed - the `VLMInterface` abstraction handles it.
 
-### Medical Disclaimer
-This is a **research prototype** for educational purposes only:
-- NOT approved for clinical use
-- NOT FDA-approved
-- Always consult healthcare professionals
-- Do not use for medical diagnosis
+## Next Steps
 
-### Performance
-- Model accuracy: ~90% on test set
-- Processing time: 1-3 seconds per image
-- GPU recommended for faster inference
+### For Funding Proposal
+- [x] MVP web app (this app)
+- [ ] Run demo with sample images
+- [ ] Collect screenshots/video
+- [ ] Document workflow
+- [ ] Submit funding request for:
+  - Dedicated training machine (large GPU)
+  - Cloud inference endpoint
 
-### Privacy
-- Images are processed locally
-- OpenAI API calls (if enabled) send only text descriptions
-- No image data is stored permanently
+### After Funding
+- [ ] Deploy cloud API endpoint
+- [ ] Fine-tune models on FADA dataset (target: 95%+)
+- [ ] Add more models (Top-5)
+- [ ] Implement ensemble based on user selections
+- [ ] Add confidence scores
+- [ ] Production deployment
 
-## Troubleshooting
+## Notes
 
-### Model Not Found
-```
-Error: Model not found at models/best_model_efficientnet_b0_12class.pth
-```
-Solution: Train the model first using the training script
+- **Research Prototype**: Not for clinical use
+- **Expert Validation Required**: All AI outputs reviewed by sonographer
+- **Data Privacy**: Images processed locally (unless using API mode)
+- **Model Updates**: Questions update automatically from Excel files
 
-### OpenAI API Errors
-```
-OpenAI API not available
-```
-Solution: Check your API key in `.env.local`
+---
 
-### CUDA/GPU Issues
-The app will automatically fall back to CPU if GPU is not available.
-
-### Memory Issues
-For batch processing of many images:
-- Process in smaller batches
-- Reduce image size if needed
-- Close other applications
-
-## Development
-
-### Project Structure
-```
-web/
-├── app.py              # Main Streamlit application
-├── README.md           # This file
-└── assets/            # Static assets (if needed)
-
-src/chatbot/
-├── chatbot.py         # Core chatbot logic
-├── response_generator.py  # Template responses
-└── openai_integration.py  # GPT integration
-```
-
-### Adding New Features
-1. Modify `app.py` for UI changes
-2. Update `chatbot.py` for analysis logic
-3. Edit response templates in `response_generator.py`
-
-## Future Enhancements
-- [ ] Add abnormality detection
-- [ ] Implement measurement tools
-- [ ] Add report generation
-- [ ] Support DICOM format
-- [ ] Multi-language support
-- [ ] Export analysis results
+*For questions or issues, see project documentation in `docs/`*
