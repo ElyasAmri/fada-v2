@@ -215,8 +215,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Models (8GB GPU)")
     st.markdown("- MiniCPM-V-2.6 (88.9%)")
-    st.markdown("- InternVL2-2B (80%)")
     st.markdown("- Moondream2 (45%)")
+    st.markdown("- *Note: InternVL2-2B disabled (compatibility issue)*")
 
 # Main interface
 col1, col2 = st.columns([1, 2])
@@ -260,10 +260,11 @@ with col1:
                 questions = question_loader.get_questions()
 
                 # Run models (8GB GPU compatible)
+                # Note: InternVL2-2B temporarily disabled due to generation compatibility issues
                 responses = run_vlm_analysis(
                     image,
                     questions,
-                    models=["minicpm", "internvl2_2b", "moondream"]
+                    models=["minicpm", "moondream"]  # Using 2 models for MVP
                 )
 
                 st.session_state.model_responses = responses
@@ -296,10 +297,10 @@ with col2:
             st.markdown(f"*{question}*")
 
             # Create columns for each model
-            cols = st.columns(3)
+            cols = st.columns(2)  # Changed from 3 to 2 models
 
-            model_keys = ["minicpm", "internvl2_2b", "moondream"]
-            model_names = ["MiniCPM-V-2.6", "InternVL2-2B", "Moondream2"]
+            model_keys = ["minicpm", "moondream"]
+            model_names = ["MiniCPM-V-2.6 (88.9%)", "Moondream2 (45%)"]
 
             for col, model_key, model_name in zip(cols, model_keys, model_names):
                 with col:
@@ -314,7 +315,7 @@ with col2:
             selection = st.radio(
                 f"Select best answer for {short_name}",
                 options=model_keys,
-                format_func=lambda x: {"minicpm": "MiniCPM-V-2.6", "internvl2_2b": "InternVL2-2B", "moondream": "Moondream2"}[x],
+                format_func=lambda x: {"minicpm": "MiniCPM-V-2.6", "moondream": "Moondream2"}[x],
                 key=f"q{q_idx}_selection",
                 horizontal=True,
                 index=model_keys.index(st.session_state.user_selections[q_idx]) if st.session_state.user_selections[q_idx] in model_keys else 0
@@ -338,14 +339,13 @@ with col2:
             # Show summary
             st.markdown("### Selection Summary")
             selection_counts = {}
-            for model_key in ["minicpm", "internvl2_2b", "moondream"]:
+            for model_key in ["minicpm", "moondream"]:
                 count = sum(1 for v in st.session_state.user_selections.values() if v == model_key)
                 selection_counts[model_key] = count
 
             summary_df = pd.DataFrame([
-                {"Model": "MiniCPM-V-2.6", "Selected": selection_counts.get("minicpm", 0)},
-                {"Model": "InternVL2-2B", "Selected": selection_counts.get("internvl2_2b", 0)},
-                {"Model": "Moondream2", "Selected": selection_counts.get("moondream", 0)},
+                {"Model": "MiniCPM-V-2.6 (88.9%)", "Selected": selection_counts.get("minicpm", 0)},
+                {"Model": "Moondream2 (45%)", "Selected": selection_counts.get("moondream", 0)},
             ])
 
             st.dataframe(summary_df, use_container_width=True)
@@ -365,6 +365,6 @@ st.markdown("""
 <div style='text-align: center; color: #666; font-size: 0.9em;'>
 <p><strong>FADA - Fetal Anomaly Detection Algorithm</strong></p>
 <p>Research Prototype • Not for Clinical Use • Multi-Model VQA Comparison MVP</p>
-<p>Models: MiniCPM-V-2.6 (88.9%) • InternVL2-2B (80%) • Moondream2 (45%)</p>
+<p>Models: MiniCPM-V-2.6 (88.9%) • Moondream2 (45%)</p>
 </div>
 """, unsafe_allow_html=True)
