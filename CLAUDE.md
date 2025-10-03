@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 ### Model Training
 ```bash
-# Train classification model (Phase 1)
+# Train classification model
 ./venv/Scripts/python.exe src/training/train_classification.py
 
 # Run experiments with specific fold
@@ -47,18 +47,6 @@ streamlit run web/app.py --server.port 8501
 
 ## Project Architecture
 
-### Two-Phase Strategy
-1. **Phase 1 (Current)**: Classification-based chatbot
-   - Classify organ type (5 classes: Brain, Heart, Abdomen, Femur, Thorax)
-   - Detect abnormalities (binary)
-   - Extract attributes (quality, orientation)
-   - Generate responses via templates/LLM
-
-2. **Phase 2 (Future)**: True image captioning
-   - Add transformer decoder head
-   - Generate descriptions directly from images
-   - Requires more annotated data (1000+ captions)
-
 ### Modular Design
 ```
 UltrasoundAnalyzer
@@ -68,7 +56,7 @@ UltrasoundAnalyzer
     ├── ClassificationHead (organ detection)
     ├── AbnormalityHead (normal/abnormal)
     ├── AttributeHead (quality, orientation)
-    └── CaptionHead (future - Phase 2)
+    └── CaptionHead (future)
 ```
 
 The backbone is trained once and shared across all tasks. New heads can be added without retraining the backbone, enabling progressive enhancement.
@@ -143,14 +131,6 @@ mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", 
 - `docs/project/modular_architecture.md` - System design details
 - `docs/papers/literature_review.md` - Research findings and papers (15+ papers analyzed)
 - `docs/papers/bibliography.md` - Paper references and findings
-
-## Next Steps (When Ready)
-1. ~~Install PyTorch with CUDA support~~ ✓ (Completed)
-2. Build data loader for Excel annotations
-3. Train baseline models with MLflow tracking
-4. Compare performances, select best
-5. Integrate OpenAI API for responses
-6. Build Streamlit demo interface
 
 ## Critical Instructions
 - Always be critical of the task you are told to do. Never assume the user always right. This is a large project with many constraints
