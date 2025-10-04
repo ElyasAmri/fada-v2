@@ -200,23 +200,40 @@ st.markdown("""
 with st.sidebar:
     st.header("Settings")
 
-    st.session_state.use_api = st.checkbox(
-        "Use API Endpoints",
-        value=st.session_state.use_api,
-        help="Use cloud API instead of local GPU (requires endpoint configuration)"
+    # API configuration (hidden from UI but kept in code for easy toggling)
+    # To use API: set st.session_state.use_api = True in init_session_state()
+    # st.session_state.use_api is already initialized to False
+
+    st.markdown("### Available Models")
+
+    # Get all available models from VLM manager
+    available_models = {
+        "minicpm": "MiniCPM-V-2.6",
+        "moondream": "Moondream2",
+        "internvl2_2b": "InternVL2-2B",
+    }
+
+    # Model selection (up to 3 models)
+    st.markdown("Select up to 3 models for comparison:")
+
+    if 'selected_models' not in st.session_state:
+        st.session_state.selected_models = ["minicpm", "moondream"]
+
+    selected_models = st.multiselect(
+        "Models",
+        options=list(available_models.keys()),
+        default=st.session_state.selected_models,
+        format_func=lambda x: available_models[x],
+        max_selections=3,
+        help="Choose 1-3 models to compare"
     )
 
-    if st.session_state.use_api:
-        api_endpoint = st.text_input("API Endpoint", value="http://localhost:8000")
-        api_key = st.text_input("API Key", type="password")
-    else:
-        st.info("Using local GPU inference")
+    st.session_state.selected_models = selected_models if selected_models else ["minicpm"]
 
-    st.markdown("---")
-    st.markdown("### Models (8GB GPU)")
-    st.markdown("- MiniCPM-V-2.6 (88.9%)")
-    st.markdown("- Moondream2 (45%)")
-    st.markdown("- *Note: InternVL2-2B disabled (compatibility issue)*")
+    if len(st.session_state.selected_models) == 0:
+        st.warning("Please select at least one model")
+
+    st.info(f"Using local GPU inference")
 
 # Main interface
 col1, col2 = st.columns([1, 2])
@@ -259,12 +276,11 @@ with col1:
                 question_loader = get_question_loader()
                 questions = question_loader.get_questions()
 
-                # Run models (8GB GPU compatible)
-                # Note: InternVL2-2B temporarily disabled due to generation compatibility issues
+                # Run selected models
                 responses = run_vlm_analysis(
                     image,
                     questions,
-                    models=["minicpm", "moondream"]  # Using 2 models for MVP
+                    models=st.session_state.selected_models
                 )
 
                 st.session_state.model_responses = responses
@@ -296,16 +312,22 @@ with col2:
             st.markdown(f"### {short_name}")
             st.markdown(f"*{question}*")
 
-            # Create columns for each model
-            cols = st.columns(2)  # Changed from 3 to 2 models
+            # Create columns dynamically based on number of selected models
+            num_models = len(st.session_state.selected_models)
+            cols = st.columns(num_models)
 
-            model_keys = ["minicpm", "moondream"]
-            model_names = ["MiniCPM-V-2.6 (88.9%)", "Moondream2 (45%)"]
+            # Get model display names
+            available_models = {
+                "minicpm": "MiniCPM-V-2.6",
+                "moondream": "Moondream2",
+                "internvl2_2b": "InternVL2-2B",
+            }
 
-            for col, model_key, model_name in zip(cols, model_keys, model_names):
+            for col, model_key in zip(cols, st.session_state.selected_models):
                 with col:
                     # Get answer
                     answer = st.session_state.model_responses.get(model_key, ["N/A"] * len(questions))[q_idx]
+                    model_name = available_models.get(model_key, model_key)
 
                     # Display model card
                     st.markdown(f"**{model_name}**")
@@ -314,11 +336,11 @@ with col2:
             # Selection radio buttons
             selection = st.radio(
                 f"Select best answer for {short_name}",
-                options=model_keys,
-                format_func=lambda x: {"minicpm": "MiniCPM-V-2.6", "moondream": "Moondream2"}[x],
+                options=st.session_state.selected_models,
+                format_func=lambda x: available_models.get(x, x),
                 key=f"q{q_idx}_selection",
                 horizontal=True,
-                index=model_keys.index(st.session_state.user_selections[q_idx]) if st.session_state.user_selections[q_idx] in model_keys else 0
+                index=st.session_state.selected_models.index(st.session_state.user_selections[q_idx]) if st.session_state.user_selections[q_idx] in st.session_state.selected_models else 0
             )
 
             st.session_state.user_selections[q_idx] = selection
@@ -339,14 +361,21 @@ with col2:
             # Show summary
             st.markdown("### Selection Summary")
             selection_counts = {}
-            for model_key in ["minicpm", "moondream"]:
+            available_models = {
+                "minicpm": "MiniCPM-V-2.6",
+                "moondream": "Moondream2",
+                "internvl2_2b": "InternVL2-2B",
+            }
+
+            for model_key in st.session_state.selected_models:
                 count = sum(1 for v in st.session_state.user_selections.values() if v == model_key)
                 selection_counts[model_key] = count
 
-            summary_df = pd.DataFrame([
-                {"Model": "MiniCPM-V-2.6 (88.9%)", "Selected": selection_counts.get("minicpm", 0)},
-                {"Model": "Moondream2 (45%)", "Selected": selection_counts.get("moondream", 0)},
-            ])
+            summary_data = [
+                {"Model": available_models.get(model_key, model_key), "Selected": selection_counts.get(model_key, 0)}
+                for model_key in st.session_state.selected_models
+            ]
+            summary_df = pd.DataFrame(summary_data)
 
             st.dataframe(summary_df, width='stretch')
 
@@ -365,6 +394,5 @@ st.markdown("""
 <div style='text-align: center; color: #666; font-size: 0.9em;'>
 <p><strong>FADA - Fetal Anomaly Detection Algorithm</strong></p>
 <p>Research Prototype • Not for Clinical Use • Multi-Model VQA Comparison MVP</p>
-<p>Models: MiniCPM-V-2.6 (88.9%) • Moondream2 (45%)</p>
 </div>
 """, unsafe_allow_html=True)
