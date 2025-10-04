@@ -48,3 +48,4 @@ venv/
 # External model repositories (cloned repos with .git directories)
 experiments/external_models/FetalCLIP/
 experiments/external_models/TinyGPT-V/
+*.ttf
