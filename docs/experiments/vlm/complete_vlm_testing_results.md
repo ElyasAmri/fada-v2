@@ -17,7 +17,7 @@ After comprehensive testing of 50+ vision-language models across three testing p
 - **10+ models failed** due to architecture incompatibilities, platform limitations, or hardware constraints
 - **Several models significantly outperformed initial baseline (BLIP-2 at ~55%)**
 - Latest 2024-2025 models (MiniCPM-V-2.6, Qwen2-VL-2B, InternVL2, LLaVA-OneVision) achieved 80%+ accuracy
-- Medical-specific models (CheXagent, MedGemma) failed or scored 0%
+- Medical-specific models: MedGemma ✅ works (requires special chat format), CheXagent scored 0%
 
 ---
 
@@ -38,38 +38,38 @@ After comprehensive testing of 50+ vision-language models across three testing p
 | 6 | Qwen2-VL-7B | 7B | ~7GB (4-bit) | ✅ Works | Very Good | Very Good | Good | **~75%** | Larger Qwen2 variant |
 | 7 | Molmo-7B | 7B | ~6GB (4-bit) | ✅ Works | Very Good | Good | Good | **~70%** | Allenai's model |
 | 8 | PaliGemma2 | 3B | ~4GB (8-bit) | ✅ Works | Good | Good | Good | **~68%** | Google's latest |
-| 9 | Kimi-VL | ~7B | ~6GB (4-bit) | ✅ Works | Good | Good | Moderate | **~65%** | Strong general VLM |
+| 9 | **MedGemma-4B** | 4B | ~3.2GB (4-bit) | ✅ Works | Very Good | Very Good | **Excellent** | **~65%** ⚕️ | Medical-domain VLM, requires chat template |
+| 10 | Kimi-VL | ~7B | ~6GB (4-bit) | ✅ Works | Good | Good | Moderate | **~65%** | Strong general VLM |
 
 ### Mid Tier: Decent Performance (40-59%)
 | # | Model | Params | Memory | Status | Fetal Context | Anatomy Accuracy | Medical Terms | Overall | Notes |
 |---|-------|--------|--------|--------|---------------|------------------|---------------|---------|-------|
-| 10 | **BLIP-2** (early baseline) | 2.7B | 6GB | ✅ Works | ~60% | ~50% | Moderate | **~55%** | Initial baseline |
-| 11 | LLaVA-NeXT-7B (4-bit) | 7B | ~5GB | ✅ Works | High | Good | Good | ~50% | Excellent but surpassed |
-| 12 | InstructBLIP-7B (4-bit) | 7B | ~5GB | ✅ Works | High | Good | Good | ~48% | Very good quality |
-| 13 | Moondream2 | ~1.6B | ~4GB | ✅ Works | Good | Moderate | Low | ~45% | Fast, lightweight |
-| 14 | Kosmos-2 | 1.66B | 3.34GB | ✅ Works | **100%** | 33% | Low | **~44%** | Perfect fetal context |
-| 15 | PaliGemma-3B (8-bit) | 3B | 11GB | ✅ Works | Good | Moderate | Moderate | ~42% | Google's model |
-| 16 | IDEFICS2-8B (4-bit) | 4.34B | 5.04GB | ✅ Works | 87.5% | 25% | Low | **37.5%** | Good context, poor details |
-| 17 | Florence-2-base | 232M | 890MB | ✅ Works | Moderate | Moderate | Low | ~35% | Requires special setup |
-| 18 | BLIP-VQA-base | 1.5B | 3GB | ✅ Works | Moderate | Low | Low | ~30% | Too brief responses |
+| 11 | **BLIP-2** (early baseline) | 2.7B | 6GB | ✅ Works | ~60% | ~50% | Moderate | **~55%** | Initial baseline |
+| 12 | LLaVA-NeXT-7B (4-bit) | 7B | ~5GB | ✅ Works | High | Good | Good | ~50% | Excellent but surpassed |
+| 13 | InstructBLIP-7B (4-bit) | 7B | ~5GB | ✅ Works | High | Good | Good | ~48% | Very good quality |
+| 14 | Moondream2 | ~1.6B | ~4GB | ✅ Works | Good | Moderate | Low | ~45% | Fast, lightweight |
+| 15 | Kosmos-2 | 1.66B | 3.34GB | ✅ Works | **100%** | 33% | Low | **~44%** | Perfect fetal context |
+| 16 | PaliGemma-3B (8-bit) | 3B | 11GB | ✅ Works | Good | Moderate | Moderate | ~42% | Google's model |
+| 17 | IDEFICS2-8B (4-bit) | 4.34B | 5.04GB | ✅ Works | 87.5% | 25% | Low | **37.5%** | Good context, poor details |
+| 18 | Florence-2-base | 232M | 890MB | ✅ Works | Moderate | Moderate | Low | ~35% | Requires special setup |
+| 19 | BLIP-VQA-base | 1.5B | 3GB | ✅ Works | Moderate | Low | Low | ~30% | Too brief responses |
 
 ### Low Tier: Poor Performance (<40%)
 | # | Model | Params | Memory | Status | Overall | Notes |
 |---|-------|--------|--------|--------|---------|-------|
-| 19 | SmolVLM-500M | 500M | 2GB | ✅ Works | ~20% | No fetal context |
-| 20 | SmolVLM-256M | 256M | 1GB | ✅ Works | ~15% | World's smallest VLM |
-| 21 | VILT-b32 | 899M | 1.8GB | ✅ Works | 0% | Nonsensical outputs |
-| 22 | Aquila-VL | ~7B | ~6GB | ⚠️ Issues | N/A | Compatibility issues |
-| 23 | MulMoE | ~7B | ~6GB | ⚠️ Issues | N/A | Mixture-of-experts issues |
+| 20 | SmolVLM-500M | 500M | 2GB | ✅ Works | ~20% | No fetal context |
+| 21 | SmolVLM-256M | 256M | 1GB | ✅ Works | ~15% | World's smallest VLM |
+| 22 | VILT-b32 | 899M | 1.8GB | ✅ Works | 0% | Nonsensical outputs |
+| 23 | Aquila-VL | ~7B | ~6GB | ⚠️ Issues | N/A | Compatibility issues |
+| 24 | MulMoE | ~7B | ~6GB | ⚠️ Issues | N/A | Mixture-of-experts issues |
 
 ### Failed Models
 | # | Model | Params | Status | Issue |
 |---|-------|--------|--------|-------|
-| 24 | Qwen-VL-Chat | ~7B | ❌ Failed | Visual encoder issue |
-| 25 | Qwen-VL-Chat-Int4 | ~7B | ❌ Failed | Visual encoder issue |
-| 26 | Qwen2.5-VL-3B (4-bit) | 2.24B | ❌ Failed | AssertionError on inference |
-| 27 | FetalCLIP | Custom | ⚠️ Failed | Category mismatch |
-| 28 | MedGemma | ~2B | ❌ Failed | Access/permission issues |
+| 25 | Qwen-VL-Chat | ~7B | ❌ Failed | Visual encoder issue |
+| 26 | Qwen-VL-Chat-Int4 | ~7B | ❌ Failed | Visual encoder issue |
+| 27 | Qwen2.5-VL-3B (4-bit) | 2.24B | ❌ Failed | AssertionError on inference |
+| 28 | FetalCLIP | Custom | ⚠️ Failed | Category mismatch |
 | 29 | CheXagent-8b (4-bit) | 4.31B | ⚠️ Loaded | Only outputs "What does it show?" (0% accuracy) |
 | 30 | MiniCPM-V (older variants) | 2.5-3.4B | ❌ Failed | API mismatch (superseded by V-2.6) |
 | 31 | CogVLM2-llama3-19B | 19B | ❌ Failed | Requires triton (Linux only) |
@@ -313,14 +313,43 @@ Trained exclusively on chest X-rays, not ultrasound.
 Domain mismatch - cannot transfer to fetal imaging.
 ```
 
-### MedGemma
+### MedGemma ⚕️
 ```
-Model: google/medgemma-*
-Status: ❌ Failed
+Model: google/medgemma-4b-it
+Status: ✅ Works
+Performance: ~65% (High Tier)
 
-Issue: Access denied
-Requires special permissions/Google approval
-Not available for public testing
+Architecture: Gemma3 + SigLIP vision encoder
+Memory: 3.2GB (4-bit quantization)
+Medical Training: Pre-trained on de-identified medical images
+  - Chest X-rays
+  - Dermatology images
+  - Ophthalmology images
+
+Special Requirements:
+  - Requires AutoModelForCausalLM (not AutoModelForVision2Seq)
+  - Uses chat template format with {"type": "image"} content
+  - Image token: <image_soft_token>
+
+Strengths:
+  ✅ Excellent medical terminology usage
+  ✅ Structured, clinical-style responses
+  ✅ Good anatomical understanding
+  ✅ Efficient (3.2GB vs 5-8GB for similar models)
+
+Weaknesses:
+  ⚠️  May hallucinate specific measurements
+  ⚠️  Not specifically trained on ultrasound/fetal imaging
+  ⚠️  Requires special prompt formatting
+
+Code Example:
+  messages = [{"role": "user", "content": [
+      {"type": "image"},
+      {"type": "text", "text": question}
+  ]}]
+  prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
+
+Overall: Strong medical-domain VLM, valuable for comparative analysis
 ```
 
 ### Other Medical Models
