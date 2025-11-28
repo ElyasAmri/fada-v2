@@ -49,3 +49,6 @@ venv/
 experiments/external_models/FetalCLIP/
 experiments/external_models/TinyGPT-V/
 *.ttf
+
+# Timesheets (private)
+docs/project/timesheets/
