@@ -12,7 +12,8 @@ from sklearn.metrics import (
     cohen_kappa_score
 )
 import torch
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+import pandas as pd
 import logging
 
 # Import extracted modules
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 class ComprehensiveMetrics:
     """Calculate and visualize comprehensive metrics for model evaluation"""
 
-    def __init__(self, class_names: List[str]):
+    def __init__(self, class_names: List[str]) -> None:
         """
         Initialize metrics calculator
 
@@ -38,13 +39,13 @@ class ComprehensiveMetrics:
         self.num_classes = len(class_names)
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all stored predictions"""
         self.all_preds = []
         self.all_labels = []
         self.all_probs = []
 
-    def update(self, preds: torch.Tensor, labels: torch.Tensor, probs: Optional[torch.Tensor] = None):
+    def update(self, preds: torch.Tensor, labels: torch.Tensor, probs: Optional[torch.Tensor] = None) -> None:
         """
         Update with batch predictions
 
@@ -139,7 +140,7 @@ class ComprehensiveMetrics:
 
         return metrics
 
-    def plot_confusion_matrix(self, save_path: Optional[str] = None, normalize: bool = False):
+    def plot_confusion_matrix(self, save_path: Optional[str] = None, normalize: bool = False) -> None:
         """
         Plot confusion matrix with detailed annotations
 
@@ -151,7 +152,7 @@ class ComprehensiveMetrics:
         y_pred = np.array(self.all_preds)
         plot_confusion_matrix(y_true, y_pred, self.class_names, save_path, normalize)
 
-    def plot_per_class_metrics(self, save_path: Optional[str] = None):
+    def plot_per_class_metrics(self, save_path: Optional[str] = None) -> None:
         """
         Plot per-class precision, recall, and F1 scores
 
@@ -166,7 +167,7 @@ class ComprehensiveMetrics:
             save_path
         )
 
-    def print_classification_report(self):
+    def print_classification_report(self) -> None:
         """Print detailed classification report"""
         y_true = np.array(self.all_labels)
         y_pred = np.array(self.all_preds)
@@ -193,7 +194,7 @@ class ComprehensiveMetrics:
         y_pred2 = np.array(other_preds)
         return statistical_significance_test(y_true, y_pred1, y_pred2, test_type)
 
-    def export_results(self, save_path: str):
+    def export_results(self, save_path: str) -> pd.DataFrame:
         """
         Export all metrics to a CSV file
 

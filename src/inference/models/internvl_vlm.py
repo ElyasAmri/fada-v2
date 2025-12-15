@@ -2,6 +2,7 @@
 InternVL2 VLM Implementation
 """
 
+from typing import Optional
 from PIL import Image
 import torch
 import torchvision.transforms as T
@@ -20,12 +21,12 @@ class InternVLVLM(LocalVLM):
     IMAGENET_MEAN = (0.485, 0.456, 0.406)
     IMAGENET_STD = (0.229, 0.224, 0.225)
 
-    def __init__(self, model_id: str = None, display_name: str = None, use_4bit: bool = True, input_size: int = 448):
+    def __init__(self, model_id: Optional[str] = None, display_name: Optional[str] = None, use_4bit: bool = True, input_size: int = 448) -> None:
         super().__init__(model_id, display_name, use_4bit)
         self.input_size = input_size
-        self._transform = None
+        self._transform: Optional[T.Compose] = None
 
-    def _build_transform(self):
+    def _build_transform(self) -> T.Compose:
         """Build image transform for InternVL2"""
         return T.Compose([
             T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),

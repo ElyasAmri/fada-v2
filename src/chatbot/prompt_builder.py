@@ -39,7 +39,7 @@ Important guidelines:
 class PromptBuilder:
     """Builds prompts for various OpenAI API calls"""
 
-    def __init__(self, system_prompt: str = MEDICAL_SYSTEM_PROMPT):
+    def __init__(self, system_prompt: str = MEDICAL_SYSTEM_PROMPT) -> None:
         self.system_prompt = system_prompt
 
     def build_analysis_prompt(

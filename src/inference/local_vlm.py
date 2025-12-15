@@ -2,7 +2,7 @@
 Local VLM Base Class - Base implementation for local GPU-based VLM inference
 """
 
-from typing import Optional
+from typing import Optional, Union, Dict, Any
 from PIL import Image
 import torch
 from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -18,7 +18,7 @@ class LocalVLM(VLMInterface):
     DISPLAY_NAME: str = ""
     USE_CAUSAL_LM: bool = False  # True for models using AutoModelForCausalLM
 
-    def __init__(self, model_id: Optional[str] = None, display_name: Optional[str] = None, use_4bit: bool = True):
+    def __init__(self, model_id: Optional[str] = None, display_name: Optional[str] = None, use_4bit: bool = True) -> None:
         """
         Initialize local VLM
 
@@ -46,7 +46,7 @@ class LocalVLM(VLMInterface):
             bnb_4bit_use_double_quant=True
         )
 
-    def get_device_map(self):
+    def get_device_map(self) -> Union[str, Dict[str, Any]]:
         """Get device map. Override in subclasses for custom configs."""
         return "auto"
 

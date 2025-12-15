@@ -73,7 +73,7 @@ class FetalUltrasoundDataset12Class(Dataset):
         logger.info(f"Loaded {len(self.samples)} images")
         logger.info(f"Class distribution: {self.get_class_distribution()}")
 
-    def load_dataset(self):
+    def load_dataset(self) -> None:
         """Load all image paths and labels from directory structure"""
         for folder in self.data_root.iterdir():
             if not folder.is_dir():
@@ -127,7 +127,7 @@ class FetalUltrasoundDataset12Class(Dataset):
 
         return weights
 
-    def load_excel_annotations(self, excel_path: str):
+    def load_excel_annotations(self, excel_path: str) -> None:
         """Load annotations from Excel file (placeholder for future use)"""
         try:
             self.annotations = pd.read_excel(excel_path)
@@ -177,7 +177,7 @@ class FetalUltrasoundDataset12Class(Dataset):
             logger.error(f"Unexpected error loading {img_path}: {type(e).__name__}: {e}")
             return self._get_fallback_image(), label
 
-    def _get_fallback_image(self):
+    def _get_fallback_image(self) -> torch.Tensor:
         """Return a black fallback image for error cases."""
         if self.transform:
             black_image = np.zeros((224, 224, 3), dtype=np.uint8)
@@ -225,7 +225,7 @@ class FetalDataModule12Class:
         self.test_dataset = None
         self.class_weights = None
 
-    def setup(self, train_transform=None, val_transform=None):
+    def setup(self, train_transform: Optional[object] = None, val_transform: Optional[object] = None) -> None:
         """
         Setup datasets with stratified splits
 
@@ -293,7 +293,7 @@ class FetalDataModule12Class:
         # Log split statistics
         self._log_split_statistics()
 
-    def _log_split_statistics(self):
+    def _log_split_statistics(self) -> None:
         """Log statistics about the data splits"""
         logger.info("=" * 60)
         logger.info("DATA SPLIT STATISTICS")
@@ -325,7 +325,7 @@ class FetalDataModule12Class:
             if self.class_weights is not None:
                 logger.info(f"  {class_name:30s}: {self.class_weights[idx]:.3f}")
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> DataLoader:
         """Get training dataloader"""
         return DataLoader(
             self.train_dataset,
@@ -335,7 +335,7 @@ class FetalDataModule12Class:
             pin_memory=torch.cuda.is_available()
         )
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> DataLoader:
         """Get validation dataloader"""
         return DataLoader(
             self.val_dataset,
@@ -345,7 +345,7 @@ class FetalDataModule12Class:
             pin_memory=torch.cuda.is_available()
         )
 
-    def test_dataloader(self):
+    def test_dataloader(self) -> DataLoader:
         """Get test dataloader"""
         return DataLoader(
             self.test_dataset,

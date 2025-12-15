@@ -3,7 +3,7 @@ VLM Interface - Abstract base class and manager for VLM inference
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Optional
 from PIL import Image
 
 
@@ -63,14 +63,14 @@ class VLMInterface(ABC):
 class VLMManager:
     """Manager for multiple VLM models"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.models: Dict[str, VLMInterface] = {}
 
-    def register_model(self, key: str, model: VLMInterface):
+    def register_model(self, key: str, model: VLMInterface) -> None:
         """Register a VLM model"""
         self.models[key] = model
 
-    def get_model(self, key: str) -> VLMInterface:
+    def get_model(self, key: str) -> Optional[VLMInterface]:
         """Get a registered model"""
         return self.models.get(key)
 
@@ -78,7 +78,7 @@ class VLMManager:
         """Get list of registered model keys"""
         return list(self.models.keys())
 
-    def unload_all(self):
+    def unload_all(self) -> None:
         """Unload all models from memory"""
         for model in self.models.values():
             if model.is_loaded:

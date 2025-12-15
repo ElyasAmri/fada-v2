@@ -19,7 +19,7 @@ class FocalLoss(nn.Module):
     Focuses learning on hard examples
     """
 
-    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: float = 2.0):
+    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: float = 2.0) -> None:
         """
         Args:
             alpha: Class weights for balancing
