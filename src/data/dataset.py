@@ -38,6 +38,11 @@ class FetalUltrasoundDataset12Class(Dataset):
         'Trans-ventricular'
     ]
 
+    # Display names for UI (corrects typos while keeping data paths unchanged)
+    DISPLAY_NAMES = {
+        'Abodomen': 'Abdomen',  # Correct spelling for display
+    }
+
     # Clinical descriptions for each class (for future chatbot responses)
     CLASS_DESCRIPTIONS = {
         'Abodomen': 'Abdominal cross-section for organ assessment',

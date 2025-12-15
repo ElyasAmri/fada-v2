@@ -13,8 +13,12 @@ Utility and helper scripts for the FADA project.
   - `count_labeled_images.py` - Count labeled dataset images
   - `evaluate_all_vqa.py` - Evaluate VQA models
 
-- **training/** - Training orchestration
-  - `train_all_full_scale.py` - Full-scale training script
+- **training/** - Training scripts
+  - `train_12class.py` - 12-class classifier training with MLflow
+  - `train_all_full_scale.py` - Full-scale training orchestration
+
+- **analysis/** - Data analysis tools
+  - `analyze_dataset.py` - Dataset structure and content analysis
 
 ## Usage
 
