@@ -15,6 +15,8 @@ from sklearn.model_selection import train_test_split
 import logging
 from collections import Counter
 
+from src.config.constants import CLASSES, DISPLAY_NAMES, CLASS_DESCRIPTIONS
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,42 +24,10 @@ logger = logging.getLogger(__name__)
 class FetalUltrasoundDataset12Class(Dataset):
     """Dataset for 12-class fetal ultrasound classification"""
 
-    # All 12 original folder names as separate classes
-    CLASSES = [
-        'Abodomen',  # Note: typo in original
-        'Aorta',
-        'Cervical',
-        'Cervix',
-        'Femur',
-        'Non_standard_NT',
-        'Public_Symphysis_fetal_head',
-        'Standard_NT',
-        'Thorax',
-        'Trans-cerebellum',
-        'Trans-thalamic',
-        'Trans-ventricular'
-    ]
-
-    # Display names for UI (corrects typos while keeping data paths unchanged)
-    DISPLAY_NAMES = {
-        'Abodomen': 'Abdomen',  # Correct spelling for display
-    }
-
-    # Clinical descriptions for each class (for future chatbot responses)
-    CLASS_DESCRIPTIONS = {
-        'Abodomen': 'Abdominal cross-section for organ assessment',
-        'Aorta': 'Aortic arch view for cardiac output assessment',
-        'Cervical': 'Cervical view for cervix evaluation',
-        'Cervix': 'Direct cervix view for length measurement',
-        'Femur': 'Femur length measurement for growth assessment',
-        'Non_standard_NT': 'Non-standard nuchal translucency view',
-        'Public_Symphysis_fetal_head': 'Fetal head position relative to pubic symphysis',
-        'Standard_NT': 'Standard nuchal translucency measurement',
-        'Thorax': 'Thoracic cross-section for lung and heart assessment',
-        'Trans-cerebellum': 'Transcerebellar plane for posterior fossa evaluation',
-        'Trans-thalamic': 'Transthalamic plane for midline structures',
-        'Trans-ventricular': 'Transventricular plane for ventricle measurement'
-    }
+    # Import from centralized constants
+    CLASSES = CLASSES
+    DISPLAY_NAMES = DISPLAY_NAMES
+    CLASS_DESCRIPTIONS = CLASS_DESCRIPTIONS
 
     def __init__(
         self,
@@ -192,15 +162,29 @@ class FetalUltrasoundDataset12Class(Dataset):
 
             return image, label
 
+        except FileNotFoundError:
+            logger.error(f"Image file not found: {img_path}")
+            # Return black image as fallback for missing files
+            return self._get_fallback_image(), label
+
+        except (IOError, OSError) as e:
+            # Handles PIL.UnidentifiedImageError and other IO issues
+            logger.error(f"Error reading image {img_path}: {e}")
+            return self._get_fallback_image(), label
+
         except Exception as e:
-            logger.error(f"Error loading image {img_path}: {e}")
-            # Return black image as fallback
-            if self.transform:
-                black_image = np.zeros((224, 224, 3), dtype=np.uint8)
-                transformed = self.transform(image=black_image)
-                return transformed['image'], label
-            else:
-                return torch.zeros((3, 224, 224), dtype=torch.float32), label
+            # Log unexpected errors but don't crash training
+            logger.error(f"Unexpected error loading {img_path}: {type(e).__name__}: {e}")
+            return self._get_fallback_image(), label
+
+    def _get_fallback_image(self):
+        """Return a black fallback image for error cases."""
+        if self.transform:
+            black_image = np.zeros((224, 224, 3), dtype=np.uint8)
+            transformed = self.transform(image=black_image)
+            return transformed['image']
+        else:
+            return torch.zeros((3, 224, 224), dtype=torch.float32)
 
 
 class FetalDataModule12Class:

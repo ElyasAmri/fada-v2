@@ -2,7 +2,6 @@
 from .classifier import (
     FetalUltrasoundClassifier12,
     FocalLoss,
-    create_model,
-    ModelWithTTA
+    create_model
 )
 from .vqa_model import UltrasoundVQA

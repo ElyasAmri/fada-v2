@@ -19,6 +19,7 @@ from src.models.classifier import create_model
 from src.data.augmentation import get_validation_augmentation
 from src.chatbot.response_generator import ResponseGenerator, ClassificationResult
 from src.chatbot.openai_integration import HybridResponseGenerator
+from src.config.constants import CLASSES
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +39,11 @@ class AnalysisResult:
 class UltrasoundChatbot:
     """Main chatbot class for ultrasound image analysis and response generation"""
 
-    CLASSES = [
-        'Abodomen', 'Aorta', 'Cervical', 'Cervix', 'Femur',
-        'Non_standard_NT', 'Public_Symphysis_fetal_head',
-        'Standard_NT', 'Thorax', 'Trans-cerebellum',
-        'Trans-thalamic', 'Trans-ventricular'
-    ]
+    # Import from centralized constants
+    CLASSES = CLASSES
+
+    # Valid backbone architectures
+    VALID_BACKBONES = ['efficientnet_b0', 'efficientnet_b1', 'resnet50', 'resnet18']
 
     def __init__(
         self,
@@ -64,7 +64,18 @@ class UltrasoundChatbot:
             use_openai: Whether to use OpenAI for response generation
             openai_api_key: OpenAI API key
             confidence_threshold: Minimum confidence for definitive statements
+
+        Raises:
+            ValueError: If confidence_threshold is not between 0 and 1
+            ValueError: If backbone is not a supported architecture
         """
+        # Validate parameters
+        if not 0.0 <= confidence_threshold <= 1.0:
+            raise ValueError(f"confidence_threshold must be between 0 and 1, got {confidence_threshold}")
+
+        if backbone not in self.VALID_BACKBONES:
+            logger.warning(f"Backbone '{backbone}' not in known list {self.VALID_BACKBONES}, proceeding anyway")
+
         self.device = torch.device('cuda' if use_gpu and torch.cuda.is_available() else 'cpu')
         logger.info(f"Using device: {self.device}")
 
