@@ -48,6 +48,8 @@ venv/
 # External model repositories (cloned repos with .git directories)
 experiments/external_models/FetalCLIP/
 experiments/external_models/TinyGPT-V/
+experiments/api_models/results/
+experiments/notebooks/
 *.ttf
 
 # Timesheets (private)
