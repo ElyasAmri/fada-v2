@@ -105,12 +105,12 @@ class UltrasoundAnalyzer(nn.Module):
 
         return outputs
 
-    def freeze_backbone(self):
+    def freeze_backbone(self) -> None:
         """Freeze backbone parameters for transfer learning"""
         for param in self.backbone.parameters():
             param.requires_grad = False
 
-    def unfreeze_backbone(self):
+    def unfreeze_backbone(self) -> None:
         """Unfreeze backbone parameters for fine-tuning"""
         for param in self.backbone.parameters():
             param.requires_grad = True
@@ -145,7 +145,7 @@ class FeatureExtractor(nn.Module):
         """Extract features from input"""
         return self.backbone(x)
 
-    def freeze(self):
+    def freeze(self) -> None:
         """Freeze all parameters"""
         for param in self.parameters():
             param.requires_grad = False

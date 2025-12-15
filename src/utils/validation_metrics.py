@@ -4,21 +4,21 @@ Includes confusion matrix, per-class metrics, and statistical significance testi
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.metrics import (
     confusion_matrix,
-    classification_report,
     accuracy_score,
     precision_recall_fscore_support,
     roc_auc_score,
     cohen_kappa_score
 )
 import torch
-from typing import List, Tuple, Dict, Optional
-import pandas as pd
-from scipy import stats
+from typing import List, Dict, Optional
 import logging
+
+# Import extracted modules
+from .metrics_visualization import plot_confusion_matrix, plot_per_class_metrics
+from .statistical_testing import statistical_significance_test
+from .metrics_export import print_classification_report, export_results
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -149,51 +149,7 @@ class ComprehensiveMetrics:
         """
         y_true = np.array(self.all_labels)
         y_pred = np.array(self.all_preds)
-
-        cm = confusion_matrix(y_true, y_pred, labels=range(self.num_classes))
-
-        if normalize:
-            # Handle division by zero for classes with no samples
-            cm = cm.astype('float')
-            cm_sum = cm.sum(axis=1)[:, np.newaxis]
-            # Replace zeros with 1 to avoid division by zero
-            cm_sum[cm_sum == 0] = 1
-            cm = cm / cm_sum * 100
-
-        plt.figure(figsize=(10, 8))
-
-        # Create heatmap
-        # Handle NaN values in confusion matrix
-        if normalize:
-            # Replace NaN with 0 for visualization
-            cm = np.nan_to_num(cm, nan=0.0)
-            fmt = '.1f'  # Remove % from format, will add manually
-        else:
-            fmt = 'd'
-
-        sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues',
-                   xticklabels=self.class_names,
-                   yticklabels=self.class_names,
-                   square=True,
-                   cbar_kws={'label': 'Percentage' if normalize else 'Count'})
-
-        plt.title('Confusion Matrix' + (' (Normalized)' if normalize else ''))
-        plt.ylabel('True Label')
-        plt.xlabel('Predicted Label')
-
-        # Add accuracy for each class
-        for i in range(self.num_classes):
-            class_acc = cm[i, i] / cm[i].sum() * 100 if not normalize else cm[i, i]
-            plt.text(self.num_classes + 0.3, i + 0.5, f'{class_acc:.1f}%',
-                    ha='left', va='center')
-
-        plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"Confusion matrix saved to {save_path}")
-
-        plt.show()
+        plot_confusion_matrix(y_true, y_pred, self.class_names, save_path, normalize)
 
     def plot_per_class_metrics(self, save_path: Optional[str] = None):
         """
@@ -203,80 +159,25 @@ class ComprehensiveMetrics:
             save_path: Path to save figure
         """
         metrics = self.compute_metrics()
-        per_class = metrics['per_class']
-
-        # Prepare data for plotting
-        classes = self.class_names
-        precision_values = [per_class['precision'][c] for c in classes]
-        recall_values = [per_class['recall'][c] for c in classes]
-        f1_values = [per_class['f1'][c] for c in classes]
-
-        x = np.arange(len(classes))
-        width = 0.25
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-
-        # Create bars
-        bars1 = ax.bar(x - width, precision_values, width, label='Precision')
-        bars2 = ax.bar(x, recall_values, width, label='Recall')
-        bars3 = ax.bar(x + width, f1_values, width, label='F1-Score')
-
-        # Add value labels on bars
-        for bars in [bars1, bars2, bars3]:
-            for bar in bars:
-                height = bar.get_height()
-                ax.annotate(f'{height:.2f}',
-                           xy=(bar.get_x() + bar.get_width() / 2, height),
-                           xytext=(0, 3),
-                           textcoords="offset points",
-                           ha='center', va='bottom')
-
-        ax.set_xlabel('Classes')
-        ax.set_ylabel('Score')
-        ax.set_title('Per-Class Performance Metrics')
-        ax.set_xticks(x)
-        ax.set_xticklabels(classes)
-        ax.legend()
-        ax.set_ylim([0, 1.1])
-
-        # Add horizontal line for average
-        ax.axhline(y=metrics['weighted']['f1'], color='r', linestyle='--',
-                  label=f"Weighted F1: {metrics['weighted']['f1']:.3f}")
-
-        plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"Per-class metrics saved to {save_path}")
-
-        plt.show()
+        plot_per_class_metrics(
+            self.class_names,
+            metrics['per_class'],
+            metrics['weighted']['f1'],
+            save_path
+        )
 
     def print_classification_report(self):
         """Print detailed classification report"""
         y_true = np.array(self.all_labels)
         y_pred = np.array(self.all_preds)
-
-        print("\n" + "="*60)
-        print("CLASSIFICATION REPORT")
-        print("="*60)
-        print(classification_report(y_true, y_pred, target_names=self.class_names, digits=3))
-
         metrics = self.compute_metrics()
-        print(f"\nOverall Accuracy: {metrics['accuracy']:.4f}")
-        print(f"Cohen's Kappa: {metrics['kappa']:.4f}")
+        print_classification_report(y_true, y_pred, self.class_names, metrics)
 
-        if metrics['auc'] is not None:
-            if isinstance(metrics['auc'], dict):
-                print("\nAUC Scores:")
-                for class_name, auc in metrics['auc'].items():
-                    if auc is not None:
-                        print(f"  {class_name}: {auc:.4f}")
-            else:
-                print(f"AUC Score: {metrics['auc']:.4f}")
-
-    def statistical_significance_test(self,
-                                     other_preds: List[int],
-                                     test_type: str = 'mcnemar') -> Dict:
+    def statistical_significance_test(
+        self,
+        other_preds: List[int],
+        test_type: str = 'mcnemar'
+    ) -> Dict:
         """
         Test statistical significance between two models
 
@@ -290,44 +191,7 @@ class ComprehensiveMetrics:
         y_true = np.array(self.all_labels)
         y_pred1 = np.array(self.all_preds)
         y_pred2 = np.array(other_preds)
-
-        if test_type == 'mcnemar':
-            # McNemar's test for paired nominal data
-            # Create contingency table
-            correct1_correct2 = np.sum((y_pred1 == y_true) & (y_pred2 == y_true))
-            correct1_wrong2 = np.sum((y_pred1 == y_true) & (y_pred2 != y_true))
-            wrong1_correct2 = np.sum((y_pred1 != y_true) & (y_pred2 == y_true))
-            wrong1_wrong2 = np.sum((y_pred1 != y_true) & (y_pred2 != y_true))
-
-            # Perform McNemar's test
-            from statsmodels.stats.contingency_tables import mcnemar
-            table = [[correct1_correct2, correct1_wrong2],
-                    [wrong1_correct2, wrong1_wrong2]]
-            result = mcnemar(table, exact=False, correction=True)
-
-            return {
-                'test': 'McNemar',
-                'statistic': result.statistic,
-                'p_value': result.pvalue,
-                'contingency_table': table,
-                'significant': result.pvalue < 0.05
-            }
-
-        elif test_type == 'wilcoxon':
-            # Wilcoxon signed-rank test
-            acc1 = (y_pred1 == y_true).astype(int)
-            acc2 = (y_pred2 == y_true).astype(int)
-            statistic, p_value = stats.wilcoxon(acc1, acc2)
-
-            return {
-                'test': 'Wilcoxon signed-rank',
-                'statistic': statistic,
-                'p_value': p_value,
-                'significant': p_value < 0.05
-            }
-
-        else:
-            raise ValueError(f"Unknown test type: {test_type}")
+        return statistical_significance_test(y_true, y_pred1, y_pred2, test_type)
 
     def export_results(self, save_path: str):
         """
@@ -337,41 +201,9 @@ class ComprehensiveMetrics:
             save_path: Path to save CSV
         """
         metrics = self.compute_metrics()
-
-        # Create dataframe with results
-        results = []
-
-        for class_name in self.class_names:
-            results.append({
-                'Class': class_name,
-                'Precision': metrics['per_class']['precision'][class_name],
-                'Recall': metrics['per_class']['recall'][class_name],
-                'F1-Score': metrics['per_class']['f1'][class_name],
-                'Support': metrics['per_class']['support'][class_name],
-                'AUC': metrics['auc'][class_name] if isinstance(metrics['auc'], dict) else None
-            })
-
-        # Add overall metrics
-        results.append({
-            'Class': 'Weighted Average',
-            'Precision': metrics['weighted']['precision'],
-            'Recall': metrics['weighted']['recall'],
-            'F1-Score': metrics['weighted']['f1'],
-            'Support': len(self.all_labels),
-            'AUC': None
-        })
-
-        results.append({
-            'Class': 'Macro Average',
-            'Precision': metrics['macro']['precision'],
-            'Recall': metrics['macro']['recall'],
-            'F1-Score': metrics['macro']['f1'],
-            'Support': len(self.all_labels),
-            'AUC': None
-        })
-
-        df = pd.DataFrame(results)
-        df.to_csv(save_path, index=False)
-        logger.info(f"Results exported to {save_path}")
-
-        return df
+        return export_results(
+            self.class_names,
+            metrics,
+            len(self.all_labels),
+            save_path
+        )

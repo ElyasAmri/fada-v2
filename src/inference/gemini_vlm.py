@@ -4,14 +4,15 @@ Supports Gemini 2.0 Flash and other vision-capable models
 """
 
 import os
-import time
-import base64
-import io
+import logging
 from typing import List, Optional
 from pathlib import Path
 
 from PIL import Image
 from dotenv import load_dotenv
+
+from src.utils.image_processing import to_base64
+from src.utils.api_client import call_with_retry
 
 # Load environment variables from .env.local
 env_path = Path(__file__).parent.parent.parent / '.env.local'
@@ -25,6 +26,8 @@ except ImportError:
     genai = None
 
 from src.inference.vlm_interface import VLMInterface
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiVLM(VLMInterface):
@@ -106,19 +109,46 @@ class GeminiVLM(VLMInterface):
 
     def _image_to_part(self, image: Image.Image) -> dict:
         """Convert PIL Image to Gemini image part"""
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-
-        # Save to bytes
-        buffer = io.BytesIO()
-        image.save(buffer, format='JPEG', quality=95)
-        image_bytes = buffer.getvalue()
-
         return {
             "mime_type": "image/jpeg",
-            "data": base64.b64encode(image_bytes).decode('utf-8')
+            "data": to_base64(image)
         }
+
+    def _extract_response_text(self, response) -> str:
+        """Extract text from Gemini response, handling various formats."""
+        # Try the simple accessor first
+        try:
+            if response.text:
+                return response.text.strip()
+        except ValueError:
+            # response.text throws ValueError if blocked or has multiple parts
+            pass
+
+        # Try extracting from parts
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content') and candidate.content:
+                parts = candidate.content.parts
+                text_parts = []
+                for part in parts:
+                    if hasattr(part, 'text') and part.text:
+                        text_parts.append(part.text)
+                if text_parts:
+                    return "\n".join(text_parts).strip()
+
+            # Check for block reason
+            if hasattr(candidate, 'finish_reason'):
+                finish_reason = str(candidate.finish_reason)
+                if 'SAFETY' in finish_reason or 'BLOCKED' in finish_reason:
+                    return f"Response blocked: {finish_reason}"
+
+        # Check prompt feedback
+        if hasattr(response, 'prompt_feedback'):
+            feedback = response.prompt_feedback
+            if hasattr(feedback, 'block_reason') and feedback.block_reason:
+                return f"Prompt blocked: {feedback.block_reason}"
+
+        return "No response generated."
 
     def answer_question(self, image: Image.Image, question: str) -> str:
         """
@@ -145,71 +175,25 @@ Please answer the following question about this ultrasound image:
 
 Provide a clear, professional medical response."""
 
-        # Retry loop with exponential backoff
-        last_error = None
-        for attempt in range(self.max_retries):
-            try:
-                response = self._model.generate_content([
-                    {"inline_data": image_part},
-                    prompt
-                ])
+        def make_request():
+            response = self._model.generate_content([
+                {"inline_data": image_part},
+                prompt
+            ])
+            return self._extract_response_text(response)
 
-                # Extract text from response - handle various response formats
-                try:
-                    # Try the simple accessor first
-                    if response.text:
-                        return response.text.strip()
-                except ValueError:
-                    # response.text throws ValueError if blocked or has multiple parts
-                    pass
-
-                # Try extracting from parts
-                if hasattr(response, 'candidates') and response.candidates:
-                    candidate = response.candidates[0]
-                    if hasattr(candidate, 'content') and candidate.content:
-                        parts = candidate.content.parts
-                        text_parts = []
-                        for part in parts:
-                            if hasattr(part, 'text') and part.text:
-                                text_parts.append(part.text)
-                        if text_parts:
-                            return "\n".join(text_parts).strip()
-
-                    # Check for block reason
-                    if hasattr(candidate, 'finish_reason'):
-                        finish_reason = str(candidate.finish_reason)
-                        if 'SAFETY' in finish_reason or 'BLOCKED' in finish_reason:
-                            return f"Response blocked: {finish_reason}"
-
-                # Check prompt feedback
-                if hasattr(response, 'prompt_feedback'):
-                    feedback = response.prompt_feedback
-                    if hasattr(feedback, 'block_reason') and feedback.block_reason:
-                        return f"Prompt blocked: {feedback.block_reason}"
-
-                return "No response generated."
-
-            except Exception as e:
-                last_error = e
-                if attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)
-                    time.sleep(wait_time)
-                continue
-
-        raise RuntimeError(f"Gemini API failed after {self.max_retries} attempts: {last_error}")
-
-    def answer_batch(self, image: Image.Image, questions: List[str]) -> List[str]:
-        """
-        Answer multiple questions about an image
-
-        Args:
-            image: PIL Image
-            questions: List of question texts
-
-        Returns:
-            List of answer texts
-        """
-        return [self.answer_question(image, q) for q in questions]
+        try:
+            return call_with_retry(
+                make_request,
+                max_retries=self.max_retries,
+                base_delay=self.retry_delay,
+                on_retry=lambda attempt, e: logger.warning(
+                    f"Gemini API attempt {attempt + 1} failed: {e}"
+                )
+            )
+        except Exception as e:
+            logger.error(f"Gemini API failed after {self.max_retries} attempts: {e}")
+            raise RuntimeError(f"Gemini API failed: {e}")
 
     @property
     def model_name(self) -> str:

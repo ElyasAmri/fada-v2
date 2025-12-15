@@ -24,7 +24,7 @@ class QuestionLoader:
         self._category_files: Dict[str, Path] = {}
         self._scan_annotation_files()
 
-    def _scan_annotation_files(self):
+    def _scan_annotation_files(self) -> None:
         """Scan for Excel annotation files"""
         for excel_file in self.data_dir.glob("*_image_list.xlsx"):
             # Extract category name (e.g., "Abodomen" from "Abodomen_image_list.xlsx")
@@ -154,7 +154,7 @@ class QuestionLoader:
         images.sort()
         return images
 
-    def reload(self):
+    def reload(self) -> None:
         """Force reload questions from Excel files"""
         self._questions_cache = None
         self._category_files = {}

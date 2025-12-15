@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision import models
 from typing import Optional, Tuple
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +62,7 @@ class FetalUltrasoundClassifier12(nn.Module):
         num_classes: int = 12,
         backbone: str = 'efficientnet_b0',
         pretrained: bool = True,
-        dropout_rate: float = 0.2,
-        use_mixup: bool = False
+        dropout_rate: float = 0.2
     ):
         """
         Initialize classifier
@@ -72,12 +72,10 @@ class FetalUltrasoundClassifier12(nn.Module):
             backbone: Backbone architecture name
             pretrained: Use pretrained weights
             dropout_rate: Dropout rate for regularization
-            use_mixup: Whether to use mixup augmentation
         """
         super().__init__()
         self.num_classes = num_classes
         self.backbone_name = backbone
-        self.use_mixup = use_mixup
 
         # Create backbone
         if backbone == 'efficientnet_b0':
@@ -163,104 +161,6 @@ class FetalUltrasoundClassifier12(nn.Module):
             raise NotImplementedError(f"Feature extraction not implemented for {self.backbone_name}")
 
         return features
-
-    def mixup_data(
-        self,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        alpha: float = 0.2
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, float]:
-        """
-        Apply mixup augmentation
-
-        Args:
-            x: Input images
-            y: Labels
-            alpha: Mixup interpolation strength
-
-        Returns:
-            Mixed inputs, targets_a, targets_b, interpolation lambda
-        """
-        if alpha > 0:
-            lam = np.random.beta(alpha, alpha)
-        else:
-            lam = 1
-
-        batch_size = x.size()[0]
-        index = torch.randperm(batch_size).to(x.device)
-
-        mixed_x = lam * x + (1 - lam) * x[index, :]
-        y_a, y_b = y, y[index]
-
-        return mixed_x, y_a, y_b, lam
-
-    def mixup_criterion(
-        self,
-        criterion,
-        pred: torch.Tensor,
-        y_a: torch.Tensor,
-        y_b: torch.Tensor,
-        lam: float
-    ) -> torch.Tensor:
-        """
-        Calculate loss for mixup augmentation
-
-        Args:
-            criterion: Loss function
-            pred: Model predictions
-            y_a: First set of targets
-            y_b: Second set of targets
-            lam: Interpolation lambda
-
-        Returns:
-            Mixed loss
-        """
-        return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
-
-
-class ModelWithTTA(nn.Module):
-    """
-    Wrapper for Test Time Augmentation (TTA)
-    """
-
-    def __init__(self, model: nn.Module, tta_transforms: list):
-        """
-        Initialize TTA wrapper
-
-        Args:
-            model: Base model
-            tta_transforms: List of TTA transformations
-        """
-        super().__init__()
-        self.model = model
-        self.tta_transforms = tta_transforms
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass with TTA
-
-        Args:
-            x: Input tensor
-
-        Returns:
-            Averaged predictions from all TTA transforms
-        """
-        batch_size = x.size(0)
-        predictions = []
-
-        # Original prediction
-        predictions.append(F.softmax(self.model(x), dim=1))
-
-        # TTA predictions
-        for transform in self.tta_transforms:
-            # Apply transform (this would need to be implemented based on your transform library)
-            x_transformed = transform(x)
-            pred = F.softmax(self.model(x_transformed), dim=1)
-            predictions.append(pred)
-
-        # Average all predictions
-        final_pred = torch.stack(predictions).mean(dim=0)
-        return final_pred
 
 
 def create_model(

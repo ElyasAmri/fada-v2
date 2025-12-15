@@ -1,10 +1,15 @@
 """
 API VLM Accuracy Test - Evaluate Gemini and Grok vision models on fetal ultrasound images
 Tests all 8 clinical questions per image and tracks accuracy metrics
+
+Usage:
+    python test_api_vlm_accuracy.py --models gemini grok --images-per-category 5
+    python test_api_vlm_accuracy.py --models gemini --images-per-category 10 --output-dir results/my_test
 """
 import sys
 # Ensure output is not buffered
 sys.stdout.reconfigure(line_buffering=True)
+import argparse
 import json
 import time
 from pathlib import Path
@@ -95,7 +100,12 @@ def evaluate_response(response: str, category: str, question_idx: int) -> Dict[s
     category_kws = anatomy_keywords.get(category, [category.lower()])
     has_correct_anatomy = any(kw in response_lower for kw in category_kws)
 
-    # Check response quality (word count)
+    # Check response quality based on word count
+    # Thresholds based on typical medical response lengths:
+    # - < 5 words: Too brief to be useful (0.2 score)
+    # - 5-14 words: Basic response, missing context (0.5 score)
+    # - 15-29 words: Good response with some detail (0.8 score)
+    # - 30+ words: Detailed response with full explanation (1.0 score)
     word_count = len(response.split())
     if word_count < 5:
         detail_score = 0.2
@@ -107,6 +117,8 @@ def evaluate_response(response: str, category: str, question_idx: int) -> Dict[s
         detail_score = 1.0
 
     # Check for hallucination (mentioning wrong anatomy)
+    # Penalty of 0.1 per wrong anatomy mentioned strongly
+    # Only checks first 2 keywords per category (most specific ones)
     hallucination_penalty = 0
     wrong_categories = [cat for cat in anatomy_keywords.keys() if cat != category]
     for wrong_cat in wrong_categories:
@@ -115,8 +127,11 @@ def evaluate_response(response: str, category: str, question_idx: int) -> Dict[s
         if any(kw in response_lower and category.lower() not in response_lower for kw in wrong_kws[:2]):
             hallucination_penalty += 0.1
 
-    # Calculate overall score
-    # Weights: fetal context (30%), anatomy (40%), detail (20%), hallucination (10%)
+    # Calculate overall score using weighted components:
+    # - Fetal context (30%): Does response mention fetal/pregnancy context?
+    # - Correct anatomy (40%): Does response correctly identify the anatomy type?
+    # - Detail score (20%): How detailed is the response?
+    # - Hallucination penalty (10%): Deduction for mentioning wrong anatomy
     overall_score = (
         (1.0 if has_fetal_context else 0.0) * 0.3 +
         (1.0 if has_correct_anatomy else 0.0) * 0.4 +
@@ -343,29 +358,106 @@ def run_evaluation(
     return all_results
 
 
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Evaluate API VLM models on fetal ultrasound images",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --models gemini grok --images-per-category 5
+  %(prog)s --models gemini --images-per-category 10 --output-dir results/custom
+  %(prog)s --gemini-model gemini-2.5-flash --grok-model grok-4
+        """
+    )
+
+    parser.add_argument(
+        "--models", "-m",
+        nargs="+",
+        choices=["gemini", "grok", "all"],
+        default=["all"],
+        help="Models to evaluate (default: all)"
+    )
+
+    parser.add_argument(
+        "--images-per-category", "-n",
+        type=int,
+        default=5,
+        help="Number of images per category to test (default: 5)"
+    )
+
+    parser.add_argument(
+        "--output-dir", "-o",
+        type=Path,
+        default=None,
+        help="Output directory for results (default: experiments/api_models/results)"
+    )
+
+    parser.add_argument(
+        "--gemini-model",
+        default="gemini-3-pro-preview",
+        help="Gemini model to use (default: gemini-3-pro-preview)"
+    )
+
+    parser.add_argument(
+        "--grok-model",
+        default="grok-4",
+        help="Grok model to use (default: grok-4)"
+    )
+
+    parser.add_argument(
+        "--thinking-level",
+        choices=["none", "low", "medium", "high"],
+        default="low",
+        help="Gemini thinking level (default: low)"
+    )
+
+    parser.add_argument(
+        "--skip-single-test",
+        action="store_true",
+        help="Skip single image test and run full evaluation immediately"
+    )
+
+    return parser.parse_args()
+
+
 def main():
     """Main entry point"""
+    args = parse_args()
+
     print("API VLM Accuracy Test")
     print("=" * 60)
+    print(f"Configuration:")
+    print(f"  Models: {args.models}")
+    print(f"  Images per category: {args.images_per_category}")
+    print(f"  Gemini model: {args.gemini_model}")
+    print(f"  Grok model: {args.grok_model}")
+    print("=" * 60)
+
+    # Determine which models to run
+    run_gemini = "all" in args.models or "gemini" in args.models
+    run_grok = "all" in args.models or "grok" in args.models
 
     # Initialize models
     models = []
 
     # Try Gemini
-    try:
-        gemini = create_gemini_vlm(model="gemini-3-pro-preview", thinking_level="low")
-        models.append({'name': 'Gemini 3 Pro', 'instance': gemini})
-        print("[OK] Gemini 3 Pro initialized")
-    except Exception as e:
-        print(f"[SKIP] Gemini: {e}")
+    if run_gemini:
+        try:
+            gemini = create_gemini_vlm(model=args.gemini_model, thinking_level=args.thinking_level)
+            models.append({'name': f'Gemini ({args.gemini_model})', 'instance': gemini})
+            print(f"[OK] Gemini initialized: {args.gemini_model}")
+        except Exception as e:
+            print(f"[SKIP] Gemini: {e}")
 
     # Try Grok
-    try:
-        grok = create_grok_vlm(model="grok-2-vision-latest")
-        models.append({'name': 'Grok 2 Vision', 'instance': grok})
-        print("[OK] Grok 2 Vision initialized")
-    except Exception as e:
-        print(f"[SKIP] Grok: {e}")
+    if run_grok:
+        try:
+            grok = create_grok_vlm(model=args.grok_model)
+            models.append({'name': f'Grok ({args.grok_model})', 'instance': grok})
+            print(f"[OK] Grok initialized: {args.grok_model}")
+        except Exception as e:
+            print(f"[SKIP] Grok: {e}")
 
     if not models:
         print("\nNo models available. Please check API keys in .env.local")
@@ -375,8 +467,9 @@ def main():
     # Run evaluation
     results = run_evaluation(
         models=models,
-        images_per_category=5,
-        single_image_first=True
+        images_per_category=args.images_per_category,
+        single_image_first=not args.skip_single_test,
+        output_dir=args.output_dir
     )
 
     # Print summary

@@ -178,7 +178,7 @@ def main():
         results.append(result)
 
         # Clear CUDA cache between categories
-        subprocess.run([sys.executable, "clear_cuda.py"], capture_output=True)
+        subprocess.run([sys.executable, "scripts/utilities/clear_cuda.py"], capture_output=True)
         time.sleep(5)  # Brief pause
 
     total_time = time.time() - total_start
@@ -194,12 +194,12 @@ def main():
     failed = [r for r in results if r.get("status") != "success"]
 
     for result in successful:
-        print(f"  ✓ {result['category']}: {result['training_time_min']:.1f}min")
+        print(f"  [OK] {result['category']}: {result['training_time_min']:.1f}min")
 
     if failed:
         print(f"\nFailed:")
         for result in failed:
-            print(f"  ✗ {result['category']}: {result.get('status', 'unknown error')}")
+            print(f"  [FAIL] {result['category']}: {result.get('status', 'unknown error')}")
 
     print(f"\nSuccess rate: {len(successful)}/{len(results)}")
 
