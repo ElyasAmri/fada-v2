@@ -12,7 +12,7 @@ import re
 class QuestionLoader:
     """Load and manage VQA questions from Excel annotation files"""
 
-    def __init__(self, data_dir: str = "data/Fetal Ultrasound"):
+    def __init__(self, data_dir: str = "data/Fetal Ultrasound") -> None:
         """
         Initialize question loader
 

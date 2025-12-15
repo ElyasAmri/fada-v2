@@ -128,7 +128,7 @@ class FeatureExtractor(nn.Module):
     Used for extracting features for downstream tasks
     """
 
-    def __init__(self, backbone_name: str = 'efficientnet_b0', pretrained: bool = True):
+    def __init__(self, backbone_name: str = 'efficientnet_b0', pretrained: bool = True) -> None:
         super(FeatureExtractor, self).__init__()
 
         if backbone_name == 'efficientnet_b0':

@@ -50,7 +50,7 @@ class UltrasoundVQA:
         self.processor = None
         self.model = None
 
-    def load_model(self):
+    def load_model(self) -> None:
         """Load BLIP-2 base model and LoRA adapters"""
         if self.model is not None:
             return  # Already loaded
@@ -234,7 +234,7 @@ class UltrasoundVQA:
         }
         return shortcuts
 
-    def unload_model(self):
+    def unload_model(self) -> None:
         """Unload model to free memory"""
         if self.model is not None:
             del self.model

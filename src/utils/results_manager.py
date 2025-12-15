@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ResultsManager:
     """Manager for saving and loading experiment results."""
 
-    def __init__(self, output_dir: Union[str, Path]):
+    def __init__(self, output_dir: Union[str, Path]) -> None:
         """
         Initialize results manager.
 

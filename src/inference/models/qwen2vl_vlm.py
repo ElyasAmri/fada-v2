@@ -2,7 +2,7 @@
 Qwen2-VL VLM Implementation
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from PIL import Image
 import torch
 from transformers import BitsAndBytesConfig
@@ -29,10 +29,10 @@ class Qwen2VLVLM(LocalVLM):
             llm_int8_enable_fp32_cpu_offload=True
         )
 
-    def get_device_map(self):
+    def get_device_map(self) -> Dict[str, Any]:
         """Custom device map to allow CPU offload"""
         if not self.use_4bit:
-            return "auto"
+            return {"": "auto"}
 
         return {
             "": "cuda:0",

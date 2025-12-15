@@ -20,7 +20,7 @@ class ClassificationResult:
 class ResponseGenerator:
     """Generate natural language responses for ultrasound classifications"""
 
-    def __init__(self, confidence_threshold: float = 0.7):
+    def __init__(self, confidence_threshold: float = 0.7) -> None:
         """
         Initialize response generator
 

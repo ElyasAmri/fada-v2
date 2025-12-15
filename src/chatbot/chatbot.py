@@ -382,14 +382,14 @@ class UltrasoundChatbot:
 
         return results
 
-    def clear_history(self):
+    def clear_history(self) -> None:
         """Clear conversation history"""
         self.conversation_history = []
         logger.info("Conversation history cleared")
 
 
 # Standalone function for quick testing
-def test_chatbot(image_path: str, model_path: Optional[str] = None):
+def test_chatbot(image_path: str, model_path: Optional[str] = None) -> None:
     """Quick test function for the chatbot"""
 
     print("Initializing chatbot...")

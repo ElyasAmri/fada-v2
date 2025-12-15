@@ -5,7 +5,7 @@ Reusable Training Utilities for Deep Learning Models
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 import mlflow
 from tqdm import tqdm
 import logging
@@ -148,7 +148,7 @@ def validate(
 class EarlyStopping:
     """Early stopping utility"""
 
-    def __init__(self, patience: int = 10, mode: str = 'max', verbose: bool = True):
+    def __init__(self, patience: int = 10, mode: str = 'max', verbose: bool = True) -> None:
         """
         Args:
             patience: How many epochs to wait after last improvement
@@ -200,7 +200,7 @@ class EarlyStopping:
 class ModelCheckpoint:
     """Save model checkpoints"""
 
-    def __init__(self, filepath: str, monitor: str = 'val_acc', mode: str = 'max', verbose: bool = True):
+    def __init__(self, filepath: str, monitor: str = 'val_acc', mode: str = 'max', verbose: bool = True) -> None:
         """
         Args:
             filepath: Path to save checkpoint
@@ -295,7 +295,7 @@ def get_optimizer(model: nn.Module, config: dict) -> optim.Optimizer:
         raise ValueError(f"Unknown optimizer: {opt_name}")
 
 
-def get_scheduler(optimizer: optim.Optimizer, config: dict):
+def get_scheduler(optimizer: optim.Optimizer, config: dict) -> Optional[optim.lr_scheduler.LRScheduler]:
     """
     Create learning rate scheduler from config
 
@@ -327,7 +327,7 @@ def get_scheduler(optimizer: optim.Optimizer, config: dict):
         return None
 
 
-def log_metrics(metrics: dict, step: int = None, prefix: str = ''):
+def log_metrics(metrics: dict, step: Optional[int] = None, prefix: str = '') -> None:
     """
     Log metrics to MLflow
 

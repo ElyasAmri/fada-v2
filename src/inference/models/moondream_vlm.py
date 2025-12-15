@@ -2,6 +2,7 @@
 Moondream2 VLM Implementation
 """
 
+from typing import Optional
 from PIL import Image
 import torch
 
@@ -15,7 +16,7 @@ class MoondreamVLM(LocalVLM):
     DISPLAY_NAME = "Moondream2"
     USE_CAUSAL_LM = True  # Moondream uses AutoModelForCausalLM
 
-    def __init__(self, model_id: str = None, display_name: str = None, use_4bit: bool = False):
+    def __init__(self, model_id: Optional[str] = None, display_name: Optional[str] = None, use_4bit: bool = False) -> None:
         # Moondream is small enough without quantization by default
         super().__init__(model_id, display_name, use_4bit)
 
