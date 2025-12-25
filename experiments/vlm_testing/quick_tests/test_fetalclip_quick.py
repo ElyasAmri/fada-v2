@@ -181,15 +181,15 @@ for item in tqdm(test_images, desc="FetalCLIP inference"):
         'correct': is_correct
     })
 
-# Calculate accuracy
-accuracy = correct / total if total > 0 else 0
+# Calculate agreement rate (not "accuracy" since FetalCLIP uses different class taxonomy)
+agreement_rate = correct / total if total > 0 else 0
 
 print("\n" + "="*70)
 print("Results Summary")
 print("="*70)
 print(f"\nTotal images tested: {total}")
 print(f"Correct predictions: {correct}")
-print(f"Accuracy: {accuracy:.2%}")
+print(f"Agreement rate: {agreement_rate:.2%}")
 
 # Per-category breakdown
 category_stats = defaultdict(lambda: {'correct': 0, 'total': 0})
@@ -199,18 +199,18 @@ for r in results:
     if r['correct']:
         category_stats[cat]['correct'] += 1
 
-print("\nPer-category accuracy:")
+print("\nPer-category agreement rate:")
 for cat, stats in sorted(category_stats.items()):
-    cat_acc = stats['correct'] / stats['total'] if stats['total'] > 0 else 0
-    print(f"  {cat}: {cat_acc:.2%} ({stats['correct']}/{stats['total']})")
+    cat_rate = stats['correct'] / stats['total'] if stats['total'] > 0 else 0
+    print(f"  {cat}: {cat_rate:.2%} ({stats['correct']}/{stats['total']})")
 
 print("\n" + "="*70)
 print("Comparison with FADA Phase 1 Classifier")
 print("="*70)
-print(f"\nFetalCLIP (zero-shot):     {accuracy:.2%}")
-print(f"EfficientNet-B0 (trained): 88.0%")
-print("\nNote: This is a quick test on limited images.")
-print("For full comparison, run evaluation on complete test set.")
+print(f"\nFetalCLIP (zero-shot) agreement rate: {agreement_rate:.2%}")
+print(f"EfficientNet-B0 (fine-tuned) accuracy: 88.0%")
+print("\nNote: 'Agreement rate' for zero-shot (different taxonomy),")
+print("      'accuracy' for fine-tuned (same classes).")
 
 # Save results
 results_df = pd.DataFrame(results)
@@ -235,16 +235,16 @@ results_df['pred_coarse'] = results_df['predicted'].map(COARSE_MAP)
 df_filtered = results_df[results_df['true_coarse'].notna()].copy()
 df_filtered['correct_coarse'] = df_filtered['true_coarse'] == df_filtered['pred_coarse']
 
-print(f"\n12-class accuracy: {accuracy:.2%} ({correct}/{total})")
-coarse_acc = df_filtered['correct_coarse'].mean()
+print(f"\n12-class agreement rate: {agreement_rate:.2%} ({correct}/{total})")
+coarse_rate = df_filtered['correct_coarse'].mean()
 coarse_correct = df_filtered['correct_coarse'].sum()
-print(f"5-class accuracy:  {coarse_acc:.2%} ({coarse_correct}/{len(df_filtered)})")
+print(f"5-class agreement rate:  {coarse_rate:.2%} ({coarse_correct}/{len(df_filtered)})")
 
-print("\n5-class per-category:")
+print("\n5-class per-category agreement:")
 for cat in sorted(df_filtered['true_coarse'].unique()):
     cat_df = df_filtered[df_filtered['true_coarse'] == cat]
-    acc = cat_df['correct_coarse'].mean() * 100
-    print(f"  {cat:12s}: {acc:.1f}% ({cat_df['correct_coarse'].sum()}/{len(cat_df)})")
+    rate = cat_df['correct_coarse'].mean() * 100
+    print(f"  {cat:12s}: {rate:.1f}% ({cat_df['correct_coarse'].sum()}/{len(cat_df)})")
 
 print("\n" + "="*70)
 print("Next Steps")
