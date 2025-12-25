@@ -19,6 +19,7 @@ venv/
 
 # ML/Data Science
 *.pth
+*.pt
 *.h5
 *.pkl
 *.log
