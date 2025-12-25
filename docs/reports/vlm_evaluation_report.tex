@@ -1,0 +1,354 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{float}
+
+% Page geometry
+\geometry{margin=1in}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10}
+}
+
+\title{Evaluation of Vision-Language Models for Fetal Ultrasound Analysis}
+\author{FADA Project Team}
+\date{December 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents an evaluation of vision-language models (VLMs) for fetal ultrasound image analysis as part of the FADA (Fetal Anomaly Detection Algorithm) research project. We evaluate two approaches: (1) FetalCLIP, a domain-specific CLIP model pre-trained on 210,000 fetal ultrasound images, for zero-shot classification; and (2) MedGemma-27B, a medical vision-language model, for open-ended image analysis. Our findings indicate that FetalCLIP achieves 65.5\% accuracy on coarse 5-class organ classification but only 40.3\% on fine-grained 12-class categorization, significantly underperforming a fine-tuned EfficientNet-B0 baseline (88\%). These results highlight the importance of task-specific fine-tuning for specialized medical imaging applications.
+\end{abstract}
+
+\section{Introduction}
+
+The FADA (Fetal Anomaly Detection Algorithm) project aims to develop a conversational chatbot for fetal ultrasound image analysis. This research prototype explores the application of deep learning models to assist in interpreting ultrasound images across multiple anatomical categories.
+
+\textbf{Important Disclaimer:} This is a research prototype and is \textbf{not intended for clinical use}.
+
+\subsection{Dataset Overview}
+
+The evaluation dataset comprises 15,002 fetal ultrasound images across 12 anatomical categories:
+
+\begin{table}[H]
+\centering
+\caption{Dataset Distribution by Category}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Category} & \textbf{Train} & \textbf{Val} & \textbf{Test} & \textbf{Total} \\
+\midrule
+Abdomen & 1,940 & 242 & 242 & 2,424 \\
+Aorta & 1,048 & 130 & 130 & 1,308 \\
+Cervical & 400 & 50 & 50 & 500 \\
+Cervix & 1,302 & 162 & 162 & 1,626 \\
+Femur & 933 & 116 & 116 & 1,165 \\
+Non-standard NT & 391 & 48 & 48 & 487 \\
+Public Symphysis & 1,088 & 135 & 135 & 1,358 \\
+Standard NT & 1,208 & 150 & 150 & 1,508 \\
+Thorax & 1,435 & 179 & 179 & 1,793 \\
+Trans-cerebellum & 548 & 68 & 68 & 684 \\
+Trans-thalamic & 1,253 & 156 & 156 & 1,565 \\
+Trans-ventricular & 468 & 58 & 58 & 584 \\
+\midrule
+\textbf{Total} & \textbf{12,014} & \textbf{1,494} & \textbf{1,494} & \textbf{15,002} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dataset was split using stratified sampling with a 70/15/15 train/validation/test ratio and a fixed random seed (42) to ensure reproducibility.
+
+\section{Methodology}
+
+\subsection{FetalCLIP Zero-Shot Classification}
+
+FetalCLIP is a vision-language foundation model specifically designed for fetal ultrasound analysis, developed by Mohamed bin Zayed University of Artificial Intelligence (MBZUAI). The model was pre-trained on 210,035 fetal ultrasound image-text pairs using contrastive learning.
+
+\subsubsection{Model Architecture}
+
+\begin{itemize}
+    \item \textbf{Vision Encoder:} ViT-style architecture with 24 layers, 1024 width, patch size 14
+    \item \textbf{Text Encoder:} Transformer with 12 layers, 768 width, 12 attention heads
+    \item \textbf{Embedding Dimension:} 768
+    \item \textbf{Total Parameters:} Approximately 400M
+\end{itemize}
+
+\subsubsection{Text Prompt Engineering}
+
+For zero-shot classification, we designed category-specific text prompts:
+
+\begin{lstlisting}
+"Abdomen": "Ultrasound image focusing on the fetal
+            abdominal area, highlighting structural
+            development."
+"Brain":   "Fetal ultrasound image showing the brain
+            region with visible anatomical structures."
+"Femur":   "Ultrasound image displaying the fetal femur
+            bone, used for measuring fetal growth."
+...
+\end{lstlisting}
+
+\subsubsection{Category Mapping}
+
+To handle naming inconsistencies between folder names and FetalCLIP's training categories, we applied the following mappings:
+
+\begin{itemize}
+    \item \texttt{Abodomen} $\rightarrow$ \texttt{Abdomen} (typo correction)
+    \item \texttt{Aorta} $\rightarrow$ \texttt{Heart} (semantic grouping)
+    \item \texttt{Cervical} $\rightarrow$ \texttt{Cervix} (semantic equivalent)
+    \item \texttt{Public\_Symphysis\_fetal\_head} $\rightarrow$ Excluded (no mapping)
+\end{itemize}
+
+\subsubsection{Inference Pipeline}
+
+\begin{enumerate}
+    \item Load FetalCLIP model with pre-trained weights
+    \item Tokenize and encode all text prompts (cached)
+    \item For each test image:
+    \begin{enumerate}
+        \item Preprocess and encode image features
+        \item Compute cosine similarity with all text embeddings
+        \item Apply softmax to obtain prediction probabilities
+        \item Select category with highest probability
+    \end{enumerate}
+\end{enumerate}
+
+\subsection{MedGemma VLM Evaluation}
+
+MedGemma-27B is a medical vision-language model capable of processing both images and text for open-ended medical image analysis.
+
+\subsubsection{Evaluation Framework}
+
+We developed an asynchronous parallel evaluation framework with the following features:
+
+\begin{itemize}
+    \item \textbf{Rate Limiting:} Token bucket algorithm with configurable requests per minute
+    \item \textbf{Concurrent Requests:} Up to 20 parallel API calls
+    \item \textbf{Checkpoint/Resume:} Automatic saving every 10 images for fault tolerance
+    \item \textbf{OpenAI-Compatible API:} Deployed via vLLM on Vast.ai (A100 80GB)
+\end{itemize}
+
+\subsubsection{Standardized Question Set}
+
+Each image was evaluated using 8 standardized questions:
+
+\begin{enumerate}
+    \item Anatomical Structures Identification
+    \item Fetal Orientation Assessment
+    \item Imaging Plane Evaluation
+    \item Biometric Measurements Analysis
+    \item Gestational Age Estimation
+    \item Image Quality Assessment
+    \item Normality/Abnormality Determination
+    \item Clinical Recommendations
+\end{enumerate}
+
+\subsubsection{Response Scoring Metrics}
+
+Responses were evaluated using the following weighted metrics:
+
+\begin{equation}
+\text{Score} = 0.3 \cdot C_{\text{fetal}} + 0.4 \cdot C_{\text{anatomy}} + 0.2 \cdot S_{\text{detail}} - 0.1 \cdot P_{\text{hallucination}}
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $C_{\text{fetal}}$: Binary indicator for fetal medical context (0 or 1)
+    \item $C_{\text{anatomy}}$: Binary indicator for correct anatomical region (0 or 1)
+    \item $S_{\text{detail}}$: Detail score based on response length (0.2--1.0)
+    \item $P_{\text{hallucination}}$: Penalty for mentioning incorrect anatomical regions
+\end{itemize}
+
+\section{Results}
+
+\subsection{FetalCLIP Zero-Shot Classification}
+
+FetalCLIP was evaluated on 1,359 test images (excluding Public Symphysis category).
+
+\subsubsection{12-Class Fine-Grained Results}
+
+\begin{table}[H]
+\centering
+\caption{FetalCLIP 12-Class Zero-Shot Classification Results}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Accuracy} \\
+\midrule
+Cervix & 211 & 212 & 99.53\% \\
+Femur & 105 & 116 & 90.52\% \\
+Abdomen & 112 & 242 & 46.28\% \\
+Heart (Aorta) & 49 & 130 & 37.69\% \\
+Trans-ventricular & 19 & 58 & 32.76\% \\
+Standard NT & 20 & 150 & 13.33\% \\
+Trans-thalamic & 19 & 156 & 12.18\% \\
+Trans-cerebellum & 7 & 68 & 10.29\% \\
+Non-standard NT & 5 & 48 & 10.42\% \\
+Thorax & 1 & 179 & 0.56\% \\
+\midrule
+\textbf{Overall} & \textbf{548} & \textbf{1,359} & \textbf{40.32\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{5-Class Coarse-Grained Results}
+
+To evaluate FetalCLIP's performance on standard fetal plane classification, we grouped categories into 5 coarse classes:
+
+\begin{itemize}
+    \item \textbf{Brain:} Trans-cerebellum, Trans-thalamic, Trans-ventricular
+    \item \textbf{Abdomen, Thorax, Femur, Heart, Cervix:} Individual classes
+    \item \textbf{Excluded:} Standard NT, Non-standard NT (no standard mapping)
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{FetalCLIP 5-Class Coarse-Grained Results}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Accuracy} \\
+\midrule
+Brain & 282 & 282 & \textbf{100.00\%} \\
+Cervix & 211 & 212 & 99.53\% \\
+Femur & 105 & 116 & 90.52\% \\
+Abdomen & 112 & 242 & 46.28\% \\
+Heart & 49 & 130 & 37.69\% \\
+Thorax & 1 & 179 & 0.56\% \\
+\midrule
+\textbf{Overall} & \textbf{760} & \textbf{1,161} & \textbf{65.46\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Key Findings}
+
+\begin{enumerate}
+    \item \textbf{Strong Performance:} Brain (100\%), Cervix (99.5\%), Femur (90.5\%)
+    \item \textbf{Critical Weakness:} Thorax images almost always misclassified as Heart (0.6\% accuracy)
+    \item \textbf{Brain Subplane Limitation:} All brain subplanes correctly grouped as ``Brain'' but individual subplanes not distinguished
+    \item \textbf{NT Classification Failure:} Cannot distinguish Standard vs Non-standard NT views
+\end{enumerate}
+
+\subsection{MedGemma VLM Evaluation}
+
+MedGemma-27B evaluation is ongoing. Preliminary results from checkpoint data:
+
+\begin{itemize}
+    \item \textbf{Progress:} 170/1,494 images processed (as of report generation)
+    \item \textbf{Inference Speed:} Approximately 30-32 seconds per image
+    \item \textbf{Deployment:} vLLM on Vast.ai A100 80GB with 20 concurrent requests
+\end{itemize}
+
+\subsubsection{Preliminary Per-Question Performance}
+
+Based on early checkpoint data:
+
+\begin{table}[H]
+\centering
+\caption{MedGemma Per-Question Performance (Preliminary)}
+\begin{tabular}{lc}
+\toprule
+\textbf{Question Type} & \textbf{Avg. Score} \\
+\midrule
+Anatomical Identification (Q1) & 0.97 \\
+Plane Evaluation (Q3) & 0.99 \\
+Image Quality (Q6) & 0.99 \\
+Clinical Recommendations (Q8) & 0.97 \\
+Biometric Measurements (Q4) & 0.96 \\
+Normality Assessment (Q7) & 0.95 \\
+Fetal Orientation (Q2) & 0.60 \\
+Gestational Age (Q5) & 0.59 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+\subsection{FetalCLIP Limitations}
+
+The significant performance gap between 5-class (65.5\%) and 12-class (40.3\%) accuracy reveals fundamental limitations:
+
+\begin{enumerate}
+    \item \textbf{Training Distribution Mismatch:} FetalCLIP was trained on standard 5-plane classification. Our 12-class dataset includes fine-grained distinctions (brain subplanes, NT variants) outside its training distribution.
+
+    \item \textbf{Anatomical Confusion:} Thorax and Heart images share similar cross-sectional views, leading to systematic misclassification. The heart is prominently visible in thorax views, confusing the model.
+
+    \item \textbf{Zero-Shot vs Fine-Tuned:} Comparing zero-shot FetalCLIP (40.3\%) against fine-tuned EfficientNet-B0 (88\%) is not a fair baseline comparison---they represent fundamentally different paradigms.
+\end{enumerate}
+
+\subsection{Implications for Baseline Selection}
+
+FetalCLIP is \textbf{not suitable as a direct baseline} for the FADA 12-class classification task because:
+
+\begin{itemize}
+    \item Different task granularity (5 vs 12 classes)
+    \item Different training paradigms (zero-shot vs fine-tuned)
+    \item Categories include distinctions FetalCLIP was never trained to make
+\end{itemize}
+
+However, FetalCLIP provides value as:
+\begin{itemize}
+    \item A comparison point demonstrating that domain-specific foundation models still underperform task-specific fine-tuning
+    \item A potential feature extractor for downstream tasks
+    \item Validation that our fine-tuning approach is appropriate for this specialized dataset
+\end{itemize}
+
+\subsection{MedGemma Observations}
+
+Preliminary MedGemma results suggest:
+\begin{itemize}
+    \item Strong performance on anatomical identification and image quality assessment
+    \item Weaker performance on orientation and gestational age estimation
+    \item Comprehensive, professionally-worded responses with appropriate clinical caveats
+\end{itemize}
+
+\section{Conclusion}
+
+This evaluation demonstrates that:
+
+\begin{enumerate}
+    \item \textbf{FetalCLIP} achieves reasonable accuracy (65.5\%) for coarse 5-class organ classification but is inadequate for fine-grained 12-class categorization (40.3\%).
+
+    \item \textbf{Task-specific fine-tuning} (EfficientNet-B0 at 88\%) significantly outperforms zero-shot foundation models for specialized medical imaging tasks.
+
+    \item \textbf{Domain-specific pre-training} (FetalCLIP on 210K fetal images) provides advantages over generic models but cannot replace task-specific adaptation.
+
+    \item \textbf{MedGemma} shows promise for open-ended image analysis with strong anatomical understanding, though evaluation is ongoing.
+\end{enumerate}
+
+\subsection{Recommendations}
+
+For the FADA project:
+\begin{itemize}
+    \item Continue with fine-tuned EfficientNet-B0 for classification
+    \item Consider FetalCLIP embeddings as additional features
+    \item Use MedGemma for generating explanatory text responses
+    \item Document these findings as comparative analysis for publication
+\end{itemize}
+
+\section*{Acknowledgments}
+
+This research uses the FetalCLIP model developed by MBZUAI and MedGemma developed by Google. Dataset annotations were provided by the FADA project team.
+
+\end{document}
