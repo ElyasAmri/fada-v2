@@ -40,7 +40,7 @@
 \maketitle
 
 \begin{abstract}
-This report presents an evaluation of vision-language models (VLMs) for fetal ultrasound image analysis as part of the FADA (Fetal Anomaly Detection Algorithm) research project. We evaluate two approaches: (1) FetalCLIP, a domain-specific CLIP model pre-trained on 210,000 fetal ultrasound images, for zero-shot classification; and (2) MedGemma-27B, a medical vision-language model, for open-ended image analysis. Our findings indicate that FetalCLIP achieves 65.5\% accuracy on coarse 5-class organ classification but only 40.3\% on fine-grained 12-class categorization, significantly underperforming a fine-tuned EfficientNet-B0 baseline (88\%). These results highlight the importance of task-specific fine-tuning for specialized medical imaging applications.
+This report presents an evaluation of vision-language models (VLMs) for fetal ultrasound image analysis as part of the FADA (Fetal Anomaly Detection Algorithm) research project. We evaluate two approaches: (1) FetalCLIP, a domain-specific CLIP model pre-trained on 210,000 fetal ultrasound images, for zero-shot classification; and (2) MedGemma-27B, a medical vision-language model, for open-ended image analysis. Our findings indicate that FetalCLIP achieves 65.5\% agreement rate on coarse 5-class organ classification but only 40.3\% on fine-grained 12-class categorization, significantly underperforming a fine-tuned EfficientNet-B0 baseline (88\% accuracy). Note: We use ``agreement rate'' for zero-shot models (comparing predictions against mapped labels from a different taxonomy) and ``accuracy'' for supervised models (trained and tested on the same classification scheme). These results highlight the importance of task-specific fine-tuning for specialized medical imaging applications.
 \end{abstract}
 
 \section{Introduction}
@@ -194,7 +194,7 @@ FetalCLIP was evaluated on 1,359 test images (excluding Public Symphysis categor
 \caption{FetalCLIP 12-Class Zero-Shot Classification Results}
 \begin{tabular}{lrrr}
 \toprule
-\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Accuracy} \\
+\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Agreement Rate} \\
 \midrule
 Cervix & 211 & 212 & 99.53\% \\
 Femur & 105 & 116 & 90.52\% \\
@@ -227,7 +227,7 @@ To evaluate FetalCLIP's performance on standard fetal plane classification, we g
 \caption{FetalCLIP 5-Class Coarse-Grained Results}
 \begin{tabular}{lrrr}
 \toprule
-\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Accuracy} \\
+\textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Agreement Rate} \\
 \midrule
 Brain & 282 & 282 & \textbf{100.00\%} \\
 Cervix & 211 & 212 & 99.53\% \\
@@ -244,8 +244,8 @@ Thorax & 1 & 179 & 0.56\% \\
 \subsubsection{Key Findings}
 
 \begin{enumerate}
-    \item \textbf{Strong Performance:} Brain (100\%), Cervix (99.5\%), Femur (90.5\%)
-    \item \textbf{Critical Weakness:} Thorax images almost always misclassified as Heart (0.6\% accuracy)
+    \item \textbf{Strong Agreement:} Brain (100\%), Cervix (99.5\%), Femur (90.5\%)
+    \item \textbf{Critical Weakness:} Thorax images almost always misclassified as Heart (0.6\% agreement rate)
     \item \textbf{Brain Subplane Limitation:} All brain subplanes correctly grouped as ``Brain'' but individual subplanes not distinguished
     \item \textbf{NT Classification Failure:} Cannot distinguish Standard vs Non-standard NT views
 \end{enumerate}
@@ -287,14 +287,14 @@ Gestational Age (Q5) & 0.59 \\
 
 \subsection{FetalCLIP Limitations}
 
-The significant performance gap between 5-class (65.5\%) and 12-class (40.3\%) accuracy reveals fundamental limitations:
+The significant performance gap between 5-class (65.5\%) and 12-class (40.3\%) agreement rates reveals fundamental limitations:
 
 \begin{enumerate}
     \item \textbf{Training Distribution Mismatch:} FetalCLIP was trained on standard 5-plane classification. Our 12-class dataset includes fine-grained distinctions (brain subplanes, NT variants) outside its training distribution.
 
     \item \textbf{Anatomical Confusion:} Thorax and Heart images share similar cross-sectional views, leading to systematic misclassification. The heart is prominently visible in thorax views, confusing the model.
 
-    \item \textbf{Zero-Shot vs Fine-Tuned:} Comparing zero-shot FetalCLIP (40.3\%) against fine-tuned EfficientNet-B0 (88\%) is not a fair baseline comparison---they represent fundamentally different paradigms.
+    \item \textbf{Zero-Shot vs Fine-Tuned:} Comparing zero-shot FetalCLIP (40.3\% agreement rate) against fine-tuned EfficientNet-B0 (88\% accuracy) is not a fair baseline comparison---they represent fundamentally different paradigms and evaluation metrics.
 \end{enumerate}
 
 \subsection{Implications for Baseline Selection}
@@ -328,13 +328,13 @@ Preliminary MedGemma results suggest:
 This evaluation demonstrates that:
 
 \begin{enumerate}
-    \item \textbf{FetalCLIP} achieves reasonable accuracy (65.5\%) for coarse 5-class organ classification but is inadequate for fine-grained 12-class categorization (40.3\%).
+    \item \textbf{FetalCLIP} achieves reasonable agreement (65.5\%) for coarse 5-class organ classification but is inadequate for fine-grained 12-class categorization (40.3\% agreement rate).
 
-    \item \textbf{Task-specific fine-tuning} (EfficientNet-B0 at 88\%) significantly outperforms zero-shot foundation models for specialized medical imaging tasks.
+    \item \textbf{Task-specific fine-tuning} (EfficientNet-B0 at 88\% accuracy) significantly outperforms zero-shot foundation models for specialized medical imaging tasks.
 
     \item \textbf{Domain-specific pre-training} (FetalCLIP on 210K fetal images) provides advantages over generic models but cannot replace task-specific adaptation.
 
-    \item \textbf{MedGemma} shows promise for open-ended image analysis with strong anatomical understanding, though evaluation is ongoing.
+    \item \textbf{MedGemma} shows promise for open-ended image analysis with strong anatomical understanding, evaluated using response quality scores.
 \end{enumerate}
 
 \subsection{Recommendations}

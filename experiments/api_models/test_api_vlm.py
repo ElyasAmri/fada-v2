@@ -1,5 +1,8 @@
 """
-Parallel API VLM Accuracy Test - Evaluate vision models with concurrent requests and rate limiting
+Parallel API VLM Response Quality Test - Evaluate vision models with concurrent requests and rate limiting
+
+Note: Uses "response quality score" not "accuracy" since VLMs produce free-text responses
+evaluated by rubrics, not classification against ground-truth labels.
 
 Usage:
     python test_api_vlm_parallel.py --models grok --images-per-category 3 --max-rpm 60
@@ -527,7 +530,7 @@ class AsyncVLLM:
 
 
 def evaluate_response(response: str, category: str, question_idx: int) -> Dict[str, Any]:
-    """Evaluate a model response for accuracy"""
+    """Evaluate a model response quality using rubric-based scoring"""
     response_lower = response.lower()
 
     fetal_keywords = ['fetal', 'fetus', 'ultrasound', 'pregnancy', 'prenatal',
@@ -793,7 +796,7 @@ async def run_parallel_evaluation(
         'completed_count': len(completed_images),
         'total_count': len(test_images),
         'metrics': {
-            'overall_accuracy': sum(all_scores) / len(all_scores) if all_scores else 0,
+            'avg_response_score': sum(all_scores) / len(all_scores) if all_scores else 0,
             'total_images': len(results),
             'total_questions': len(all_scores),
             'total_time': total_time,
@@ -1197,7 +1200,7 @@ async def main():
             metrics = model_data['metrics']
             elapsed = metrics['total_time']
             rpm = (metrics['total_questions'] / elapsed * 60) if elapsed > 0 else 0
-            summary = f"{model_name}: {metrics['overall_accuracy']:.2%} ({metrics['total_questions']} in {elapsed:.0f}s, {rpm:.1f} RPM)"
+            summary = f"{model_name}: {metrics['avg_response_score']:.2%} ({metrics['total_questions']} in {elapsed:.0f}s, {rpm:.1f} RPM)"
             logger.info(summary)
             print(summary)
 
