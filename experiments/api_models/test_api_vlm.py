@@ -672,11 +672,18 @@ async def run_parallel_evaluation(
     no_progress: bool = False,
     logger: Optional[logging.Logger] = None,
     checkpoint_path: Optional[Path] = None,
-    completed_images: Optional[Dict[str, Dict]] = None
+    completed_images: Optional[Dict[str, Dict]] = None,
+    max_requests: int = 0
 ) -> Dict[str, Any]:
-    """Run evaluation with parallel requests and checkpoint support"""
+    """Run evaluation with parallel requests and checkpoint support
+
+    Args:
+        max_requests: Maximum total requests before stopping (0=unlimited)
+    """
 
     completed_images = completed_images or {}
+    requests_per_image = len(questions)
+    total_requests_made = len(completed_images) * requests_per_image
     results = list(completed_images.values())  # Start with already completed
 
     # Filter out already completed images
@@ -702,13 +709,30 @@ async def run_parallel_evaluation(
 
         # Process in batches for checkpoint saving (save every 10 images)
         CHECKPOINT_INTERVAL = 10
+        max_requests_hit = False
 
         for i, img in enumerate(remaining_images):
+            # Check max_requests limit before processing
+            if max_requests > 0 and total_requests_made + requests_per_image > max_requests:
+                max_requests_hit = True
+                if logger:
+                    logger.info(f"MAX REQUESTS LIMIT: Stopping at {total_requests_made} requests (limit: {max_requests})")
+                print(f"\n[MAX REQUESTS] Reached limit of {max_requests} requests ({total_requests_made} made)")
+
+                # Save checkpoint
+                if checkpoint_path:
+                    save_checkpoint(checkpoint_path, completed_images, model_name,
+                                  {'total_images': len(test_images)}, results)
+                    print(f"[CHECKPOINT] Saved {len(completed_images)}/{len(test_images)} images to {checkpoint_path.name}")
+                    print(f"[RESUME] Run with --resume {checkpoint_path.name} to continue tomorrow")
+                break
+
             try:
                 result = await process_single_image(
                     model, img['path'], questions, img['category'], rate_limiter
                 )
                 results.append(result)
+                total_requests_made += requests_per_image
 
                 # Track completed
                 img_key = f"{img['category']}/{img['name']}"
@@ -719,7 +743,7 @@ async def run_parallel_evaluation(
                     save_checkpoint(checkpoint_path, completed_images, model_name,
                                   {'total_images': len(test_images)}, results)
                     if logger:
-                        logger.info(f"Checkpoint saved: {len(completed_images)}/{len(test_images)} images")
+                        logger.info(f"Checkpoint saved: {len(completed_images)}/{len(test_images)} images ({total_requests_made} requests)")
 
                 if pbar:
                     pbar.update(1)
@@ -983,6 +1007,13 @@ Examples:
         help="Resume from checkpoint file (filename in results dir)"
     )
 
+    parser.add_argument(
+        "--max-requests",
+        type=int,
+        default=0,
+        help="Maximum total requests before stopping (0=unlimited). Useful for API quota limits like 10K RPD."
+    )
+
     return parser.parse_args()
 
 
@@ -1096,7 +1127,8 @@ async def main():
             result = await run_parallel_evaluation(
                 openai_vlm, f"OpenAI ({args.openai_model})",
                 test_images, questions, rate_limiter, output_dir, quiet, no_progress, logger,
-                checkpoint_path=checkpoint_path, completed_images=completed_images
+                checkpoint_path=checkpoint_path, completed_images=completed_images,
+                max_requests=args.max_requests
             )
             all_results['models'][f'OpenAI ({args.openai_model})'] = result
         except Exception as e:
@@ -1115,7 +1147,8 @@ async def main():
             result = await run_parallel_evaluation(
                 grok, f"Grok ({args.grok_model})",
                 test_images, questions, rate_limiter, output_dir, quiet, no_progress, logger,
-                checkpoint_path=checkpoint_path, completed_images=completed_images
+                checkpoint_path=checkpoint_path, completed_images=completed_images,
+                max_requests=args.max_requests
             )
             all_results['models'][f'Grok ({args.grok_model})'] = result
         except Exception as e:
@@ -1134,7 +1167,8 @@ async def main():
             result = await run_parallel_evaluation(
                 gemini, f"Gemini ({args.gemini_model})",
                 test_images, questions, rate_limiter, output_dir, quiet, no_progress, logger,
-                checkpoint_path=checkpoint_path, completed_images=completed_images
+                checkpoint_path=checkpoint_path, completed_images=completed_images,
+                max_requests=args.max_requests
             )
             all_results['models'][f'Gemini ({args.gemini_model})'] = result
         except Exception as e:
@@ -1157,7 +1191,8 @@ async def main():
             result = await run_parallel_evaluation(
                 vertex_ai, f"VertexAI ({args.vertex_ai_model})",
                 test_images, questions, rate_limiter, output_dir, quiet, no_progress, logger,
-                checkpoint_path=checkpoint_path, completed_images=completed_images
+                checkpoint_path=checkpoint_path, completed_images=completed_images,
+                max_requests=args.max_requests
             )
             all_results['models'][f'VertexAI ({args.vertex_ai_model})'] = result
 
@@ -1179,7 +1214,8 @@ async def main():
             result = await run_parallel_evaluation(
                 vllm, f"vLLM ({args.vllm_model})",
                 test_images, questions, rate_limiter, output_dir, quiet, no_progress, logger,
-                checkpoint_path=checkpoint_path, completed_images=completed_images
+                checkpoint_path=checkpoint_path, completed_images=completed_images,
+                max_requests=args.max_requests
             )
             all_results['models'][f'vLLM ({args.vllm_model})'] = result
         except Exception as e:

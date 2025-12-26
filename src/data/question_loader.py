@@ -25,11 +25,20 @@ class QuestionLoader:
         self._scan_annotation_files()
 
     def _scan_annotation_files(self) -> None:
-        """Scan for Excel annotation files"""
+        """Scan for Excel annotation files and image directories"""
+        # First, scan for Excel annotation files
         for excel_file in self.data_dir.glob("*_image_list.xlsx"):
             # Extract category name (e.g., "Abodomen" from "Abodomen_image_list.xlsx")
             category = excel_file.stem.replace("_image_list", "")
             self._category_files[category] = excel_file
+
+        # Also scan for directories with images but no Excel file
+        for subdir in self.data_dir.iterdir():
+            if subdir.is_dir() and subdir.name not in self._category_files:
+                # Check if directory contains images
+                has_images = any(subdir.glob("*.png")) or any(subdir.glob("*.jpg"))
+                if has_images:
+                    self._category_files[subdir.name] = None  # No Excel file
 
     def _extract_questions(self, df: pd.DataFrame) -> List[str]:
         """
@@ -149,8 +158,8 @@ class QuestionLoader:
         if not category_dir.exists():
             return []
 
-        # Get PNG images
-        images = list(category_dir.glob("*.png"))
+        # Get PNG and JPG images
+        images = list(category_dir.glob("*.png")) + list(category_dir.glob("*.jpg"))
         images.sort()
         return images
 
