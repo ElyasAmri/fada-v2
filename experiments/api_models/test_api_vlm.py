@@ -1014,6 +1014,20 @@ Examples:
         help="Maximum total requests before stopping (0=unlimited). Useful for API quota limits like 10K RPD."
     )
 
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=None,
+        help="Start index for image list (0-based). For splitting dataset across machines."
+    )
+
+    parser.add_argument(
+        "--end-index",
+        type=int,
+        default=None,
+        help="End index for image list (exclusive). If not specified, processes to end."
+    )
+
     return parser.parse_args()
 
 
@@ -1082,6 +1096,17 @@ async def main():
     else:
         test_images = get_test_images(question_loader, args.images_per_category)
 
+    # Apply sharding if specified (for parallel processing across machines)
+    total_images_before_shard = len(test_images)
+    shard_suffix = ""
+    if args.start_index is not None or args.end_index is not None:
+        start = args.start_index or 0
+        end = args.end_index or len(test_images)
+        shard_suffix = f"_shard{start}-{end}"
+        print(f"[SHARD] Processing images {start} to {end} (of {total_images_before_shard} total)")
+        logger.info(f"Sharding: images {start} to {end} of {total_images_before_shard}")
+        test_images = test_images[start:end]
+
     total_requests = len(test_images) * len(questions)
     logger.info(f"Total: {len(test_images)} images x {len(questions)} questions = {total_requests} requests")
 
@@ -1118,7 +1143,7 @@ async def main():
     if run_openai:
         try:
             # Create checkpoint path for this model
-            checkpoint_path = output_dir / f'checkpoint_openai_{args.openai_model.replace("/", "_")}.json'
+            checkpoint_path = output_dir / f'checkpoint_openai_{args.openai_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('OpenAI'):
                 completed_images = checkpoint_data.get('completed_images', {})
@@ -1138,7 +1163,7 @@ async def main():
     # Run Grok
     if run_grok:
         try:
-            checkpoint_path = output_dir / f'checkpoint_grok_{args.grok_model.replace("/", "_")}.json'
+            checkpoint_path = output_dir / f'checkpoint_grok_{args.grok_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('Grok'):
                 completed_images = checkpoint_data.get('completed_images', {})
@@ -1158,7 +1183,7 @@ async def main():
     # Run Gemini
     if run_gemini:
         try:
-            checkpoint_path = output_dir / f'checkpoint_gemini_{args.gemini_model.replace("/", "_")}.json'
+            checkpoint_path = output_dir / f'checkpoint_gemini_{args.gemini_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('Gemini'):
                 completed_images = checkpoint_data.get('completed_images', {})
@@ -1178,7 +1203,7 @@ async def main():
     # Run Vertex AI
     if run_vertex_ai:
         try:
-            checkpoint_path = output_dir / f'checkpoint_vertex_ai_{args.vertex_ai_model.replace("/", "_")}.json'
+            checkpoint_path = output_dir / f'checkpoint_vertex_ai_{args.vertex_ai_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('VertexAI'):
                 completed_images = checkpoint_data.get('completed_images', {})
@@ -1205,7 +1230,7 @@ async def main():
     # Run vLLM (local server)
     if run_vllm:
         try:
-            checkpoint_path = output_dir / f'checkpoint_vllm_{args.vllm_model.replace("/", "_")}.json'
+            checkpoint_path = output_dir / f'checkpoint_vllm_{args.vllm_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('vLLM'):
                 completed_images = checkpoint_data.get('completed_images', {})
