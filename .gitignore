@@ -50,6 +50,7 @@ venv/
 
 # Artifacts - training outputs and models (gitignored, kept locally)
 /artifacts/
+/mlruns/
 
 # Experiments - all experimental work (tracked in git)
 # Note: Large files within experiments/ are handled by other rules
