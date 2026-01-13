@@ -34,8 +34,18 @@ sys.path.insert(0, str(project_root))
 from PIL import Image
 from tqdm.asyncio import tqdm_asyncio
 
-from src.data.question_loader import QuestionLoader
-from src.data.dataset_splits import load_splits, SPLITS_FILE
+# Direct imports to avoid torch dependency from src.data.__init__
+import importlib.util
+spec = importlib.util.spec_from_file_location("question_loader", project_root / "src/data/question_loader.py")
+question_loader_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(question_loader_module)
+QuestionLoader = question_loader_module.QuestionLoader
+
+spec2 = importlib.util.spec_from_file_location("dataset_splits", project_root / "src/data/dataset_splits.py")
+dataset_splits_module = importlib.util.module_from_spec(spec2)
+spec2.loader.exec_module(dataset_splits_module)
+load_splits = dataset_splits_module.load_splits
+SPLITS_FILE = dataset_splits_module.SPLITS_FILE
 
 
 # RPD (Requests Per Day) limit error patterns
@@ -683,7 +693,7 @@ async def run_parallel_evaluation(
 
     completed_images = completed_images or {}
     requests_per_image = len(questions)
-    total_requests_made = len(completed_images) * requests_per_image
+    total_requests_made = 0  # Only count NEW requests this session (not resumed)
     results = list(completed_images.values())  # Start with already completed
 
     # Filter out already completed images
@@ -707,30 +717,85 @@ async def run_parallel_evaluation(
         if not no_progress and not quiet:
             pbar = tqdm_asyncio(total=len(remaining_images), desc=model_name, initial=len(completed_images))
 
-        # Process in batches for checkpoint saving (save every 10 images)
-        CHECKPOINT_INTERVAL = 10
+        # Process images in PARALLEL batches
+        CHECKPOINT_INTERVAL = 50  # Save checkpoint every N images
+        IMAGE_BATCH_SIZE = rate_limiter.max_concurrent  # Process this many images concurrently
         max_requests_hit = False
+        stop_processing = False
 
-        for i, img in enumerate(remaining_images):
-            # Check max_requests limit before processing
-            if max_requests > 0 and total_requests_made + requests_per_image > max_requests:
-                max_requests_hit = True
-                if logger:
-                    logger.info(f"MAX REQUESTS LIMIT: Stopping at {total_requests_made} requests (limit: {max_requests})")
-                print(f"\n[MAX REQUESTS] Reached limit of {max_requests} requests ({total_requests_made} made)")
+        async def process_image_wrapper(img):
+            """Wrapper to process a single image and return result with metadata"""
+            nonlocal total_requests_made, stop_processing
 
-                # Save checkpoint
-                if checkpoint_path:
-                    save_checkpoint(checkpoint_path, completed_images, model_name,
-                                  {'total_images': len(test_images)}, results)
-                    print(f"[CHECKPOINT] Saved {len(completed_images)}/{len(test_images)} images to {checkpoint_path.name}")
-                    print(f"[RESUME] Run with --resume {checkpoint_path.name} to continue tomorrow")
-                break
+            if stop_processing:
+                return None
 
             try:
                 result = await process_single_image(
                     model, img['path'], questions, img['category'], rate_limiter
                 )
+                return {'img': img, 'result': result, 'error': None}
+            except RPDLimitError as e:
+                return {'img': img, 'result': None, 'error': ('rpd', e)}
+            except Exception as e:
+                return {'img': img, 'result': None, 'error': ('other', e)}
+
+        # Process in batches of IMAGE_BATCH_SIZE images concurrently
+        for batch_start in range(0, len(remaining_images), IMAGE_BATCH_SIZE):
+            if stop_processing:
+                break
+
+            # Check max_requests limit before processing batch
+            batch_end = min(batch_start + IMAGE_BATCH_SIZE, len(remaining_images))
+            batch = remaining_images[batch_start:batch_end]
+            batch_requests = len(batch) * requests_per_image
+
+            if max_requests > 0 and total_requests_made + batch_requests > max_requests:
+                # Reduce batch size to fit within limit
+                remaining_quota = max_requests - total_requests_made
+                max_images_in_batch = remaining_quota // requests_per_image
+                if max_images_in_batch <= 0:
+                    max_requests_hit = True
+                    if logger:
+                        logger.info(f"MAX REQUESTS LIMIT: Stopping at {total_requests_made} requests (limit: {max_requests})")
+                    print(f"\n[MAX REQUESTS] Reached limit of {max_requests} requests ({total_requests_made} made)")
+                    break
+                batch = batch[:max_images_in_batch]
+
+            # Process batch concurrently
+            tasks = [process_image_wrapper(img) for img in batch]
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for res in batch_results:
+                if res is None:
+                    continue
+                if isinstance(res, Exception):
+                    if logger:
+                        logger.error(f"Unexpected error in batch: {res}")
+                    if pbar:
+                        pbar.update(1)
+                    continue
+
+                img = res['img']
+                result = res['result']
+                error = res['error']
+
+                if error:
+                    error_type, error_obj = error
+                    if error_type == 'rpd':
+                        rpd_hit = True
+                        stop_processing = True
+                        if logger:
+                            logger.error(f"RPD LIMIT HIT: {error_obj}")
+                        print(f"\n[RPD LIMIT] {error_obj}")
+                    else:
+                        if logger:
+                            logger.error(f"Error processing {img['category']}/{img['name']}: {error_obj}")
+                    if pbar:
+                        pbar.update(1)
+                    continue
+
                 results.append(result)
                 total_requests_made += requests_per_image
 
@@ -738,35 +803,24 @@ async def run_parallel_evaluation(
                 img_key = f"{img['category']}/{img['name']}"
                 completed_images[img_key] = result
 
-                # Save checkpoint periodically
-                if checkpoint_path and (i + 1) % CHECKPOINT_INTERVAL == 0:
-                    save_checkpoint(checkpoint_path, completed_images, model_name,
-                                  {'total_images': len(test_images)}, results)
-                    if logger:
-                        logger.info(f"Checkpoint saved: {len(completed_images)}/{len(test_images)} images ({total_requests_made} requests)")
-
                 if pbar:
                     pbar.update(1)
 
-            except RPDLimitError as e:
-                rpd_hit = True
+            # Save checkpoint after each batch
+            if checkpoint_path and len(completed_images) % CHECKPOINT_INTERVAL < IMAGE_BATCH_SIZE:
+                save_checkpoint(checkpoint_path, completed_images, model_name,
+                              {'total_images': len(test_images)}, results)
                 if logger:
-                    logger.error(f"RPD LIMIT HIT: {e}")
-                print(f"\n[RPD LIMIT] {e}")
+                    logger.info(f"Checkpoint saved: {len(completed_images)}/{len(test_images)} images ({total_requests_made} requests)")
 
-                # Save checkpoint immediately
+            if rpd_hit:
+                # Save checkpoint immediately on RPD hit
                 if checkpoint_path:
                     save_checkpoint(checkpoint_path, completed_images, model_name,
                                   {'total_images': len(test_images)}, results)
                     print(f"[CHECKPOINT] Saved {len(completed_images)}/{len(test_images)} images to {checkpoint_path.name}")
                     print(f"[RESUME] Run with --resume {checkpoint_path.name} to continue")
                 break
-
-            except Exception as e:
-                if logger:
-                    logger.error(f"Error processing {img['category']}/{img['name']}: {e}")
-                if pbar:
-                    pbar.update(1)
 
         if pbar:
             pbar.close()
@@ -775,6 +829,10 @@ async def run_parallel_evaluation(
         if checkpoint_path and not rpd_hit:
             save_checkpoint(checkpoint_path, completed_images, model_name,
                           {'total_images': len(test_images)}, results)
+
+        if max_requests_hit and checkpoint_path:
+            print(f"[CHECKPOINT] Saved {len(completed_images)}/{len(test_images)} images to {checkpoint_path.name}")
+            print(f"[RESUME] Run with --resume {checkpoint_path.name} to continue tomorrow")
 
     # Calculate metrics from all results (completed + new)
     all_scores = []
