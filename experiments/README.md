@@ -1,33 +1,52 @@
 # Experiments
 
-This directory contains all experimental work for the FADA project, including VLM testing, notebooks, and external model repositories.
+This directory contains all experimental work for the FADA project, including VLM testing, notebooks, and external model integrations.
 
-## Structure
+## Active Directories
 
-- **vlm_testing/** - Vision-Language Model testing and evaluation
-  - **comprehensive/** - Latest comprehensive VLM tests (13 models tested Oct 2025)
-  - **quick_tests/** - Early quick testing scripts
-  - **legacy/** - Historical VLM test scripts
-  - **results/** - VLM test results (JSON, CSV files)
+### api_models/
+API-based VLM inference infrastructure.
+- `test_api_vlm.py` - Main async parallel VLM testing (Gemini, OpenAI, Grok)
+- `batch_gemini_annotation.py` - Batch API processing for Gemini
+- `results/` - Checkpoints, batch files, and results (DO NOT DELETE)
 
-- **notebooks/** - Jupyter notebooks for exploratory work
-  - **blip2_training/** - BLIP-2 model training experiments
-  - **experiments/** - General experimental notebooks
-  - **exploratory/** - Standalone exploratory notebooks
+### vlm_testing/
+Local Vision-Language Model testing.
+- `comprehensive/` - SOTA model tests (InternVL2, Qwen2-VL, MolMo, etc.)
+- `quick_tests/` - Fast validation scripts
+- `medgemma/` - Medical VLM-specific tests
 
-- **external_models/** - Cloned repositories for comparison/testing
-  - **FetalCLIP/** - FetalCLIP model repository
-  - **TinyGPT-V/** - TinyGPT-V model repository
+### external_models/
+Third-party model integrations.
+- `FetalCLIP/` - MBZUAI FetalCLIP (zero-shot, probing, few-shot)
+
+### fine_tuning/
+Model fine-tuning scripts.
+- `train_qwen3vl_lora.py` - LoRA fine-tuning for Qwen3-VL
+- `train_vastai.py` - Training on Vast.ai infrastructure
+
+### notebooks/
+Jupyter notebooks for training.
+- `blip2_training/` - BLIP-2 VQA training (5 categories complete)
+
+## Archived Directories
+
+### _archive/
+Legacy and deprecated code preserved for reference.
+- `legacy_vlm_tests/` - Old VLM tests (TinyGPT-V, Florence2, IDEFICS2, etc.)
+- `tinygptv/` - Full TinyGPT-V repository (unused)
+- `exploratory_notebooks/` - Old exploration notebooks
 
 ## Usage
 
-All experimental scripts should be run from the project root:
+Run scripts from project root:
 ```bash
-./venv/Scripts/python.exe experiments/vlm_testing/comprehensive/test_model.py
+./venv/Scripts/python.exe experiments/api_models/test_api_vlm.py --help
+./venv/Scripts/python.exe experiments/vlm_testing/comprehensive/test_internvl2.py
 ```
 
 ## Notes
 
-- This directory is tracked in git
-- Large model weights and outputs are stored in `artifacts/` (gitignored)
-- See `docs/experiments/` for detailed documentation of experimental results
+- Results in `api_models/results/` are critical - do not delete
+- See `docs/experiments/` for detailed documentation
+- Large model weights stored in `artifacts/` (gitignored)
