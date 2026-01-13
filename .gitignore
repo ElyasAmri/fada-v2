@@ -17,6 +17,9 @@ venv/
 .vscode/
 .DS_Store
 
+# Claude Code temp directories
+tmpclaude-*/
+
 # ML/Data Science
 *.pth
 *.pt
