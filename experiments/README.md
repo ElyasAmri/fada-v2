@@ -29,14 +29,6 @@ Model fine-tuning scripts.
 Jupyter notebooks for training.
 - `blip2_training/` - BLIP-2 VQA training (5 categories complete)
 
-## Archived Directories
-
-### _archive/
-Legacy and deprecated code preserved for reference.
-- `legacy_vlm_tests/` - Old VLM tests (TinyGPT-V, Florence2, IDEFICS2, etc.)
-- `tinygptv/` - Full TinyGPT-V repository (unused)
-- `exploratory_notebooks/` - Old exploration notebooks
-
 ## Usage
 
 Run scripts from project root:
