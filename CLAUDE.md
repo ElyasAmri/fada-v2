@@ -9,7 +9,7 @@ FADA (Fetal Anomaly Detection Algorithm) is a research prototype for ultrasound 
 ### Key Project Files to Review First
 1. `docs/project/project.md` - Original project description
 2. `docs/project/spec.md` - Detailed specifications and requirements
-3. `docs/project/modular_architecture.md` - System architecture (classification → captioning evolution)
+3. `docs/project/modular_architecture.md` - System architecture (classification to captioning evolution)
 4. `docs/project/APPROACH_VALIDATION.md` - Critical decisions and validation points
 
 ## Key Commands
@@ -50,13 +50,13 @@ streamlit run web/app.py --server.port 8501
 ### Modular Design
 ```
 UltrasoundAnalyzer
-├── FeatureExtractor (backbone.py)
-│   └── EfficientNet-B0 (frozen after initial training)
-└── Task Heads (heads.py)
-    ├── ClassificationHead (organ detection)
-    ├── AbnormalityHead (normal/abnormal)
-    ├── AttributeHead (quality, orientation)
-    └── CaptionHead (future)
++-- FeatureExtractor (backbone.py)
+|   +-- EfficientNet-B0 (frozen after initial training)
++-- Task Heads (heads.py)
+    +-- ClassificationHead (organ detection)
+    +-- AbnormalityHead (normal/abnormal)
+    +-- AttributeHead (quality, orientation)
+    +-- CaptionHead (future)
 ```
 
 The backbone is trained once and shared across all tasks. New heads can be added without retraining the backbone, enabling progressive enhancement.
@@ -131,6 +131,11 @@ mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", 
 - `docs/project/modular_architecture.md` - System design details
 - `docs/papers/literature_review.md` - Research findings and papers (15+ papers analyzed)
 - `docs/papers/bibliography.md` - Paper references and findings
+
+## API Model Defaults
+- **Gemini API**: Always use `gemini-3-flash-preview` as the default model (NOT gemini-2.5-flash)
+- **Batch annotations**: Use Gemini 3 Flash for all new annotation jobs
+- **OpenAI API**: Use GPT-4o for vision tasks
 
 ## Critical Instructions
 - Always be critical of the task you are told to do. Never assume the user always right. This is a large project with many constraints
