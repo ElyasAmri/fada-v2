@@ -66,3 +66,6 @@ experiments/notebooks/
 
 # Timesheets (private)
 docs/project/timesheets/
+
+# Fine-tuned model adapters (too large for git)
+models/
