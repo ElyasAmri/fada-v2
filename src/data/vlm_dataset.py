@@ -30,6 +30,7 @@ VLM_TRAINING_DIR = PROJECT_ROOT / "data" / "vlm_training"
 # Default pseudo-label sources
 MEDGEMMA_EXCEL = RESULTS_DIR / "medgemma_4b_responses.xlsx"
 GEMINI_CHECKPOINT = RESULTS_DIR / "checkpoint_gemini_gemini-3-flash-preview.json"
+GEMINI_COMPLETE = RESULTS_DIR / "gemini_annotations_complete.json"
 
 # Standard 8 questions
 QUESTIONS = [
@@ -122,6 +123,57 @@ def load_gemini_checkpoint(checkpoint_path: Path = GEMINI_CHECKPOINT) -> Dict[st
 
         if image_responses:
             responses[image_path] = image_responses
+
+    return responses
+
+
+def load_gemini_complete(json_path: Path = GEMINI_COMPLETE) -> Dict[str, Dict[str, str]]:
+    """
+    Load Gemini responses from merged complete JSON file.
+
+    This loader handles the format from gemini_annotations_complete.json:
+    {
+        "completed_images": {
+            "Category/image.png": {
+                "category": "...",
+                "image": "...",
+                "questions": [
+                    {"question_idx": 0, "question": "...", "response": "...", ...},
+                    ...
+                ]
+            }
+        }
+    }
+
+    Returns:
+        Dict mapping image_path -> {question_col: response}
+    """
+    if not json_path.exists():
+        raise FileNotFoundError(f"Gemini complete file not found: {json_path}")
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    responses = {}
+    for image_key, entry in data.get('completed_images', {}).items():
+        image_responses = {}
+
+        for q in entry.get('questions', []):
+            q_idx = q.get('question_idx', -1)
+            response = q.get('response', '')
+            error = q.get('error')
+
+            # Skip if invalid index, no response, or has error
+            if q_idx < 0 or q_idx >= len(QUESTION_COLUMNS):
+                continue
+            if not response or error:
+                continue
+
+            q_col = QUESTION_COLUMNS[q_idx]
+            image_responses[q_col] = str(response)
+
+        if image_responses:
+            responses[image_key] = image_responses
 
     return responses
 
@@ -339,8 +391,8 @@ def main():
         description="Convert API responses to VLM fine-tuning format"
     )
     parser.add_argument(
-        '--source', choices=['medgemma', 'gemini'], default='medgemma',
-        help='Source of pseudo-labels (default: medgemma)'
+        '--source', choices=['medgemma', 'gemini', 'gemini-complete'], default='gemini-complete',
+        help='Source of pseudo-labels (default: gemini-complete)'
     )
     parser.add_argument(
         '--output', type=str, default=str(VLM_TRAINING_DIR),
@@ -364,6 +416,9 @@ def main():
     if args.source == 'medgemma':
         responses = load_medgemma_responses()
         source_model = 'medgemma_4b'
+    elif args.source == 'gemini-complete':
+        responses = load_gemini_complete()
+        source_model = 'gemini_complete'
     else:
         responses = load_gemini_checkpoint()
         source_model = 'gemini_3_flash'
