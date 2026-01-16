@@ -25,6 +25,7 @@ pip-chill==1.0.3
 rfc3987-syntax==1.1.0
 rouge-score==0.1.2
 seaborn==0.13.2
+sentence-transformers>=2.2.0
 statsmodels==0.14.5
 streamlit==1.50.0
 tensorflow==2.20.0
