@@ -14,7 +14,7 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     print("Warning: sentence-transformers not installed. Install with: pip install sentence-transformers")
 
-from config import DEFAULT_EMBEDDING_MODEL, FALLBACK_EMBEDDING_MODEL
+from .config import DEFAULT_EMBEDDING_MODEL, FALLBACK_EMBEDDING_MODEL
 
 
 class EmbeddingScorer:

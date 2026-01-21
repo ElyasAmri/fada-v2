@@ -26,7 +26,7 @@ from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
-from config import (
+from .config import (
     BASE_MODEL_ID,
     ADAPTER_PATH,
     STRATIFIED_TEST_DATA,

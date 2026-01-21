@@ -85,8 +85,4 @@ class VLMManager:
                 model.unload()
 
 
-# Backward compatibility imports
-from src.inference.local_vlm import LocalVLM
-from src.inference.vlm_factory import create_top_vlms
-
-__all__ = ['VLMInterface', 'VLMManager', 'LocalVLM', 'create_top_vlms']
+__all__ = ['VLMInterface', 'VLMManager']

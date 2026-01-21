@@ -13,7 +13,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-from config import (
+from .config import (
     FULL_TEST_DATA,
     STRATIFIED_TEST_DATA,
     CATEGORIES,
