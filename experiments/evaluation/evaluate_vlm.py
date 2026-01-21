@@ -243,7 +243,8 @@ class VLMEvaluator:
 
 def compute_scores(
     results: List[Dict],
-    embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL,
+    device: str = "cpu"
 ) -> Dict:
     """Compute embedding similarity scores."""
     from embedding_scorer import EmbeddingScorer
@@ -252,8 +253,8 @@ def compute_scores(
     ground_truths = [r['ground_truth'] for r in results]
     categories = [r['category'] for r in results]
 
-    # Initialize scorer
-    scorer = EmbeddingScorer(model_name=embedding_model)
+    # Initialize scorer (use CPU by default to avoid CUDA compatibility issues)
+    scorer = EmbeddingScorer(model_name=embedding_model, device=device)
 
     # Compute similarities
     similarities = scorer.compute_similarity(predictions, ground_truths)

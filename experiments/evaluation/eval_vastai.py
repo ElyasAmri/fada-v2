@@ -522,6 +522,7 @@ def main():
     parser.add_argument("--vastai-path", type=str, default="vastai")
     parser.add_argument("--disk", type=int, default=80, help="Disk size in GB")
     parser.add_argument("--embedding-model", type=str, default="all-mpnet-base-v2")
+    parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
 
     args = parser.parse_args()
 
@@ -613,10 +614,11 @@ def main():
             offer = offers[0]
             print(f"\nSelected offer {offer['id']}: {offer['gpu_name']}, ${offer['dph_total']:.3f}/hr")
 
-            confirm = input("Create instance? [y/N]: ")
-            if confirm.lower() != 'y':
-                print("Aborted.")
-                return 0
+            if not args.yes:
+                confirm = input("Create instance? [y/N]: ")
+                if confirm.lower() != 'y':
+                    print("Aborted.")
+                    return 0
 
             print(f"\n[2/6] Creating instance...")
             evaluator.instance_id = evaluator.create_instance(offer['id'], disk_gb=args.disk)

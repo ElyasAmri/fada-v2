@@ -1,0 +1,483 @@
+"""
+Vast.ai Instance Management: Create, monitor, and destroy GPU instances.
+
+Wraps the vastai CLI tool with a clean Python API.
+"""
+
+import json
+import re
+import subprocess
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+
+@dataclass
+class GPUOffer:
+    """Represents a Vast.ai GPU offer."""
+    offer_id: int
+    gpu_name: str
+    gpu_ram: int  # MB
+    price_per_hour: float
+    download_speed: float
+    reliability: float
+    disk_space: float
+    cuda_version: str = ""
+
+    @classmethod
+    def from_api(cls, data: Dict) -> "GPUOffer":
+        return cls(
+            offer_id=data["id"],
+            gpu_name=data.get("gpu_name", "Unknown"),
+            gpu_ram=int(data.get("gpu_ram", 0)),
+            price_per_hour=float(data.get("dph_total", 999)),
+            download_speed=float(data.get("inet_down", 0)),
+            reliability=float(data.get("reliability", 0)),
+            disk_space=float(data.get("disk_space", 0)),
+            cuda_version=str(data.get("cuda_max_good", "")),
+        )
+
+
+class VastInstance:
+    """Manage a single Vast.ai instance."""
+
+    # Default Docker images for different use cases
+    IMAGES = {
+        "pytorch": "pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel",
+        "pytorch_nightly": "pytorch/pytorch:nightly-devel",
+        "cuda": "nvidia/cuda:12.4.0-devel-ubuntu22.04",
+    }
+
+    def __init__(self, vastai_path: Optional[str] = None):
+        """Initialize with vastai CLI path."""
+        self.vastai = vastai_path or self._find_vastai()
+        self.instance_id: Optional[int] = None
+        self.ssh_host: Optional[str] = None
+        self.ssh_port: Optional[int] = None
+        self._offer: Optional[GPUOffer] = None
+
+    def _find_vastai(self) -> str:
+        """Find vastai CLI in common locations."""
+        import shutil
+
+        # Check if vastai is in PATH
+        vastai = shutil.which("vastai")
+        if vastai:
+            return vastai
+
+        # Check common locations
+        common_paths = [
+            Path.home() / ".local" / "bin" / "vastai",
+            Path(__file__).parent.parent.parent / "venv" / "Scripts" / "vastai.exe",
+            Path(__file__).parent.parent.parent / "venv" / "bin" / "vastai",
+        ]
+
+        for path in common_paths:
+            if path.exists():
+                return str(path)
+
+        # Fall back to assuming it's in PATH
+        return "vastai"
+
+    def _run_vastai(self, *args, timeout: int = 60) -> Tuple[int, str, str]:
+        """Run vastai CLI command."""
+        cmd = [self.vastai] + list(args)
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            return result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return 1, "", "Command timed out"
+        except FileNotFoundError:
+            return 1, "", f"vastai CLI not found at {self.vastai}"
+
+    # =========================================================================
+    # GPU Search
+    # =========================================================================
+
+    def search_offers(
+        self,
+        gpu_name: Optional[str] = None,
+        min_vram: int = 20,
+        max_price: float = 1.0,
+        min_reliability: float = 0.95,
+        min_download: int = 100,
+        num_gpus: int = 1,
+    ) -> List[GPUOffer]:
+        """
+        Search for available GPU offers.
+
+        Args:
+            gpu_name: GPU type (e.g., "RTX_4090", "A100", "H100")
+            min_vram: Minimum VRAM in GB
+            max_price: Maximum price per hour in USD
+            min_reliability: Minimum reliability score (0-1)
+            min_download: Minimum download speed in Mbps
+            num_gpus: Number of GPUs required
+
+        Returns:
+            List of GPUOffer sorted by price (cheapest first)
+        """
+        query_parts = [
+            f"gpu_ram>={min_vram}",  # API uses GB
+            f"dph<{max_price}",
+            f"reliability>{min_reliability}",
+            f"inet_down>{min_download}",
+            f"num_gpus={num_gpus}",
+        ]
+
+        if gpu_name:
+            query_parts.append(f"gpu_name={gpu_name.replace(' ', '_')}")
+
+        query = " ".join(query_parts)
+
+        ret, stdout, stderr = self._run_vastai("search", "offers", query, "--raw")
+
+        if ret != 0:
+            print(f"Error searching offers: {stderr}")
+            return []
+
+        try:
+            data = json.loads(stdout)
+            offers = [GPUOffer.from_api(o) for o in data]
+            offers.sort(key=lambda x: x.price_per_hour)
+            return offers
+        except json.JSONDecodeError:
+            print(f"Failed to parse offers: {stdout[:200]}")
+            return []
+
+    def print_offers(self, offers: List[GPUOffer], limit: int = 10):
+        """Print offers in a formatted table."""
+        print(f"\n{'='*80}")
+        print(f"{'ID':>10} | {'GPU':^20} | {'VRAM':^8} | {'$/hr':^8} | {'DL':^8} | {'Rel':^6}")
+        print(f"{'='*80}")
+
+        for offer in offers[:limit]:
+            vram_gb = offer.gpu_ram / 1000
+            print(
+                f"{offer.offer_id:>10} | "
+                f"{offer.gpu_name[:20]:^20} | "
+                f"{vram_gb:^8.0f} | "
+                f"${offer.price_per_hour:^7.3f} | "
+                f"{offer.download_speed:^8.0f} | "
+                f"{offer.reliability:^6.2f}"
+            )
+
+        print(f"{'='*80}")
+        print(f"Showing {min(limit, len(offers))} of {len(offers)} offers")
+
+    # =========================================================================
+    # Instance Lifecycle
+    # =========================================================================
+
+    def create(
+        self,
+        offer_id: int,
+        disk_gb: int = 80,
+        image: str = "pytorch",
+    ) -> bool:
+        """
+        Create a new instance from an offer.
+
+        Args:
+            offer_id: The offer ID to use
+            disk_gb: Disk size in GB
+            image: Docker image (key from IMAGES dict or full image name)
+
+        Returns:
+            True if instance was created successfully
+        """
+        # Resolve image name
+        docker_image = self.IMAGES.get(image, image)
+
+        ret, stdout, stderr = self._run_vastai(
+            "create", "instance", str(offer_id),
+            "--image", docker_image,
+            "--disk", str(disk_gb),
+            "--ssh", "--direct",
+            timeout=120,
+        )
+
+        if ret != 0:
+            print(f"Error creating instance: {stderr}")
+            return False
+
+        # Parse instance ID from output
+        # Output format: "{'success': True, 'new_contract': 12345678}"
+        try:
+            match = re.search(r"'new_contract':\s*(\d+)", stdout)
+            if match:
+                self.instance_id = int(match.group(1))
+                return True
+
+            # Fallback: try to find any number
+            match = re.search(r"(\d{6,})", stdout)
+            if match:
+                self.instance_id = int(match.group(1))
+                return True
+        except Exception as e:
+            print(f"Failed to parse instance ID: {e}")
+
+        print(f"Create output: {stdout}")
+        return False
+
+    def get_info(self, instance_id: Optional[int] = None) -> Optional[Dict]:
+        """Get instance information."""
+        iid = instance_id or self.instance_id
+        if not iid:
+            return None
+
+        ret, stdout, stderr = self._run_vastai("show", "instance", str(iid), "--raw")
+
+        if ret != 0:
+            return None
+
+        try:
+            data = json.loads(stdout)
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]
+            return data
+        except json.JSONDecodeError:
+            return None
+
+    def wait_until_ready(self, timeout: int = 600, poll_interval: int = 15) -> bool:
+        """
+        Wait for instance to be ready for SSH connections.
+
+        Args:
+            timeout: Maximum seconds to wait
+            poll_interval: Seconds between status checks
+
+        Returns:
+            True if instance is ready, False if timeout or error
+        """
+        if not self.instance_id:
+            return False
+
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            info = self.get_info()
+
+            if info:
+                status = info.get("actual_status", "")
+
+                if status == "running":
+                    # Extract SSH connection details
+                    self.ssh_host = info.get("public_ipaddr", "")
+                    ports = info.get("ports", {})
+                    ssh_ports = ports.get("22/tcp", [])
+
+                    if ssh_ports:
+                        self.ssh_port = int(ssh_ports[0].get("HostPort", 22))
+                    else:
+                        self.ssh_port = info.get("ssh_port", 22)
+
+                    if self.ssh_host and self.ssh_port:
+                        return True
+
+                elif status in ("error", "terminated", "failed", "exited"):
+                    print(f"Instance {self.instance_id} failed with status: {status}")
+                    return False
+
+                print(f"Waiting for instance {self.instance_id}... (status: {status})")
+            else:
+                print(f"Waiting for instance {self.instance_id}... (status: unknown)")
+
+            time.sleep(poll_interval)
+
+        print(f"Timeout waiting for instance {self.instance_id}")
+        return False
+
+    def destroy(self, instance_id: Optional[int] = None) -> bool:
+        """Destroy/terminate an instance."""
+        iid = instance_id or self.instance_id
+        if not iid:
+            return False
+
+        ret, stdout, stderr = self._run_vastai("destroy", "instance", str(iid))
+        return ret == 0
+
+    # =========================================================================
+    # SSH Operations
+    # =========================================================================
+
+    def run_ssh(
+        self,
+        command: str,
+        timeout: int = 300,
+        capture: bool = True,
+    ) -> Tuple[int, str, str]:
+        """
+        Run command on remote instance via SSH.
+
+        Args:
+            command: Shell command to run
+            timeout: Command timeout in seconds
+            capture: Whether to capture output
+
+        Returns:
+            Tuple of (return_code, stdout, stderr)
+        """
+        if not self.ssh_host or not self.ssh_port:
+            return 1, "", "No SSH connection info"
+
+        ssh_cmd = [
+            "ssh",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "ConnectTimeout=30",
+            "-o", "ServerAliveInterval=60",
+            "-p", str(self.ssh_port),
+            f"root@{self.ssh_host}",
+            command,
+        ]
+
+        try:
+            if capture:
+                result = subprocess.run(
+                    ssh_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                return result.returncode, result.stdout, result.stderr
+            else:
+                result = subprocess.run(ssh_cmd, timeout=timeout)
+                return result.returncode, "", ""
+        except subprocess.TimeoutExpired:
+            return 1, "", f"SSH command timed out after {timeout}s"
+        except Exception as e:
+            return 1, "", str(e)
+
+    def upload_file(self, local_path: Path, remote_path: str, show_progress: bool = True) -> bool:
+        """Upload a file via SCP."""
+        if not self.ssh_host or not self.ssh_port:
+            return False
+
+        scp_cmd = [
+            "scp",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-P", str(self.ssh_port),
+            str(local_path),
+            f"root@{self.ssh_host}:{remote_path}",
+        ]
+
+        if show_progress:
+            print(f"  Uploading {local_path.name}...")
+
+        result = subprocess.run(scp_cmd, capture_output=not show_progress)
+        return result.returncode == 0
+
+    def upload_directory(self, local_dir: Path, remote_dir: str, show_progress: bool = True) -> bool:
+        """Upload a directory via SCP."""
+        if not self.ssh_host or not self.ssh_port:
+            return False
+
+        scp_cmd = [
+            "scp",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-P", str(self.ssh_port),
+            "-r",
+            str(local_dir),
+            f"root@{self.ssh_host}:{remote_dir}",
+        ]
+
+        if show_progress:
+            print(f"  Uploading {local_dir.name}/...")
+
+        result = subprocess.run(scp_cmd, capture_output=not show_progress)
+        return result.returncode == 0
+
+    def download_file(self, remote_path: str, local_path: Path, show_progress: bool = True) -> bool:
+        """Download a file via SCP."""
+        if not self.ssh_host or not self.ssh_port:
+            return False
+
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+
+        scp_cmd = [
+            "scp",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-P", str(self.ssh_port),
+            f"root@{self.ssh_host}:{remote_path}",
+            str(local_path),
+        ]
+
+        if show_progress:
+            print(f"  Downloading to {local_path.name}...")
+
+        result = subprocess.run(scp_cmd, capture_output=not show_progress)
+        return result.returncode == 0
+
+    def download_glob(self, remote_pattern: str, local_dir: Path) -> List[Path]:
+        """Download files matching a pattern."""
+        if not self.ssh_host or not self.ssh_port:
+            return []
+
+        # First, list files matching pattern
+        ret, stdout, _ = self.run_ssh(f"ls {remote_pattern} 2>/dev/null", timeout=30)
+
+        if ret != 0 or not stdout.strip():
+            return []
+
+        downloaded = []
+        local_dir.mkdir(parents=True, exist_ok=True)
+
+        for remote_path in stdout.strip().split("\n"):
+            remote_path = remote_path.strip()
+            if remote_path:
+                filename = Path(remote_path).name
+                local_path = local_dir / filename
+                if self.download_file(remote_path, local_path, show_progress=True):
+                    downloaded.append(local_path)
+
+        return downloaded
+
+    # =========================================================================
+    # Convenience Methods
+    # =========================================================================
+
+    def connect(self, instance_id: int) -> bool:
+        """Connect to an existing instance by ID."""
+        self.instance_id = instance_id
+        info = self.get_info()
+
+        if not info:
+            return False
+
+        self.ssh_host = info.get("public_ipaddr", "")
+        ports = info.get("ports", {})
+        ssh_ports = ports.get("22/tcp", [])
+
+        if ssh_ports:
+            self.ssh_port = int(ssh_ports[0].get("HostPort", 22))
+        else:
+            self.ssh_port = info.get("ssh_port", 22)
+
+        return bool(self.ssh_host and self.ssh_port)
+
+    @property
+    def ssh_command(self) -> str:
+        """Get SSH command string for manual connection."""
+        if self.ssh_host and self.ssh_port:
+            return f"ssh -p {self.ssh_port} root@{self.ssh_host}"
+        return ""
+
+    def is_process_running(self, pattern: str) -> bool:
+        """Check if a process matching pattern is running."""
+        ret, _, _ = self.run_ssh(f"pgrep -f '{pattern}'", timeout=30)
+        return ret == 0
+
+    def tail_log(self, log_path: str, lines: int = 50) -> str:
+        """Get last N lines from a log file."""
+        ret, stdout, _ = self.run_ssh(f"tail -n {lines} {log_path} 2>/dev/null", timeout=30)
+        return stdout if ret == 0 else ""
