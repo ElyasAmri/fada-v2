@@ -5,7 +5,7 @@ MiniCPM-V VLM Implementation
 from PIL import Image
 import torch
 
-from src.inference.local_vlm import LocalVLM
+from src.inference.local.base import LocalVLM
 
 
 class MiniCPMVLM(LocalVLM):

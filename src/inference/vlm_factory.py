@@ -3,7 +3,7 @@ VLM Factory - Factory functions for creating VLM instances
 """
 
 from src.inference.vlm_interface import VLMManager
-from src.inference.models import MiniCPMVLM, Qwen2VLVLM, InternVLVLM, MoondreamVLM
+from src.inference.local import MiniCPMVLM, Qwen2VLVLM, InternVLVLM, MoondreamVLM
 
 
 def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: str = None, gpu_8gb: bool = True) -> VLMManager:

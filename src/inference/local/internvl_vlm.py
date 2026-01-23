@@ -8,7 +8,7 @@ import torch
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
 
-from src.inference.local_vlm import LocalVLM
+from src.inference.local.base import LocalVLM
 
 
 class InternVLVLM(LocalVLM):

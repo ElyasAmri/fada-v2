@@ -1,11 +1,11 @@
 """
-Grok VLM - xAI Grok Vision API wrapper implementing VLMInterface
-Uses OpenAI-compatible API endpoint
+OpenAI VLM - GPT-5.2 Vision API wrapper implementing VLMInterface
+Supports GPT-5.2, GPT-4o and other vision-capable models
 """
 
 import os
 import logging
-from typing import List, Optional
+from typing import Optional
 from pathlib import Path
 
 from PIL import Image
@@ -15,7 +15,7 @@ from src.utils.image_processing import to_base64_data_url
 from src.utils.api_client import call_with_retry
 
 # Load environment variables from .env.local
-env_path = Path(__file__).parent.parent.parent / '.env.local'
+env_path = Path(__file__).parent.parent.parent.parent / '.env.local'
 load_dotenv(env_path)
 
 try:
@@ -30,33 +30,39 @@ from src.inference.vlm_interface import VLMInterface
 logger = logging.getLogger(__name__)
 
 
-class GrokVLM(VLMInterface):
-    """xAI Grok Vision API wrapper using OpenAI-compatible endpoint"""
+class OpenAIVLM(VLMInterface):
+    """OpenAI Vision API wrapper for GPT-5.2 and GPT-4o models"""
 
-    # Available Grok vision models
+    # Available vision models
     AVAILABLE_MODELS = {
-        "grok-4": "Grok 4",
-        "grok-4-fast": "Grok 4 Fast",
-        "grok-2-vision-latest": "Grok 2 Vision (Latest)",
-        "grok-2-vision-1212": "Grok 2 Vision (Dec 2024)",
+        # GPT-5.2 series (latest)
+        "gpt-5.2": "GPT-5.2 Thinking",
+        "gpt-5.2-chat-latest": "GPT-5.2 Instant",
+        # GPT-5.1 series
+        "gpt-5.1": "GPT-5.1 Thinking",
+        "gpt-5.1-chat-latest": "GPT-5.1 Instant",
+        # GPT-4o series
+        "gpt-4o": "GPT-4o",
+        "gpt-4o-mini": "GPT-4o Mini",
+        "gpt-4o-2024-11-20": "GPT-4o (Nov 2024)",
+        # GPT-4.1 series
+        "gpt-4.1": "GPT-4.1",
+        "gpt-4.1-mini": "GPT-4.1 Mini",
     }
-
-    # xAI API base URL
-    BASE_URL = "https://api.x.ai/v1"
 
     def __init__(
         self,
-        model_name: str = "grok-4",
+        model_name: str = "gpt-5.2-chat-latest",
         api_key: Optional[str] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0
     ):
         """
-        Initialize Grok VLM
+        Initialize OpenAI VLM
 
         Args:
-            model_name: Grok model to use (default: grok-2-vision-latest)
-            api_key: API key (defaults to XAI_API_KEY or GROK_API_KEY env var)
+            model_name: Model to use (default: gpt-5.2-chat-latest for speed)
+            api_key: API key (defaults to OPENAI_API_KEY env var)
             max_retries: Maximum number of retries on API errors
             retry_delay: Initial delay between retries (exponential backoff)
         """
@@ -65,7 +71,7 @@ class GrokVLM(VLMInterface):
 
         self.model_name_id = model_name
         self.display_name = self.AVAILABLE_MODELS.get(model_name, model_name)
-        self.api_key = api_key or os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
@@ -73,18 +79,14 @@ class GrokVLM(VLMInterface):
         self._client = None
 
         if not self.api_key:
-            raise ValueError("XAI_API_KEY or GROK_API_KEY not found in environment variables or .env.local")
+            raise ValueError("OPENAI_API_KEY not found in environment variables or .env.local")
 
     def load(self) -> None:
-        """Initialize the OpenAI-compatible client for xAI"""
+        """Initialize the OpenAI client"""
         if self._loaded:
             return
 
-        self._client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.BASE_URL
-        )
-
+        self._client = OpenAI(api_key=self.api_key)
         self._loaded = True
 
     def unload(self) -> None:
@@ -106,7 +108,7 @@ class GrokVLM(VLMInterface):
         if not self._loaded:
             self.load()
 
-        # Prepare the image as base64 URL using shared utility
+        # Prepare the image as base64 URL
         image_url = to_base64_data_url(image)
 
         # Create the message with medical context
@@ -134,14 +136,21 @@ class GrokVLM(VLMInterface):
         ]
 
         def make_request():
-            response = self._client.chat.completions.create(
-                model=self.model_name_id,
-                messages=messages,
-                max_tokens=1024,
-                temperature=0.4
-            )
+            # GPT-5.x models use max_completion_tokens and don't support custom temperature
+            if self.model_name_id.startswith("gpt-5"):
+                response = self._client.chat.completions.create(
+                    model=self.model_name_id,
+                    messages=messages,
+                    max_completion_tokens=1024
+                )
+            else:
+                response = self._client.chat.completions.create(
+                    model=self.model_name_id,
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.4
+                )
 
-            # Extract text from response
             if response.choices and response.choices[0].message.content:
                 return response.choices[0].message.content.strip()
             return "No response generated."
@@ -152,12 +161,12 @@ class GrokVLM(VLMInterface):
                 max_retries=self.max_retries,
                 base_delay=self.retry_delay,
                 on_retry=lambda attempt, e: logger.warning(
-                    f"Grok API attempt {attempt + 1} failed: {e}"
+                    f"OpenAI API attempt {attempt + 1} failed: {e}"
                 )
             )
         except Exception as e:
-            logger.error(f"Grok API failed after {self.max_retries} attempts: {e}")
-            raise RuntimeError(f"Grok API failed: {e}")
+            logger.error(f"OpenAI API failed after {self.max_retries} attempts: {e}")
+            raise RuntimeError(f"OpenAI API failed: {e}")
 
     @property
     def model_name(self) -> str:
@@ -168,14 +177,14 @@ class GrokVLM(VLMInterface):
         return self._loaded
 
 
-def create_grok_vlm(model: str = "grok-4") -> GrokVLM:
+def create_openai_vlm(model: str = "gpt-5.2-chat-latest") -> OpenAIVLM:
     """
-    Factory function to create a Grok VLM instance
+    Factory function to create an OpenAI VLM instance
 
     Args:
-        model: Model name to use
+        model: Model name to use (default: gpt-5.2-chat-latest)
 
     Returns:
-        GrokVLM instance
+        OpenAIVLM instance
     """
-    return GrokVLM(model_name=model)
+    return OpenAIVLM(model_name=model)

@@ -15,7 +15,7 @@ from src.utils.image_processing import to_base64
 from src.utils.api_client import call_with_retry
 
 # Load environment variables from .env.local
-env_path = Path(__file__).parent.parent.parent / '.env.local'
+env_path = Path(__file__).parent.parent.parent.parent / '.env.local'
 load_dotenv(env_path)
 
 try:
