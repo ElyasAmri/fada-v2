@@ -70,3 +70,10 @@ docs/project/timesheets/
 # Fine-tuned model adapters (too large for git)
 models/
 outputs/
+experiments/fine_tuning/runs/
+
+# Sisyphus internal state
+.sisyphus/
+
+# Accidental files
+3.5.1
