@@ -314,6 +314,172 @@ class DataTransfer:
         print(f"  Uploading script: {script_path.name}")
         return self.instance.upload_file(script_path, remote_path)
 
+    def upload_training_data(self, train_file: Path, val_file: Path = None, force: bool = False) -> bool:
+        """
+        Upload training and validation data files.
+
+        Args:
+            train_file: Path to training JSONL file
+            val_file: Path to validation JSONL file (optional)
+            force: Force upload even if cached
+
+        Returns:
+            True if upload successful
+        """
+        if not train_file.exists():
+            print(f"Training file not found: {train_file}")
+            return False
+
+        # Upload training file
+        remote_train = f"{REMOTE_DATA_DIR}/train.jsonl"
+        print(f"  Uploading training data: {train_file.name}")
+        if not self.instance.upload_file(train_file, remote_train):
+            return False
+
+        # Upload validation file if provided
+        if val_file and val_file.exists():
+            remote_val = f"{REMOTE_DATA_DIR}/val.jsonl"
+            print(f"  Uploading validation data: {val_file.name}")
+            if not self.instance.upload_file(val_file, remote_val):
+                return False
+
+        return True
+
+    def upload_training_images(self, train_file: Path, val_file: Path = None, force: bool = False) -> bool:
+        """
+        Upload only the images referenced in training/validation files.
+
+        Args:
+            train_file: Path to training JSONL file
+            val_file: Path to validation JSONL file (optional)
+            force: Force upload even if cached
+
+        Returns:
+            True if upload successful
+        """
+        import tempfile
+        import shutil
+
+        # Check cache
+        if not force:
+            manifest = self._load_manifest("training_images")
+            if manifest.get("instance_id") == self.instance.instance_id:
+                print(f"  Training images already uploaded to this instance (cached)")
+                return True
+
+        # Get list of unique images from training and validation files
+        images = set()
+
+        for data_file in [train_file, val_file]:
+            if data_file and data_file.exists():
+                with open(data_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            data = json.loads(line)
+                            for img_path in data.get('images', []):
+                                images.add(img_path)
+
+        if not images:
+            print("  No images found in training data")
+            return True
+
+        print(f"  Uploading {len(images)} training images...")
+
+        # Create temp directory with same structure
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            for img_path in images:
+                src = Path(img_path)
+                if not src.exists():
+                    print(f"    Warning: Image not found: {src}")
+                    continue
+
+                # Extract relative path from "Fetal Ultrasound/..."
+                import re
+                match = re.search(r'Fetal Ultrasound[/\\](.+)$', str(src))
+                if match:
+                    rel_path = match.group(1).replace('\\', '/')
+                    dst = tmpdir / "Fetal Ultrasound" / rel_path
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
+
+            # Upload the temp directory
+            src_dir = tmpdir / "Fetal Ultrasound"
+            if src_dir.exists():
+                total_size = sum(f.stat().st_size for f in src_dir.rglob('*') if f.is_file())
+                print(f"  Uploading training images ({total_size / 1024 / 1024:.1f} MB)...")
+                if not self.instance.upload_directory(src_dir, "/workspace/data/"):
+                    return False
+
+        # Update cache
+        manifest = {
+            "instance_id": self.instance.instance_id,
+            "image_count": len(images),
+        }
+        self._save_manifest("training_images", manifest)
+        return True
+
+    def download_adapter(self, local_dir: Path) -> Optional[Path]:
+        """
+        Download trained LoRA adapter from remote.
+
+        Args:
+            local_dir: Local directory to save adapter
+
+        Returns:
+            Path to downloaded adapter directory, or None if not found
+        """
+        local_dir.mkdir(parents=True, exist_ok=True)
+
+        # Find adapter directories (format: model_timestamp/adapter)
+        pattern = f"{REMOTE_OUTPUT_DIR}/*/adapter"
+        ret, stdout, _ = self.instance.run_ssh(f"ls -d {pattern} 2>/dev/null | tail -1", timeout=30)
+
+        if ret != 0 or not stdout.strip():
+            # Try alternative pattern
+            pattern = f"{REMOTE_OUTPUT_DIR}/*/*.safetensors"
+            ret, stdout, _ = self.instance.run_ssh(f"ls {pattern} 2>/dev/null | head -1", timeout=30)
+
+            if ret != 0 or not stdout.strip():
+                print("No adapter found on remote")
+                return None
+
+            # Get parent directory
+            adapter_dir = str(Path(stdout.strip()).parent)
+        else:
+            adapter_dir = stdout.strip()
+
+        print(f"  Found adapter: {adapter_dir}")
+
+        # Download adapter directory
+        adapter_name = Path(adapter_dir).name
+        if adapter_name == "adapter":
+            adapter_name = Path(adapter_dir).parent.name
+
+        local_adapter = local_dir / adapter_name
+        local_adapter.mkdir(parents=True, exist_ok=True)
+
+        # Download all files in adapter directory
+        ret, files, _ = self.instance.run_ssh(f"ls {adapter_dir}", timeout=30)
+        if ret == 0:
+            for filename in files.strip().split('\n'):
+                filename = filename.strip()
+                if filename:
+                    remote_file = f"{adapter_dir}/{filename}"
+                    local_file = local_adapter / filename
+                    self.instance.download_file(remote_file, local_file)
+
+        # Also download config.json and metrics.json from parent if present
+        parent_dir = str(Path(adapter_dir).parent)
+        for extra_file in ['config.json', 'metrics.json']:
+            ret, _, _ = self.instance.run_ssh(f"test -f {parent_dir}/{extra_file}", timeout=10)
+            if ret == 0:
+                self.instance.download_file(f"{parent_dir}/{extra_file}", local_adapter / extra_file)
+
+        return local_adapter if (local_adapter / "adapter_model.safetensors").exists() or any(local_adapter.glob("*.safetensors")) else None
+
     def download_predictions(self, local_dir: Path) -> Optional[Path]:
         """
         Download prediction files from remote.

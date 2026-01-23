@@ -7,12 +7,18 @@ Usage:
     python -m experiments.vastai test InternVL3-2B         # Quick test (20 samples)
     python -m experiments.vastai test InternVL3-2B --full  # Full evaluation (600 samples)
     python -m experiments.vastai batch-test A B C          # Test multiple models
+    python -m experiments.vastai finetune InternVL3-2B     # Fine-tune a model
+    python -m experiments.vastai finetune InternVL3-2B --epochs 3 --auto-destroy
     python -m experiments.vastai destroy job-abc123        # Destroy instance
     python -m experiments.vastai destroy --all             # Destroy all instances
+    python -m experiments.vastai models                    # List supported models
+    python -m experiments.vastai presets                   # List GPU presets
 """
 
 import argparse
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +38,83 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs" / "vastai"
 TEST_SUBSET = PROJECT_ROOT / "outputs" / "evaluation" / "test_subset.jsonl"
 IMAGES_DIR = DATA_DIR / "Fetal Ultrasound"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+class RuntimeWatchdog:
+    """
+    Background watchdog that destroys instances after max runtime.
+
+    Provides billing protection by ensuring instances don't run forever.
+    """
+
+    def __init__(
+        self,
+        instance: VastInstance,
+        db: 'JobDatabase',
+        job_id: str,
+        max_hours: float,
+        check_interval: int = 60,
+    ):
+        """
+        Initialize watchdog.
+
+        Args:
+            instance: VastInstance to monitor
+            db: Job database for status updates
+            job_id: Job ID for status updates
+            max_hours: Maximum runtime in hours
+            check_interval: Seconds between checks
+        """
+        self.instance = instance
+        self.db = db
+        self.job_id = job_id
+        self.max_seconds = max_hours * 3600
+        self.check_interval = check_interval
+        self.start_time = time.time()
+        self._stop = threading.Event()
+        self._thread = None
+
+    def start(self):
+        """Start the watchdog thread."""
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        print(f"Watchdog started: will destroy instance after {self.max_seconds/3600:.1f} hours")
+
+    def stop(self):
+        """Stop the watchdog thread."""
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def _run(self):
+        """Background thread that monitors runtime."""
+        while not self._stop.is_set():
+            elapsed = time.time() - self.start_time
+
+            if elapsed >= self.max_seconds:
+                print(f"\n[WATCHDOG] Maximum runtime ({self.max_seconds/3600:.1f} hours) exceeded!")
+                print(f"[WATCHDOG] Destroying instance {self.instance.instance_id}...")
+
+                # Update job status
+                self.db.set_status(
+                    self.job_id,
+                    JobStatus.CANCELLED,
+                    f"Watchdog: max runtime {self.max_seconds/3600:.1f}h exceeded"
+                )
+
+                # Destroy instance
+                if self.instance.instance_id:
+                    self.instance.destroy()
+
+                print("[WATCHDOG] Instance destroyed. Billing protection activated.")
+                break
+
+            # Log progress every 30 minutes
+            if int(elapsed) % 1800 == 0 and elapsed > 0:
+                remaining = (self.max_seconds - elapsed) / 3600
+                print(f"[WATCHDOG] Runtime: {elapsed/3600:.1f}h, remaining: {remaining:.1f}h")
+
+            self._stop.wait(self.check_interval)
 
 
 class VastaiRunner:
@@ -103,6 +186,7 @@ class VastaiRunner:
         auto_destroy: bool = False,
         yes: bool = False,
         skip_images: bool = False,
+        max_hours: float = None,
     ):
         """
         Test a VLM model on the evaluation dataset.
@@ -112,6 +196,7 @@ class VastaiRunner:
             samples: Number of samples (default 20, ignored if --full)
             full: Run full 600-sample evaluation
             preset: GPU preset override
+            max_hours: Maximum runtime hours (billing protection)
             dry_run: Show plan without executing
             auto_destroy: Destroy instance after completion
             yes: Skip confirmation prompts
@@ -364,6 +449,7 @@ class VastaiRunner:
         samples: int = 20,
         auto_destroy: bool = True,
         yes: bool = False,
+        max_hours: float = None,
     ):
         """
         Test multiple models in sequence.
@@ -373,6 +459,7 @@ class VastaiRunner:
             samples: Samples per model
             auto_destroy: Destroy instance after each model
             yes: Skip confirmations
+            max_hours: Maximum hours per model
         """
         print("\n" + "=" * 60)
         print("Batch Test Configuration")
@@ -384,6 +471,8 @@ class VastaiRunner:
             print(f"  - {resolved} ({preset.name})")
         print(f"Samples per model: {samples}")
         print(f"Auto-destroy: {auto_destroy}")
+        if max_hours:
+            print(f"Max hours per model: {max_hours}")
 
         if not yes:
             confirm = input("\nProceed with batch test? [y/N]: ")
@@ -402,6 +491,7 @@ class VastaiRunner:
                 samples=samples,
                 auto_destroy=auto_destroy,
                 yes=True,
+                max_hours=max_hours,
             )
 
             results.append({
@@ -416,6 +506,291 @@ class VastaiRunner:
         for r in results:
             status = "OK" if r["success"] else "FAILED"
             print(f"  {r['model']}: {status}")
+
+        return 0
+
+    # =========================================================================
+    # Finetune Command
+    # =========================================================================
+
+    def cmd_finetune(
+        self,
+        model_id: str,
+        train_data: str = None,
+        val_data: str = None,
+        epochs: int = 2,
+        batch_size: int = 1,
+        gradient_accumulation: int = 8,
+        learning_rate: float = 2e-4,
+        lora_r: int = 16,
+        lora_alpha: int = 32,
+        preset: str = None,
+        dry_run: bool = False,
+        auto_destroy: bool = False,
+        yes: bool = False,
+        max_hours: float = None,
+    ):
+        """
+        Fine-tune a VLM model on the training dataset.
+
+        Args:
+            model_id: Model name, alias, or HuggingFace ID
+            train_data: Path to training JSONL file
+            val_data: Path to validation JSONL file
+            epochs: Number of training epochs
+            batch_size: Per-device batch size
+            gradient_accumulation: Gradient accumulation steps
+            learning_rate: Learning rate
+            lora_r: LoRA rank
+            lora_alpha: LoRA alpha
+            preset: GPU preset override
+            dry_run: Show plan without executing
+            auto_destroy: Destroy instance after completion
+            yes: Skip confirmation prompts
+            max_hours: Maximum runtime hours (billing protection)
+        """
+        # Resolve model ID
+        model_id = resolve_model_id(model_id)
+
+        # Get preset - finetune needs more VRAM, prefer medium or large
+        if preset:
+            gpu_preset = PRESETS.get(preset)
+            if not gpu_preset:
+                print(f"Unknown preset: {preset}")
+                print_presets()
+                return 1
+        else:
+            gpu_preset = get_preset_for_model(model_id)
+            # For fine-tuning, prefer A100 if model fits in 24GB but could benefit from more
+            _, vram_est, preset_name = MODEL_CONFIGS.get(model_id, (7.0, 16, "medium"))
+            if preset_name == "small" and vram_est > 10:
+                gpu_preset = PRESETS.get("medium", gpu_preset)
+
+        # Default training data paths
+        if train_data is None:
+            train_data = PROJECT_ROOT / "data" / "vlm_training" / "gemini_complete_train.jsonl"
+        else:
+            train_data = Path(train_data)
+
+        if val_data is None:
+            val_data = PROJECT_ROOT / "data" / "vlm_training" / "gemini_complete_val.jsonl"
+        else:
+            val_data = Path(val_data)
+
+        print("\n" + "=" * 60)
+        print("VLM Fine-Tuning Configuration")
+        print("=" * 60)
+        print(f"Model:         {model_id}")
+        print(f"Train data:    {train_data}")
+        print(f"Val data:      {val_data}")
+        print(f"Epochs:        {epochs}")
+        print(f"Batch size:    {batch_size} x {gradient_accumulation} grad accum")
+        print(f"Learning rate: {learning_rate}")
+        print(f"LoRA:          r={lora_r}, alpha={lora_alpha}")
+        print(f"GPU Preset:    {gpu_preset.name} ({gpu_preset.description})")
+        print(f"Max $/hr:      ${gpu_preset.max_price:.2f}")
+        if max_hours:
+            print(f"Max runtime:   {max_hours:.1f} hours")
+
+        if dry_run:
+            print("\n[DRY RUN] Would execute the above configuration")
+            return 0
+
+        # Check training data exists
+        if not train_data.exists():
+            print(f"\nError: Training data not found: {train_data}")
+            return 1
+
+        # Check images exist
+        if not IMAGES_DIR.exists():
+            print(f"\nError: Images not found: {IMAGES_DIR}")
+            return 1
+
+        # Confirmation
+        if not yes:
+            confirm = input("\nProceed with fine-tuning? [y/N]: ")
+            if confirm.lower() != 'y':
+                print("Aborted.")
+                return 0
+
+        # Create job record
+        job = self.db.create_job(
+            job_type=JobType.FINETUNE,
+            model_id=model_id,
+            preset=gpu_preset.name,
+            metadata={
+                "epochs": epochs,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate,
+                "lora_r": lora_r,
+                "lora_alpha": lora_alpha,
+                "auto_destroy": auto_destroy,
+                "max_hours": max_hours,
+            }
+        )
+        print(f"\nJob created: {job.job_id}")
+
+        try:
+            # Step 1: Search for GPU
+            print(f"\n[1/6] Searching for {gpu_preset.gpu_name}...")
+            offers = self.instance.search_offers(
+                gpu_name=gpu_preset.gpu_name,
+                min_vram=gpu_preset.min_vram,
+                max_price=gpu_preset.max_price,
+            )
+
+            if not offers:
+                print("No suitable GPU offers found. Try:")
+                print(f"  - Increase --max-price (current: ${gpu_preset.max_price})")
+                print(f"  - Use a different preset")
+                self.db.set_status(job.job_id, JobStatus.FAILED, "No GPU offers found")
+                return 1
+
+            self.instance.print_offers(offers, limit=5)
+            offer = offers[0]
+            print(f"\nSelected: {offer.gpu_name} @ ${offer.price_per_hour:.3f}/hr")
+
+            # Step 2: Create instance
+            print(f"\n[2/6] Creating instance...")
+            if not self.instance.create(offer.offer_id, disk_gb=gpu_preset.disk_gb):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Failed to create instance")
+                return 1
+
+            print(f"Instance created: {self.instance.instance_id}")
+            self.db.set_status(job.job_id, JobStatus.CREATING)
+
+            # Step 3: Wait for instance
+            print(f"\n[3/6] Waiting for instance...")
+            if not self.instance.wait_until_ready(timeout=600):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Instance failed to start")
+                return 1
+
+            self.db.set_instance(
+                job.job_id,
+                self.instance.instance_id,
+                self.instance.ssh_host,
+                self.instance.ssh_port
+            )
+            print(f"Instance ready: {self.instance.ssh_command}")
+
+            # Check GPU
+            gpu_info = check_gpu(self.instance)
+            if gpu_info:
+                print(f"GPU: {gpu_info['name']}, VRAM: {gpu_info['memory_total']}")
+
+            # Step 4: Setup environment and upload data
+            print(f"\n[4/6] Setting up environment...")
+            self.db.set_status(job.job_id, JobStatus.UPLOADING)
+
+            if not setup_environment(self.instance, use_flash_attn=True):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Environment setup failed")
+                return 1
+
+            transfer = DataTransfer(self.instance)
+            if not transfer.setup_workspace():
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Workspace setup failed")
+                return 1
+
+            # Upload training data
+            print("Uploading training data...")
+            if not transfer.upload_training_data(train_data, val_data):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Failed to upload training data")
+                return 1
+
+            # Upload images
+            print("Uploading images...")
+            if not transfer.upload_training_images(train_data, val_data):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Failed to upload images")
+                return 1
+
+            # Upload finetune script
+            finetune_script = TEMPLATES_DIR / "run_finetune.py"
+            if not transfer.upload_script(finetune_script):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Failed to upload script")
+                return 1
+
+            # Step 5: Run fine-tuning
+            print(f"\n[5/6] Starting fine-tuning...")
+            self.db.set_status(job.job_id, JobStatus.RUNNING)
+
+            # Start watchdog if max_hours specified
+            watchdog = None
+            if max_hours:
+                watchdog = RuntimeWatchdog(
+                    instance=self.instance,
+                    db=self.db,
+                    job_id=job.job_id,
+                    max_hours=max_hours,
+                )
+                watchdog.start()
+
+            finetune_cmd = f"""
+            cd {REMOTE_WORKSPACE} && python scripts/run_finetune.py \
+                --model {model_id} \
+                --train-data data/train.jsonl \
+                --val-data data/val.jsonl \
+                --epochs {epochs} \
+                --batch-size {batch_size} \
+                --gradient-accumulation {gradient_accumulation} \
+                --learning-rate {learning_rate} \
+                --lora-r {lora_r} \
+                --lora-alpha {lora_alpha} \
+                --output outputs
+            """
+
+            # Run in foreground (wait for completion)
+            print("Running fine-tuning (this may take several hours)...")
+            print(f"SSH: {self.instance.ssh_command}")
+
+            # Calculate timeout based on max_hours or default to 8 hours
+            timeout = int((max_hours or 8) * 3600)
+
+            ret, stdout, stderr = self.instance.run_ssh(
+                finetune_cmd,
+                timeout=timeout,
+                capture=True
+            )
+
+            # Stop watchdog
+            if watchdog:
+                watchdog.stop()
+
+            if ret != 0:
+                print(f"Fine-tuning failed: {stderr}")
+                self.db.set_status(job.job_id, JobStatus.FAILED, f"Training failed: {stderr[:200]}")
+                return 1
+
+            print("Fine-tuning complete!")
+
+            # Step 6: Download results
+            print("\n[6/6] Downloading adapter...")
+            self.db.set_status(job.job_id, JobStatus.DOWNLOADING)
+
+            output_dir = OUTPUTS_DIR / job.job_id
+            adapter_path = transfer.download_adapter(output_dir)
+
+            if adapter_path:
+                print(f"Adapter saved to: {adapter_path}")
+                self.db.set_output(job.job_id, str(adapter_path))
+            else:
+                print("Warning: Could not download adapter")
+
+            self.db.set_status(job.job_id, JobStatus.COMPLETE)
+            print(f"\nJob complete: {job.job_id}")
+
+        except KeyboardInterrupt:
+            print("\n\nAborted by user.")
+            self.db.set_status(job.job_id, JobStatus.CANCELLED, "User abort")
+
+        except Exception as e:
+            print(f"\nError: {e}")
+            self.db.set_status(job.job_id, JobStatus.FAILED, str(e))
+            return 1
+
+        finally:
+            if auto_destroy and self.instance.instance_id:
+                print(f"\nDestroying instance {self.instance.instance_id}...")
+                self.instance.destroy()
 
         return 0
 
@@ -525,6 +900,7 @@ Examples:
     test_parser.add_argument("--preset", help="GPU preset override")
     test_parser.add_argument("--dry-run", action="store_true", help="Show plan only")
     test_parser.add_argument("--auto-destroy", action="store_true", help="Destroy after completion")
+    test_parser.add_argument("--max-hours", type=float, help="Maximum runtime hours (billing protection)")
     test_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmations")
     test_parser.add_argument("--skip-images", action="store_true", help="Skip image upload (if already on instance)")
 
@@ -533,6 +909,7 @@ Examples:
     batch_parser.add_argument("models", nargs="+", help="Model names")
     batch_parser.add_argument("--samples", type=int, default=20, help="Samples per model")
     batch_parser.add_argument("--no-auto-destroy", action="store_true")
+    batch_parser.add_argument("--max-hours", type=float, help="Maximum hours per model")
     batch_parser.add_argument("-y", "--yes", action="store_true")
 
     # Destroy command
@@ -549,6 +926,23 @@ Examples:
 
     # Presets command
     subparsers.add_parser("presets", help="List GPU presets")
+
+    # Finetune command
+    finetune_parser = subparsers.add_parser("finetune", help="Fine-tune a VLM model")
+    finetune_parser.add_argument("model", help="Model name or HuggingFace ID")
+    finetune_parser.add_argument("--train-data", help="Path to training JSONL file")
+    finetune_parser.add_argument("--val-data", help="Path to validation JSONL file")
+    finetune_parser.add_argument("--epochs", type=int, default=2, help="Number of epochs")
+    finetune_parser.add_argument("--batch-size", type=int, default=1, help="Per-device batch size")
+    finetune_parser.add_argument("--gradient-accumulation", type=int, default=8, help="Gradient accumulation steps")
+    finetune_parser.add_argument("--learning-rate", type=float, default=2e-4, help="Learning rate")
+    finetune_parser.add_argument("--lora-r", type=int, default=16, help="LoRA rank")
+    finetune_parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha")
+    finetune_parser.add_argument("--preset", help="GPU preset override")
+    finetune_parser.add_argument("--dry-run", action="store_true", help="Show plan only")
+    finetune_parser.add_argument("--auto-destroy", action="store_true", help="Destroy after completion")
+    finetune_parser.add_argument("--max-hours", type=float, help="Maximum runtime hours (billing protection)")
+    finetune_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmations")
 
     args = parser.parse_args()
 
@@ -571,6 +965,7 @@ Examples:
             auto_destroy=args.auto_destroy,
             yes=args.yes,
             skip_images=args.skip_images,
+            max_hours=args.max_hours,
         )
 
     elif args.command == "batch-test":
@@ -579,6 +974,7 @@ Examples:
             samples=args.samples,
             auto_destroy=not args.no_auto_destroy,
             yes=args.yes,
+            max_hours=args.max_hours,
         )
 
     elif args.command == "destroy":
@@ -594,6 +990,24 @@ Examples:
     elif args.command == "presets":
         print_presets()
         return 0
+
+    elif args.command == "finetune":
+        return runner.cmd_finetune(
+            model_id=args.model,
+            train_data=args.train_data,
+            val_data=args.val_data,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            gradient_accumulation=args.gradient_accumulation,
+            learning_rate=args.learning_rate,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            preset=args.preset,
+            dry_run=args.dry_run,
+            auto_destroy=args.auto_destroy,
+            yes=args.yes,
+            max_hours=args.max_hours,
+        )
 
     return 0
 
