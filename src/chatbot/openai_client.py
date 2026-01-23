@@ -5,12 +5,9 @@ OpenAI Client Wrapper - Unified API call handling with error management
 import os
 import logging
 from typing import List, Dict, Optional
-from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables
-env_path = Path(__file__).parent.parent.parent / '.env.local'
-load_dotenv(env_path)
+load_dotenv(find_dotenv('.env.local'))
 
 try:
     from openai import OpenAI

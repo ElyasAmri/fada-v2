@@ -7,18 +7,15 @@ import os
 import logging
 import requests
 from typing import Optional
-from pathlib import Path
 
 from PIL import Image
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from src.utils.image_processing import to_base64_data_url
 from src.utils.api_client import call_with_retry
 from src.inference.vlm_interface import VLMInterface
 
-# Load environment variables from .env.local
-env_path = Path(__file__).parent.parent.parent.parent / '.env.local'
-load_dotenv(env_path)
+load_dotenv(find_dotenv('.env.local'))
 
 # Suppress verbose Google auth logging
 logging.getLogger("google.auth").setLevel(logging.WARNING)

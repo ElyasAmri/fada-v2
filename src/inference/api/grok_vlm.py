@@ -6,17 +6,14 @@ Uses OpenAI-compatible API endpoint
 import os
 import logging
 from typing import List, Optional
-from pathlib import Path
 
 from PIL import Image
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from src.utils.image_processing import to_base64_data_url
 from src.utils.api_client import call_with_retry
 
-# Load environment variables from .env.local
-env_path = Path(__file__).parent.parent.parent.parent / '.env.local'
-load_dotenv(env_path)
+load_dotenv(find_dotenv('.env.local'))
 
 try:
     from openai import OpenAI
