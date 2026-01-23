@@ -10,11 +10,17 @@ API-based VLM inference infrastructure.
 - `batch_gemini_annotation.py` - Batch API processing for Gemini
 - `results/` - Checkpoints, batch files, and results (DO NOT DELETE)
 
-### vlm_testing/
-Local Vision-Language Model testing.
-- `comprehensive/` - SOTA model tests (InternVL2, Qwen2-VL, MolMo, etc.)
-- `quick_tests/` - Fast validation scripts
-- `medgemma/` - Medical VLM-specific tests
+### evaluation/
+VLM evaluation framework.
+- `evaluate_vlm.py` - Main VLM evaluation pipeline
+- `embedding_scorer.py` - Embedding similarity scoring
+- `config.py` - Evaluation configuration
+
+### vastai/
+Unified Vast.ai CLI for remote GPU operations.
+- `runner.py` - Main CLI interface
+- `templates/` - Training and inference templates
+- See `./venv/Scripts/python.exe -m experiments.vastai --help`
 
 ### external_models/
 Third-party model integrations.
@@ -42,3 +48,4 @@ Run scripts from project root:
 - Results in `api_models/results/` are critical - do not delete
 - See `docs/experiments/` for detailed documentation
 - Large model weights stored in `artifacts/` (gitignored)
+- Old test scripts archived in `_archive/`
