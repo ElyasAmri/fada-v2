@@ -20,15 +20,16 @@ except ImportError as e:
 try:
     from src.models.vqa_model import UltrasoundVQA
     VQA_AVAILABLE = True
-except Exception as e:
+except (ImportError, ModuleNotFoundError) as e:
     VQA_AVAILABLE = False
     logger.warning(f"VQA import failed: {e}")
 
 try:
-    from src.config.constants import get_vqa_model_key
+    from src.config.constants import get_vqa_model_key, VQA_MODEL_MAPPING
     CONSTANTS_AVAILABLE = True
 except ImportError:
     CONSTANTS_AVAILABLE = False
+    VQA_MODEL_MAPPING = {}
 
 
 @st.cache_resource
@@ -73,7 +74,7 @@ def load_model():
                 return model
 
         return None
-    except Exception as e:
+    except (RuntimeError, KeyError, ValueError, OSError) as e:
         st.error(f"Failed to load classification model: {str(e)}")
         return None
 
@@ -90,7 +91,7 @@ def load_vqa_model():
             device="auto"
         )
         return vqa
-    except Exception as e:
+    except (RuntimeError, ValueError, OSError) as e:
         logger.error(f"VQA initialization failed: {e}")
         return None
 
@@ -100,13 +101,8 @@ def get_vqa_model_for_category(category):
     if CONSTANTS_AVAILABLE:
         model_key = get_vqa_model_key(category)
     else:
-        category_mapping = {
-            "Abodomen": "abdomen",
-            "Femur": "femur",
-            "Thorax": "thorax",
-            "Standard_NT": "standard_nt",
-        }
-        model_key = category_mapping.get(category, "1epoch")
+        # Fallback if constants not available
+        model_key = VQA_MODEL_MAPPING.get(category, "1epoch")
 
     model_path = f"outputs/blip2_{model_key}/final_model"
 
@@ -126,6 +122,6 @@ def load_category_vqa(category):
         vqa = UltrasoundVQA(model_path=model_path, device="auto")
         logger.info(f"Loading VQA for {category}: {model_path}")
         return vqa
-    except Exception as e:
+    except (RuntimeError, ValueError, OSError) as e:
         logger.error(f"Failed to load VQA for {category}: {e}")
         return None

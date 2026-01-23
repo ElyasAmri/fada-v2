@@ -26,7 +26,10 @@ class FocalLoss(nn.Module):
             gamma: Focusing parameter (higher = more focus on hard examples)
         """
         super().__init__()
-        self.alpha = alpha
+        if alpha is not None:
+            self.register_buffer('alpha', alpha)
+        else:
+            self.alpha = None
         self.gamma = gamma
 
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
@@ -45,8 +48,6 @@ class FocalLoss(nn.Module):
         focal_loss = (1 - pt) ** self.gamma * ce_loss
 
         if self.alpha is not None:
-            if self.alpha.device != inputs.device:
-                self.alpha = self.alpha.to(inputs.device)
             focal_loss = self.alpha[targets] * focal_loss
 
         return focal_loss.mean()

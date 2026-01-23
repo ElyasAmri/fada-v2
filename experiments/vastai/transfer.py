@@ -6,11 +6,19 @@ Handles file uploads/downloads with caching and progress tracking.
 
 import hashlib
 import json
+import platform
+import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional
 
 from .instance import VastInstance
 
+
+# Regex pattern for extracting relative paths from "Fetal Ultrasound/..." paths
+FETAL_ULTRASOUND_PATTERN = re.compile(r'Fetal Ultrasound[/\\](.+)$')
 
 # Default paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -140,8 +148,6 @@ class DataTransfer:
         Returns:
             True if upload successful
         """
-        import subprocess
-
         if not images_dir.exists():
             print(f"Images directory not found: {images_dir}")
             return False
@@ -160,7 +166,6 @@ class DataTransfer:
         remote_cmd = f"cd /workspace/data && tar xzf -"
 
         # tar on Windows needs special handling
-        import platform
         if platform.system() == "Windows":
             # Use scp for Windows (tar piping is problematic)
             print(f"  (Using SCP on Windows - this may take longer...)")
@@ -196,10 +201,6 @@ class DataTransfer:
         Returns:
             True if upload successful
         """
-        import subprocess
-        import tempfile
-        import shutil
-
         if not test_file.exists():
             print(f"Test file not found: {test_file}")
             return False
@@ -233,8 +234,7 @@ class DataTransfer:
                     continue
 
                 # Extract relative path from "Fetal Ultrasound/..."
-                import re
-                match = re.search(r'Fetal Ultrasound[/\\](.+)$', str(src))
+                match = FETAL_ULTRASOUND_PATTERN.search(str(src))
                 if match:
                     rel_path = match.group(1).replace('\\', '/')
                     dst = tmpdir / "Fetal Ultrasound" / rel_path
@@ -357,9 +357,6 @@ class DataTransfer:
         Returns:
             True if upload successful
         """
-        import tempfile
-        import shutil
-
         # Check cache
         if not force:
             manifest = self._load_manifest("training_images")
@@ -397,8 +394,7 @@ class DataTransfer:
                     continue
 
                 # Extract relative path from "Fetal Ultrasound/..."
-                import re
-                match = re.search(r'Fetal Ultrasound[/\\](.+)$', str(src))
+                match = FETAL_ULTRASOUND_PATTERN.search(str(src))
                 if match:
                     rel_path = match.group(1).replace('\\', '/')
                     dst = tmpdir / "Fetal Ultrasound" / rel_path
@@ -529,7 +525,6 @@ class DataTransfer:
 
     def clear_cache(self):
         """Clear upload cache manifests."""
-        import shutil
         if self.cache_dir.exists():
             shutil.rmtree(self.cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)

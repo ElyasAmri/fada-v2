@@ -105,6 +105,9 @@ CONFIDENCE_THRESHOLDS = {
     'moderate': 0.50,
 }
 
+# Image validation constants
+MIN_IMAGE_SIZE = 10  # Minimum width/height in pixels for valid images
+
 
 def get_display_name(class_name: str) -> str:
     """Get user-friendly display name for a class."""

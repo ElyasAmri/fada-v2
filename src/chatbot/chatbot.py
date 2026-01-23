@@ -74,7 +74,7 @@ class UltrasoundChatbot:
             raise ValueError(f"confidence_threshold must be between 0 and 1, got {confidence_threshold}")
 
         if backbone not in self.VALID_BACKBONES:
-            logger.warning(f"Backbone '{backbone}' not in known list {self.VALID_BACKBONES}, proceeding anyway")
+            raise ValueError(f"Invalid backbone: {backbone}. Must be one of {self.VALID_BACKBONES}")
 
         self.device = torch.device('cuda' if use_gpu and torch.cuda.is_available() else 'cpu')
         logger.info(f"Using device: {self.device}")
@@ -125,7 +125,7 @@ class UltrasoundChatbot:
                     model.load_state_dict(checkpoint)
                     logger.info(f"Loaded model weights from: {model_path}")
 
-            except Exception as e:
+            except (RuntimeError, KeyError, ValueError) as e:
                 logger.error(f"Failed to load model from {model_path}: {e}")
                 logger.warning("Using untrained model")
         else:
@@ -187,7 +187,7 @@ class UltrasoundChatbot:
 
             return result
 
-        except Exception as e:
+        except (ValueError, RuntimeError, OSError, IOError) as e:
             logger.error(f"Error analyzing image: {e}")
 
             # Return error result

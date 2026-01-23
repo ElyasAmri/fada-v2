@@ -3,8 +3,6 @@ Fetal Ultrasound Dataset V2 - 12-class classification with stratified splits
 No patient-aware splitting since no patient IDs exist in the data
 """
 
-import os
-import pandas as pd
 import numpy as np
 from PIL import Image
 from pathlib import Path
@@ -15,7 +13,7 @@ from sklearn.model_selection import train_test_split
 import logging
 from collections import Counter
 
-from src.config.constants import CLASSES, DISPLAY_NAMES, CLASS_DESCRIPTIONS
+from src.config.constants import CLASSES, DISPLAY_NAMES, CLASS_DESCRIPTIONS, MIN_IMAGE_SIZE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,9 +31,7 @@ class FetalUltrasoundDataset12Class(Dataset):
         self,
         data_root: str,
         indices: Optional[List[int]] = None,
-        transform=None,
-        excel_path: Optional[str] = None,
-        use_excel_annotations: bool = False
+        transform=None
     ):
         """
         Initialize dataset
@@ -44,12 +40,9 @@ class FetalUltrasoundDataset12Class(Dataset):
             data_root: Path to 'Fetal Ultrasound' directory
             indices: Subset indices for train/val/test split
             transform: Image transformations
-            excel_path: Path to Excel annotations (for future use)
-            use_excel_annotations: Whether to use Excel annotations (when available)
         """
         self.data_root = Path(data_root)
         self.transform = transform
-        self.use_excel_annotations = use_excel_annotations
 
         # Verify data root exists
         if not self.data_root.exists():
@@ -64,11 +57,6 @@ class FetalUltrasoundDataset12Class(Dataset):
         if indices is not None:
             self.samples = [self.samples[i] for i in indices]
             self.labels = [self.labels[i] for i in indices]
-
-        # Load Excel annotations if available (for future use)
-        self.annotations = None
-        if use_excel_annotations and excel_path:
-            self.load_excel_annotations(excel_path)
 
         logger.info(f"Loaded {len(self.samples)} images")
         logger.info(f"Class distribution: {self.get_class_distribution()}")
@@ -95,7 +83,7 @@ class FetalUltrasoundDataset12Class(Dataset):
                     try:
                         # Verify image can be opened
                         with Image.open(img_path) as img:
-                            if img.size[0] < 10 or img.size[1] < 10:
+                            if img.size[0] < MIN_IMAGE_SIZE or img.size[1] < MIN_IMAGE_SIZE:
                                 logger.warning(f"Skipping tiny image: {img_path}")
                                 continue
 
@@ -126,15 +114,6 @@ class FetalUltrasoundDataset12Class(Dataset):
             weights[class_idx] = total_samples / (num_classes * count)
 
         return weights
-
-    def load_excel_annotations(self, excel_path: str) -> None:
-        """Load annotations from Excel file (placeholder for future use)"""
-        try:
-            self.annotations = pd.read_excel(excel_path)
-            logger.info(f"Loaded annotations from {excel_path}")
-        except Exception as e:
-            logger.error(f"Failed to load Excel annotations: {e}")
-            self.annotations = None
 
     def __len__(self) -> int:
         """Get dataset size"""
