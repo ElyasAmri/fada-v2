@@ -9,13 +9,7 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv('.env.local'))
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    OpenAI = None
-
+from openai import OpenAI
 from .model_config import (
     get_model_config,
     validate_model,
@@ -46,11 +40,6 @@ class OpenAIClient:
             temperature: Response randomness
             max_tokens: Maximum response length
         """
-        if not OPENAI_AVAILABLE:
-            logger.warning("OpenAI package not installed")
-            self.client = None
-            return
-
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             logger.warning("No OpenAI API key found. Set OPENAI_API_KEY environment variable.")

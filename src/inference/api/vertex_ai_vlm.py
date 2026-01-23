@@ -17,18 +17,13 @@ from src.inference.vlm_interface import VLMInterface
 
 load_dotenv(find_dotenv('.env.local'))
 
+import google.auth
+import google.auth.transport.requests
+
 # Suppress verbose Google auth logging
 logging.getLogger("google.auth").setLevel(logging.WARNING)
 logging.getLogger("google.auth.transport").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-try:
-    import google.auth
-    import google.auth.transport.requests
-    VERTEX_AI_AVAILABLE = True
-except ImportError:
-    VERTEX_AI_AVAILABLE = False
-    google = None
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +57,6 @@ class VertexAIVLM(VLMInterface):
             max_retries: Maximum number of retries on API errors
             retry_delay: Initial delay between retries (exponential backoff)
         """
-        if not VERTEX_AI_AVAILABLE:
-            raise ImportError("google-auth package not installed. Run: pip install google-auth")
-
         self.model_name_id = model_name
         self.display_name = self.AVAILABLE_MODELS.get(model_name, model_name)
         self.project_id = project_id or os.getenv("VERTEX_AI_PROJECT_ID")

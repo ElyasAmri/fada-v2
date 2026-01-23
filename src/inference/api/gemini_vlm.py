@@ -15,13 +15,7 @@ from src.utils.api_client import call_with_retry
 
 load_dotenv(find_dotenv('.env.local'))
 
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
-    genai = None
-
+import google.generativeai as genai
 from src.inference.vlm_interface import VLMInterface
 
 logger = logging.getLogger(__name__)
@@ -58,9 +52,6 @@ class GeminiVLM(VLMInterface):
             max_retries: Maximum number of retries on API errors
             retry_delay: Initial delay between retries (exponential backoff)
         """
-        if not GEMINI_AVAILABLE:
-            raise ImportError("google-generativeai package not installed. Run: pip install google-generativeai")
-
         self.model_name_id = model_name
         self.display_name = self.AVAILABLE_MODELS.get(model_name, model_name)
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")

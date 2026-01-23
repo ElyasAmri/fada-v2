@@ -15,13 +15,7 @@ from src.utils.api_client import call_with_retry
 
 load_dotenv(find_dotenv('.env.local'))
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    OpenAI = None
-
+from openai import OpenAI
 from src.inference.vlm_interface import VLMInterface
 
 logger = logging.getLogger(__name__)
@@ -63,9 +57,6 @@ class OpenAIVLM(VLMInterface):
             max_retries: Maximum number of retries on API errors
             retry_delay: Initial delay between retries (exponential backoff)
         """
-        if not OPENAI_AVAILABLE:
-            raise ImportError("openai package not installed. Run: pip install openai")
-
         self.model_name_id = model_name
         self.display_name = self.AVAILABLE_MODELS.get(model_name, model_name)
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
