@@ -10,16 +10,19 @@ Expected VRAM: ~10GB with 4-bit quantization
 
 import os
 import sys
+import time
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
+import mlflow
 import torch
 from unsloth import FastVisionModel, is_bf16_supported
 from unsloth.trainer import UnslothVisionDataCollator
 from trl import SFTTrainer, SFTConfig
 
+from mlflow_callback import MLflowCallback
 from prepare_dataset import prepare_dataset, DATA_ROOT, ANNOTATIONS_FILE
 
 
@@ -157,6 +160,9 @@ def create_trainer(model, tokenizer, train_dataset, val_dataset, lazy_loading=Fa
         args=training_args,
     )
 
+    # Add MLflow callback for per-step logging
+    trainer.add_callback(MLflowCallback())
+
     return trainer
 
 
@@ -232,24 +238,62 @@ def main():
         print("Model and data loaded successfully!")
         return
 
-    # Create trainer
-    print("\nCreating trainer...")
-    trainer = create_trainer(model, tokenizer, train_dataset, val_dataset, lazy_loading=use_lazy)
+    # Set up MLflow experiment
+    mlflow.set_experiment("unsloth_vlm_ultrasound")
 
-    # Train
-    print("\nStarting training...")
-    print("=" * 60)
+    # Create run name based on config
+    run_name = f"q7_baseline_{args.epochs}ep"
 
-    trainer_stats = trainer.train()
+    with mlflow.start_run(run_name=run_name):
+        # Log parameters
+        mlflow.log_params({
+            "model": MODEL_NAME,
+            "task": "Q7",
+            "epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "gradient_accumulation_steps": TRAINING_CONFIG["gradient_accumulation_steps"],
+            "effective_batch_size": args.batch_size * TRAINING_CONFIG["gradient_accumulation_steps"],
+            "learning_rate": args.learning_rate,
+            "max_seq_length": TRAINING_CONFIG["max_seq_length"],
+            "lora_r": LORA_CONFIG["r"],
+            "lora_alpha": LORA_CONFIG["lora_alpha"],
+            "lora_dropout": LORA_CONFIG["lora_dropout"],
+            "train_samples": len(train_dataset),
+            "val_samples": len(val_dataset),
+            "lazy_loading": use_lazy,
+        })
 
-    print("\n" + "=" * 60)
-    print("Training completed!")
-    print(f"Final loss: {trainer_stats.training_loss:.4f}")
+        # Create trainer
+        print("\nCreating trainer...")
+        trainer = create_trainer(model, tokenizer, train_dataset, val_dataset, lazy_loading=use_lazy)
 
-    # Save model
-    save_model(model, tokenizer, OUTPUT_DIR)
+        # Train
+        print("\nStarting training...")
+        print("=" * 60)
 
-    print("\nDone!")
+        start_time = time.time()
+        trainer_stats = trainer.train()
+        training_time = time.time() - start_time
+
+        print("\n" + "=" * 60)
+        print("Training completed!")
+        print(f"Final loss: {trainer_stats.training_loss:.4f}")
+        print(f"Training time: {training_time:.1f}s")
+
+        # Log final metrics
+        mlflow.log_metrics({
+            "final_loss": trainer_stats.training_loss,
+            "total_steps": trainer_stats.global_step,
+            "training_time_seconds": training_time,
+        })
+
+        # Save model
+        save_model(model, tokenizer, OUTPUT_DIR)
+
+        # Log adapter path as parameter
+        mlflow.log_param("adapter_path", str(OUTPUT_DIR / "lora_adapters"))
+
+        print("\nDone!")
 
 
 if __name__ == "__main__":
