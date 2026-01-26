@@ -77,3 +77,11 @@ experiments/fine_tuning/runs/
 
 # Accidental files
 3.5.1
+
+# Test and benchmark outputs
+test_output/
+benchmark_summary.json
+unsloth_compiled_cache/
+
+# App directory (if not needed)
+app/

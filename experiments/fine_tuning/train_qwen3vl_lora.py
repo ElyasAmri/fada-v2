@@ -53,7 +53,6 @@ except ImportError:
 
 from transformers import (
     AutoProcessor,
-    AutoModelForVision2Seq,
     AutoModelForImageTextToText,
     TrainingArguments,
     Trainer,
@@ -134,7 +133,7 @@ class VLMDataset(Dataset):
         jsonl_path: str,
         processor: AutoProcessor,
         max_samples: Optional[int] = None,
-        max_length: int = 2048,
+        max_length: int = 4096,
     ):
         self.processor = processor
         self.max_length = max_length

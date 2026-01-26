@@ -388,6 +388,43 @@ class VastInstance:
         ret, stdout, stderr = self._run_vastai("destroy", "instance", str(iid))
         return ret == 0
 
+    def stop_instance(self, instance_id: Optional[int] = None) -> bool:
+        """Stop an instance (can be restarted later)."""
+        iid = instance_id or self.instance_id
+        if not iid:
+            return False
+
+        ret, stdout, stderr = self._run_vastai("stop", "instance", str(iid))
+        return ret == 0
+
+    def start_instance(self, instance_id: Optional[int] = None) -> bool:
+        """Start a stopped instance."""
+        iid = instance_id or self.instance_id
+        if not iid:
+            return False
+
+        ret, stdout, stderr = self._run_vastai("start", "instance", str(iid))
+        return ret == 0
+
+    def destroy_instance(self, instance_id: Optional[int] = None) -> bool:
+        """Alias for destroy() for consistency."""
+        return self.destroy(instance_id)
+
+    def create_instance(
+        self,
+        offer_id: int,
+        image: Optional[str] = None,
+        disk_gb: int = 80,
+    ) -> Optional[int]:
+        """Create instance and return instance ID (alias for create)."""
+        if self.create(offer_id, disk_gb=disk_gb, image=image):
+            return self.instance_id
+        return None
+
+    def wait_for_ready(self, timeout: int = 600) -> bool:
+        """Alias for wait_until_ready()."""
+        return self.wait_until_ready(timeout=timeout)
+
     # =========================================================================
     # SSH Operations
     # =========================================================================
