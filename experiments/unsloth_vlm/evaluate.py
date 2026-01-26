@@ -12,6 +12,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import mlflow
 import torch
 from unsloth import FastVisionModel
 from tqdm import tqdm
@@ -272,6 +273,10 @@ def main():
                         help="Output JSON file for results")
     parser.add_argument("--compare-base", action="store_true",
                         help="Also evaluate base model for comparison")
+    parser.add_argument("--run-id", type=str, default=None,
+                        help="Parent MLflow run ID to log as nested run")
+    parser.add_argument("--experiment", type=str, default="unsloth_vlm_ultrasound",
+                        help="MLflow experiment name")
 
     args = parser.parse_args()
 
@@ -290,9 +295,60 @@ def main():
 
     # Save results
     if args.output:
-        save_results(results, Path(args.output))
+        output_path = Path(args.output)
+        save_results(results, output_path)
     else:
-        save_results(results, RESULTS_DIR / "evaluation_results.json")
+        output_path = RESULTS_DIR / "evaluation_results.json"
+        save_results(results, output_path)
+
+    # Log to MLflow
+    mlflow.set_experiment(args.experiment)
+
+    if args.run_id:
+        # Log as nested run under parent training run
+        with mlflow.start_run(run_id=args.run_id):
+            with mlflow.start_run(run_name="evaluation", nested=True):
+                # Log parameters
+                mlflow.log_param("adapter_dir", str(adapter_path))
+                mlflow.log_param("max_samples", args.max_samples)
+                mlflow.log_param("compare_base", args.compare_base)
+
+                # Log metrics
+                metrics = results["metrics"]
+                mlflow.log_metric("agreement_rate", metrics["agreement_rate"])
+
+                # Log per-class metrics
+                report = metrics["classification_report"]
+                for category in ["normal", "abnormal", "unclear"]:
+                    if category in report:
+                        mlflow.log_metric(f"{category}_precision", report[category]["precision"])
+                        mlflow.log_metric(f"{category}_recall", report[category]["recall"])
+                        mlflow.log_metric(f"{category}_f1", report[category]["f1-score"])
+
+                # Log artifact
+                mlflow.log_artifact(str(output_path))
+    else:
+        # Create standalone evaluation run
+        with mlflow.start_run(run_name="evaluation"):
+            # Log parameters
+            mlflow.log_param("adapter_dir", str(adapter_path))
+            mlflow.log_param("max_samples", args.max_samples)
+            mlflow.log_param("compare_base", args.compare_base)
+
+            # Log metrics
+            metrics = results["metrics"]
+            mlflow.log_metric("agreement_rate", metrics["agreement_rate"])
+
+            # Log per-class metrics
+            report = metrics["classification_report"]
+            for category in ["normal", "abnormal", "unclear"]:
+                if category in report:
+                    mlflow.log_metric(f"{category}_precision", report[category]["precision"])
+                    mlflow.log_metric(f"{category}_recall", report[category]["recall"])
+                    mlflow.log_metric(f"{category}_f1", report[category]["f1-score"])
+
+            # Log artifact
+            mlflow.log_artifact(str(output_path))
 
     # Optionally compare with base model
     if args.compare_base:
@@ -310,7 +366,55 @@ def main():
         results_base = evaluate_model(model_base, tokenizer_base, val_dataset, args.max_samples)
         print_results(results_base)
 
-        save_results(results_base, RESULTS_DIR / "base_model_results.json")
+        base_output_path = RESULTS_DIR / "base_model_results.json"
+        save_results(results_base, base_output_path)
+
+        # Log base model results to MLflow
+        if args.run_id:
+            # Log as nested run under parent training run
+            with mlflow.start_run(run_id=args.run_id):
+                with mlflow.start_run(run_name="base_model_evaluation", nested=True):
+                    # Log parameters
+                    mlflow.log_param("adapter_dir", "None")
+                    mlflow.log_param("max_samples", args.max_samples)
+                    mlflow.log_param("compare_base", True)
+
+                    # Log metrics
+                    metrics_base = results_base["metrics"]
+                    mlflow.log_metric("agreement_rate", metrics_base["agreement_rate"])
+
+                    # Log per-class metrics
+                    report_base = metrics_base["classification_report"]
+                    for category in ["normal", "abnormal", "unclear"]:
+                        if category in report_base:
+                            mlflow.log_metric(f"{category}_precision", report_base[category]["precision"])
+                            mlflow.log_metric(f"{category}_recall", report_base[category]["recall"])
+                            mlflow.log_metric(f"{category}_f1", report_base[category]["f1-score"])
+
+                    # Log artifact
+                    mlflow.log_artifact(str(base_output_path))
+        else:
+            # Create standalone evaluation run for base model
+            with mlflow.start_run(run_name="base_model_evaluation"):
+                # Log parameters
+                mlflow.log_param("adapter_dir", "None")
+                mlflow.log_param("max_samples", args.max_samples)
+                mlflow.log_param("compare_base", True)
+
+                # Log metrics
+                metrics_base = results_base["metrics"]
+                mlflow.log_metric("agreement_rate", metrics_base["agreement_rate"])
+
+                # Log per-class metrics
+                report_base = metrics_base["classification_report"]
+                for category in ["normal", "abnormal", "unclear"]:
+                    if category in report_base:
+                        mlflow.log_metric(f"{category}_precision", report_base[category]["precision"])
+                        mlflow.log_metric(f"{category}_recall", report_base[category]["recall"])
+                        mlflow.log_metric(f"{category}_f1", report_base[category]["f1-score"])
+
+                # Log artifact
+                mlflow.log_artifact(str(base_output_path))
 
 
 if __name__ == "__main__":

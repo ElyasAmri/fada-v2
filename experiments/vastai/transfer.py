@@ -347,26 +347,33 @@ class DataTransfer:
 
     def upload_training_images(self, train_file: Path, val_file: Path = None, force: bool = False) -> bool:
         """
-        Upload only the images referenced in training/validation files.
+        Download training images from Google Drive to remote instance.
+
+        Instead of uploading from local (slow), downloads directly from Google Drive
+        to the vast.ai instance (fast server-to-server transfer).
 
         Args:
-            train_file: Path to training JSONL file
+            train_file: Path to training JSONL file (used to count images needed)
             val_file: Path to validation JSONL file (optional)
-            force: Force upload even if cached
+            force: Force download even if cached
 
         Returns:
-            True if upload successful
+            True if download successful
         """
-        # Check cache
-        if not force:
-            manifest = self._load_manifest("training_images")
-            if manifest.get("instance_id") == self.instance.instance_id:
-                print(f"  Training images already uploaded to this instance (cached)")
-                return True
+        # Google Drive file ID for the Fetal Ultrasound dataset
+        GDRIVE_FILE_ID = "11wa8pIeA8YrV7aBBJrhcKSAJPxPuA6wJ"
 
-        # Get list of unique images from training and validation files
+        # Check if images already exist on remote
+        ret, stdout, _ = self.instance.run_ssh(
+            "ls /workspace/data/Fetal\\ Ultrasound/ 2>/dev/null | wc -l",
+            timeout=30
+        )
+        if ret == 0 and stdout.strip() and int(stdout.strip()) > 10:
+            print(f"  Images already present on instance ({stdout.strip()} dirs)")
+            return True
+
+        # Count images needed (for logging)
         images = set()
-
         for data_file in [train_file, val_file]:
             if data_file and data_file.exists():
                 with open(data_file, 'r', encoding='utf-8') as f:
@@ -377,44 +384,30 @@ class DataTransfer:
                             for img_path in data.get('images', []):
                                 images.add(img_path)
 
-        if not images:
-            print("  No images found in training data")
-            return True
+        print(f"  Downloading {len(images)} training images from Google Drive...")
 
-        print(f"  Uploading {len(images)} training images...")
+        # Install gdown and download dataset
+        download_cmd = f"""
+        set -e
+        pip install -q gdown
+        cd /workspace/data
+        echo "Downloading dataset from Google Drive..."
+        gdown --id {GDRIVE_FILE_ID} -O fetal_ultrasound.zip
+        echo "Extracting..."
+        unzip -q -o fetal_ultrasound.zip
+        rm fetal_ultrasound.zip
+        echo "Done. Contents:"
+        ls -la
+        """
 
-        # Create temp directory with same structure
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
+        print("  Installing gdown and downloading from Google Drive...")
+        ret, stdout, stderr = self.instance.run_ssh(download_cmd, timeout=600)
 
-            for img_path in images:
-                src = Path(img_path)
-                if not src.exists():
-                    print(f"    Warning: Image not found: {src}")
-                    continue
+        if ret != 0:
+            print(f"  Download failed: {stderr or stdout}")
+            return False
 
-                # Extract relative path from "Fetal Ultrasound/..."
-                match = FETAL_ULTRASOUND_PATTERN.search(str(src))
-                if match:
-                    rel_path = match.group(1).replace('\\', '/')
-                    dst = tmpdir / "Fetal Ultrasound" / rel_path
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, dst)
-
-            # Upload the temp directory
-            src_dir = tmpdir / "Fetal Ultrasound"
-            if src_dir.exists():
-                total_size = sum(f.stat().st_size for f in src_dir.rglob('*') if f.is_file())
-                print(f"  Uploading training images ({total_size / 1024 / 1024:.1f} MB)...")
-                if not self.instance.upload_directory(src_dir, "/workspace/data/"):
-                    return False
-
-        # Update cache
-        manifest = {
-            "instance_id": self.instance.instance_id,
-            "image_count": len(images),
-        }
-        self._save_manifest("training_images", manifest)
+        print("  Download complete!")
         return True
 
     def download_adapter(self, local_dir: Path) -> Optional[Path]:
@@ -544,13 +537,15 @@ def setup_environment(instance: VastInstance, use_flash_attn: bool = False) -> b
     """
     print("\nSetting up Python environment...")
 
-    # Base dependencies
+    # Base dependencies with pinned versions for reproducibility
+    # Note: Qwen2.5-VL requires transformers >= 4.49, accelerate >= 1.3 for compatibility
     setup_cmds = """
+    set -e  # Exit on any error
     pip install -q --upgrade pip
-    pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cu121
-    pip install -q transformers>=4.45.0 accelerate bitsandbytes peft
-    pip install -q pillow tqdm
-    pip install -q qwen-vl-utils  # For Qwen2-VL models
+    pip install -q torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
+    pip install -q transformers>=4.49.0 accelerate>=1.3.0 bitsandbytes==0.45.0 peft>=0.14.0
+    pip install -q pillow>=10.0.0 tqdm
+    pip install -q qwen-vl-utils  # For Qwen2-VL and Qwen2.5-VL models
     """
 
     if use_flash_attn:
@@ -590,3 +585,137 @@ def check_gpu(instance: VastInstance) -> dict:
             "temperature": parts[3].strip(),
         }
     return {}
+
+
+def validate_environment(instance: VastInstance, required_packages: list = None) -> dict:
+    """
+    Validate GPU and Python environment on remote instance.
+
+    Performs comprehensive checks before running jobs to catch failures early.
+
+    Args:
+        instance: Connected VastInstance
+        required_packages: Additional packages to verify (default: transformers, bitsandbytes, peft)
+
+    Returns:
+        Dict with validation results:
+        - success: bool
+        - gpu: dict with GPU info
+        - cuda_version: str
+        - pytorch_version: str
+        - errors: list of error messages
+    """
+    if required_packages is None:
+        required_packages = ["transformers", "bitsandbytes", "peft", "accelerate"]
+
+    result = {
+        "success": True,
+        "gpu": {},
+        "cuda_version": None,
+        "pytorch_version": None,
+        "driver_version": None,
+        "errors": [],
+    }
+
+    # Check 1: GPU accessible
+    print("  Validating GPU...")
+    ret, stdout, stderr = instance.run_ssh("nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader", timeout=30)
+    if ret != 0:
+        result["success"] = False
+        result["errors"].append(f"GPU not accessible: {stderr}")
+        return result
+
+    parts = stdout.strip().split(",")
+    if len(parts) >= 3:
+        result["gpu"]["name"] = parts[0].strip()
+        result["driver_version"] = parts[1].strip()
+        result["gpu"]["memory"] = parts[2].strip()
+        print(f"    GPU: {result['gpu']['name']}, Driver: {result['driver_version']}")
+
+    # Check 2: PyTorch + CUDA
+    print("  Validating PyTorch CUDA...")
+    cuda_check = """python3 -c "
+import torch
+print(f'pytorch:{torch.__version__}')
+print(f'cuda:{torch.version.cuda}')
+print(f'available:{torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'device:{torch.cuda.get_device_name(0)}')
+"
+"""
+    ret, stdout, stderr = instance.run_ssh(cuda_check, timeout=60)
+    if ret != 0:
+        result["success"] = False
+        result["errors"].append(f"PyTorch CUDA check failed: {stderr}")
+    else:
+        for line in stdout.strip().split('\n'):
+            if line.startswith('pytorch:'):
+                result["pytorch_version"] = line.split(':')[1]
+            elif line.startswith('cuda:'):
+                result["cuda_version"] = line.split(':')[1]
+            elif line.startswith('available:'):
+                if line.split(':')[1].strip().lower() != 'true':
+                    result["success"] = False
+                    result["errors"].append("CUDA not available in PyTorch")
+
+        if result["pytorch_version"]:
+            print(f"    PyTorch: {result['pytorch_version']}, CUDA: {result['cuda_version']}")
+
+    # Check 3: Required packages
+    print("  Validating packages...")
+    for pkg in required_packages:
+        ret, _, stderr = instance.run_ssh(f'python3 -c "import {pkg}"', timeout=30)
+        if ret != 0:
+            result["success"] = False
+            result["errors"].append(f"Package '{pkg}' import failed")
+            print(f"    FAILED: {pkg}")
+        else:
+            print(f"    OK: {pkg}")
+
+    return result
+
+
+def setup_environment_with_retry(
+    instance: VastInstance,
+    max_retries: int = 3,
+    use_flash_attn: bool = False,
+    retry_delay: int = 10,
+) -> bool:
+    """
+    Setup Python environment with retry logic and validation.
+
+    Args:
+        instance: Connected VastInstance
+        max_retries: Maximum setup attempts
+        use_flash_attn: Whether to install flash-attn
+        retry_delay: Seconds between retries
+
+    Returns:
+        True if setup and validation successful
+    """
+    import time
+
+    for attempt in range(1, max_retries + 1):
+        print(f"\nSetup attempt {attempt}/{max_retries}...")
+
+        # Run setup
+        if not setup_environment(instance, use_flash_attn=use_flash_attn):
+            print(f"  Setup failed on attempt {attempt}")
+            if attempt < max_retries:
+                print(f"  Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            continue
+
+        # Validate
+        validation = validate_environment(instance)
+        if validation["success"]:
+            print("\nEnvironment validated successfully!")
+            return True
+
+        print(f"  Validation failed: {validation['errors']}")
+        if attempt < max_retries:
+            print(f"  Retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+
+    print(f"\nSetup failed after {max_retries} attempts")
+    return False

@@ -35,6 +35,17 @@ Model fine-tuning scripts.
 Jupyter notebooks for training.
 - `blip2_training/` - BLIP-2 VQA training (5 categories complete)
 
+### mobile_vlm/
+Edge VLM benchmarking infrastructure.
+- `test_edge_models.py` - Benchmark Moondream2 and Qwen2.5-VL-3B
+- Tracks inference latency, memory usage, tokens/sec
+- MLflow integration for experiment tracking
+
+### unsloth_vlm/
+Unsloth-accelerated VLM training.
+- `train_qwen3vl.py` - Qwen3-VL fine-tuning with Unsloth
+- `evaluate.py` - Model evaluation pipeline
+
 ## Usage
 
 Run scripts from project root:

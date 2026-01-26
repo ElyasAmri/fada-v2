@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from .presets import DOCKER_IMAGE, MIN_DRIVER_VERSION
+
 
 @dataclass
 class GPUOffer:
@@ -105,9 +107,11 @@ class VastInstance:
         gpu_name: Optional[str] = None,
         min_vram: int = 20,
         max_price: float = 1.0,
+        min_price: float = 0.20,  # Minimum price to avoid unreliable cheap hosts
         min_reliability: float = 0.95,
         min_download: int = 100,
         num_gpus: int = 1,
+        min_driver_version: Optional[int] = None,
     ) -> List[GPUOffer]:
         """
         Search for available GPU offers.
@@ -116,9 +120,11 @@ class VastInstance:
             gpu_name: GPU type (e.g., "RTX_4090", "A100", "H100")
             min_vram: Minimum VRAM in GB
             max_price: Maximum price per hour in USD
+            min_price: Minimum price to filter out unreliable cheap hosts
             min_reliability: Minimum reliability score (0-1)
             min_download: Minimum download speed in Mbps
             num_gpus: Number of GPUs required
+            min_driver_version: Minimum NVIDIA driver version (e.g., 535 for CUDA 12.4+)
 
         Returns:
             List of GPUOffer sorted by price (cheapest first)
@@ -126,6 +132,7 @@ class VastInstance:
         query_parts = [
             f"gpu_ram>={min_vram}",  # API uses GB
             f"dph<{max_price}",
+            f"dph>{min_price}",  # Filter out unreliable cheap hosts
             f"reliability>{min_reliability}",
             f"inet_down>{min_download}",
             f"num_gpus={num_gpus}",
@@ -133,6 +140,10 @@ class VastInstance:
 
         if gpu_name:
             query_parts.append(f"gpu_name={gpu_name.replace(' ', '_')}")
+
+        # Filter by driver version for CUDA compatibility
+        if min_driver_version:
+            query_parts.append(f"driver_version>={min_driver_version}")
 
         query = " ".join(query_parts)
 
@@ -179,7 +190,7 @@ class VastInstance:
         self,
         offer_id: int,
         disk_gb: int = 80,
-        image: str = "pytorch",
+        image: Optional[str] = None,
     ) -> bool:
         """
         Create a new instance from an offer.
@@ -187,13 +198,16 @@ class VastInstance:
         Args:
             offer_id: The offer ID to use
             disk_gb: Disk size in GB
-            image: Docker image (key from IMAGES dict or full image name)
+            image: Docker image (key from IMAGES dict, full image name, or None for default from presets)
 
         Returns:
             True if instance was created successfully
         """
         # Resolve image name
-        docker_image = self.IMAGES.get(image, image)
+        if image is None:
+            docker_image = DOCKER_IMAGE
+        else:
+            docker_image = self.IMAGES.get(image, image)
 
         ret, stdout, stderr = self._run_vastai(
             "create", "instance", str(offer_id),
@@ -294,6 +308,77 @@ class VastInstance:
         print(f"Timeout waiting for instance {self.instance_id}")
         return False
 
+    def validate_instance(self, max_retries: int = 3, retry_delay: int = 15) -> Dict:
+        """
+        Validate the running instance meets requirements.
+
+        Args:
+            max_retries: Number of retries for SSH commands
+            retry_delay: Seconds to wait between retries
+
+        Returns:
+            Dict with:
+            - valid: bool - Whether instance meets all requirements
+            - driver_version: str - NVIDIA driver version
+            - cuda_version: str - CUDA runtime version
+            - errors: list - List of validation errors
+        """
+        for attempt in range(1, max_retries + 1):
+            result = {"valid": True, "errors": []}
+
+            # Check driver version
+            ret, stdout, _ = self.run_ssh(
+                "nvidia-smi --query-gpu=driver_version --format=csv,noheader",
+                timeout=30
+            )
+            if ret == 0 and stdout.strip():
+                driver = stdout.strip()
+                result["driver_version"] = driver
+                # Extract major version (e.g., "535.104.05" -> 535)
+                try:
+                    driver_major = int(driver.split('.')[0])
+                    if driver_major < MIN_DRIVER_VERSION:
+                        result["valid"] = False
+                        result["errors"].append(
+                            f"Driver {driver} (v{driver_major}) < required v{MIN_DRIVER_VERSION}"
+                        )
+                except (ValueError, IndexError):
+                    result["valid"] = False
+                    result["errors"].append(f"Could not parse driver version: {driver}")
+            else:
+                result["valid"] = False
+                result["errors"].append("Could not query driver version")
+                result["driver_version"] = "unknown"
+
+            # Check CUDA version via nvidia-smi (more reliable than nvcc)
+            ret, stdout, _ = self.run_ssh(
+                "nvidia-smi --query-gpu=driver_version,name --format=csv,noheader",
+                timeout=30
+            )
+            if ret == 0 and stdout.strip():
+                # nvidia-smi doesn't return CUDA version directly, get from nvidia-smi main output
+                ret2, stdout2, _ = self.run_ssh(
+                    "nvidia-smi | grep 'CUDA Version' | awk '{print $9}'",
+                    timeout=30
+                )
+                if ret2 == 0 and stdout2.strip():
+                    result["cuda_version"] = stdout2.strip()
+                else:
+                    result["cuda_version"] = "unknown"
+            else:
+                result["cuda_version"] = "unknown"
+
+            # If validation passed or we got driver info, return
+            if result.get("valid", False) or result.get("driver_version") != "unknown":
+                return result
+
+            # Retry if SSH commands failed
+            if attempt < max_retries:
+                print(f"  Validation attempt {attempt} failed, retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+
+        return result
+
     def destroy(self, instance_id: Optional[int] = None) -> bool:
         """Destroy/terminate an instance."""
         iid = instance_id or self.instance_id
@@ -343,10 +428,12 @@ class VastInstance:
                 result = subprocess.run(
                     ssh_cmd,
                     capture_output=True,
-                    text=True,
                     timeout=timeout,
                 )
-                return result.returncode, result.stdout, result.stderr
+                # Decode with UTF-8 and replace errors to handle special chars
+                stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ""
+                stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ""
+                return result.returncode, stdout, stderr
             else:
                 result = subprocess.run(ssh_cmd, timeout=timeout)
                 return result.returncode, "", ""
@@ -355,8 +442,8 @@ class VastInstance:
         except Exception as e:
             return 1, "", str(e)
 
-    def upload_file(self, local_path: Path, remote_path: str, show_progress: bool = True) -> bool:
-        """Upload a file via SCP."""
+    def upload_file(self, local_path: Path, remote_path: str, show_progress: bool = True, max_retries: int = 3) -> bool:
+        """Upload a file via SCP with retry logic."""
         if not self.ssh_host or not self.ssh_port:
             return False
 
@@ -364,6 +451,7 @@ class VastInstance:
             "scp",
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "ConnectTimeout=30",
             "-P", str(self.ssh_port),
             str(local_path),
             f"root@{self.ssh_host}:{remote_path}",
@@ -372,29 +460,62 @@ class VastInstance:
         if show_progress:
             print(f"  Uploading {local_path.name}...")
 
-        result = subprocess.run(scp_cmd, capture_output=not show_progress)
-        return result.returncode == 0
+        for attempt in range(1, max_retries + 1):
+            result = subprocess.run(scp_cmd, capture_output=True)
+            if result.returncode == 0:
+                return True
+            if attempt < max_retries:
+                print(f"    Upload failed (attempt {attempt}/{max_retries}), retrying in 5s...")
+                time.sleep(5)
 
-    def upload_directory(self, local_dir: Path, remote_dir: str, show_progress: bool = True) -> bool:
-        """Upload a directory via SCP."""
+        if show_progress:
+            print(f"    Upload failed after {max_retries} attempts")
+        return False
+
+    def upload_directory(self, local_dir: Path, remote_dir: str, show_progress: bool = True, max_retries: int = 5) -> bool:
+        """Upload a directory via SCP with retry logic and longer timeout."""
+        import platform
+
         if not self.ssh_host or not self.ssh_port:
             return False
 
+        if show_progress:
+            print(f"  Uploading {local_dir.name}/...")
+
+        # Use SCP with longer timeouts for large transfers
         scp_cmd = [
             "scp",
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "ConnectTimeout=120",
+            "-o", "ServerAliveInterval=30",
+            "-o", "ServerAliveCountMax=10",
             "-P", str(self.ssh_port),
             "-r",
             str(local_dir),
             f"root@{self.ssh_host}:{remote_dir}",
         ]
 
-        if show_progress:
-            print(f"  Uploading {local_dir.name}/...")
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Longer timeout for large directory uploads (30 min)
+                result = subprocess.run(scp_cmd, capture_output=True, timeout=1800)
+                if result.returncode == 0:
+                    return True
+                if show_progress and result.stderr:
+                    print(f"    SCP error: {result.stderr.decode()[:200]}")
+            except subprocess.TimeoutExpired:
+                if show_progress:
+                    print(f"    Upload timed out after 30 min")
 
-        result = subprocess.run(scp_cmd, capture_output=not show_progress)
-        return result.returncode == 0
+            if attempt < max_retries:
+                wait_time = 15 * attempt  # Exponential backoff
+                print(f"    Upload failed (attempt {attempt}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+
+        if show_progress:
+            print(f"    Upload failed after {max_retries} attempts")
+        return False
 
     def download_file(self, remote_path: str, local_path: Path, show_progress: bool = True) -> bool:
         """Download a file via SCP."""

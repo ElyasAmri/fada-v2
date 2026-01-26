@@ -19,6 +19,7 @@ import os
 import sys
 import json
 import argparse
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -30,6 +31,16 @@ from PIL import Image
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# MLflow imports - direct file import to avoid __init__.py dependencies
+import mlflow
+import importlib.util
+mlflow_utils_path = PROJECT_ROOT / "src" / "utils" / "mlflow_utils.py"
+spec = importlib.util.spec_from_file_location("mlflow_utils", mlflow_utils_path)
+mlflow_utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mlflow_utils)
+setup_mlflow_experiment = mlflow_utils.setup_mlflow_experiment
+MLflowTrainerCallback = mlflow_utils.MLflowTrainerCallback
 
 # Try importing Unsloth, fall back to standard HF
 try:
@@ -280,6 +291,7 @@ def create_trainer(
     eval_dataset: Optional[Dataset],
     output_dir: str,
     training_args: Optional[Dict[str, Any]] = None,
+    callbacks: Optional[list] = None,
 ) -> Trainer:
     """Create HuggingFace Trainer."""
     args = DEFAULT_TRAINING_ARGS.copy()
@@ -296,6 +308,7 @@ def create_trainer(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=processor,
+        callbacks=callbacks,
     )
 
     return trainer
@@ -402,6 +415,9 @@ def main():
 
     print(f"Output directory: {output_dir}")
 
+    # Setup MLflow experiment
+    setup_mlflow_experiment("vlm_finetuning")
+
     # Check CUDA
     if not torch.cuda.is_available():
         print("WARNING: CUDA not available, training will be slow!")
@@ -450,16 +466,6 @@ def main():
         'learning_rate': args.learning_rate,
     }
 
-    # Create trainer
-    trainer = create_trainer(
-        model=model,
-        processor=processor,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        output_dir=str(output_dir),
-        training_args=training_args,
-    )
-
     # Save config
     config = {
         'model': args.model,
@@ -474,16 +480,75 @@ def main():
     with open(output_dir / 'config.json', 'w') as f:
         json.dump(config, f, indent=2)
 
-    # Train
-    print("\nStarting training...")
-    trainer.train()
+    # Create run name based on model variant
+    run_name = f"{args.model}_lora"
+    if args.test_run:
+        run_name += "_test"
 
-    # Save final model
-    print("\nSaving model...")
-    trainer.save_model(str(output_dir / 'final'))
-    processor.save_pretrained(str(output_dir / 'final'))
+    # Start MLflow run
+    with mlflow.start_run(run_name=run_name):
+        # Log parameters
+        mlflow.log_params({
+            'model': args.model,
+            'model_id': MODEL_CONFIGS.get(args.model, args.model),
+            'lora_r': args.lora_r,
+            'lora_alpha': args.lora_alpha,
+            'lora_dropout': args.lora_dropout,
+            'quantization': '4bit' if not args.no_4bit else 'none',
+            'epochs': args.epochs,
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'gradient_accumulation': args.gradient_accumulation,
+            'train_samples': len(train_dataset),
+            'val_samples': len(eval_dataset) if eval_dataset else 0,
+            'use_unsloth': use_unsloth,
+            'test_run': args.test_run,
+        })
 
-    print(f"\nTraining complete! Model saved to: {output_dir / 'final'}")
+        # Create MLflow callback
+        mlflow_callback = MLflowTrainerCallback(log_every_n_steps=1)
+
+        # Create trainer with MLflow callback
+        trainer = create_trainer(
+            model=model,
+            processor=processor,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            output_dir=str(output_dir),
+            training_args=training_args,
+            callbacks=[mlflow_callback],
+        )
+
+        # Train
+        print("\nStarting training...")
+        start_time = time.time()
+        trainer.train()
+        training_time = time.time() - start_time
+
+        # Log final metrics
+        final_metrics = {
+            'training_time': training_time,
+        }
+
+        # Extract final loss from trainer state
+        if trainer.state.log_history:
+            for entry in reversed(trainer.state.log_history):
+                if 'loss' in entry:
+                    final_metrics['final_loss'] = entry['loss']
+                    break
+
+        mlflow.log_metrics(final_metrics)
+
+        # Log config artifact
+        mlflow.log_artifact(str(output_dir / 'config.json'))
+
+        # Save final model
+        print("\nSaving model...")
+        trainer.save_model(str(output_dir / 'final'))
+        processor.save_pretrained(str(output_dir / 'final'))
+
+        print(f"\nTraining complete! Model saved to: {output_dir / 'final'}")
+        print(f"Training time: {training_time:.2f} seconds")
 
 
 if __name__ == "__main__":

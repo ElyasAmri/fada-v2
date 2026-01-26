@@ -8,6 +8,22 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 
+# Pinned Docker image for reproducibility
+# Using official PyTorch image with CUDA 12.4
+DOCKER_IMAGE = "pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime"
+
+# Fallback images by CUDA version (in case primary unavailable)
+DOCKER_IMAGES_BY_CUDA = {
+    "12.4": "vastai/pytorch:2.5.1-cuda12.4-cudnn9-runtime",
+    "12.1": "vastai/pytorch:2.4.0-cuda12.1-cudnn8-runtime",
+    "11.8": "vastai/pytorch:2.3.0-cuda11.8-cudnn8-runtime",
+}
+
+# Minimum requirements
+MIN_DRIVER_VERSION = 535
+MIN_CUDA_VERSION = "12.1"
+
+
 @dataclass
 class GPUPreset:
     """GPU configuration preset."""
@@ -17,6 +33,8 @@ class GPUPreset:
     max_price: float  # Maximum $/hr
     disk_gb: int  # Default disk size
     description: str
+    cuda_version_min: str = "12.1"  # Minimum CUDA version
+    driver_version_min: int = 535   # Minimum driver version
 
 
 # GPU presets by tier
@@ -28,6 +46,8 @@ PRESETS: Dict[str, GPUPreset] = {
         max_price=0.40,
         disk_gb=60,
         description="RTX 4090 (~24GB) - For 1B-4B models",
+        cuda_version_min="12.1",
+        driver_version_min=535,
     ),
     "medium": GPUPreset(
         name="medium",
@@ -36,6 +56,8 @@ PRESETS: Dict[str, GPUPreset] = {
         max_price=1.20,
         disk_gb=100,
         description="A100 40GB - For 7B-14B models",
+        cuda_version_min="12.1",
+        driver_version_min=535,
     ),
     "large": GPUPreset(
         name="large",
@@ -44,6 +66,8 @@ PRESETS: Dict[str, GPUPreset] = {
         max_price=2.50,
         disk_gb=150,
         description="H100 80GB - For 30B+ models",
+        cuda_version_min="12.1",
+        driver_version_min=535,
     ),
     "budget": GPUPreset(
         name="budget",
@@ -52,6 +76,8 @@ PRESETS: Dict[str, GPUPreset] = {
         max_price=0.25,
         disk_gb=50,
         description="RTX 3090 (~24GB) - Budget option for small models",
+        cuda_version_min="11.8",
+        driver_version_min=520,
     ),
 }
 
@@ -267,6 +293,28 @@ def print_presets():
             print(f"    Models: {', '.join(m[0].split('/')[-1] for m in models[:5])}")
             if len(models) > 5:
                 print(f"            ...and {len(models) - 5} more")
+
+
+def get_docker_image(cuda_version: str = None) -> str:
+    """
+    Get the appropriate Docker image for the CUDA version.
+
+    Args:
+        cuda_version: Target CUDA version (e.g., "12.4"). If None, returns default.
+
+    Returns:
+        Docker image string
+    """
+    if cuda_version is None:
+        return DOCKER_IMAGE
+
+    # Find best matching image
+    for version, image in sorted(DOCKER_IMAGES_BY_CUDA.items(), reverse=True):
+        if cuda_version >= version:
+            return image
+
+    # Fallback to default
+    return DOCKER_IMAGE
 
 
 def print_model_list():

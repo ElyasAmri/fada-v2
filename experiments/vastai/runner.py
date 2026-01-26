@@ -28,7 +28,10 @@ from .presets import (
     PRESETS, MODEL_CONFIGS, resolve_model_id, get_preset_for_model,
     print_presets, print_model_list
 )
-from .transfer import DataTransfer, setup_environment, check_gpu, REMOTE_WORKSPACE
+from .transfer import (
+    DataTransfer, setup_environment, setup_environment_with_retry,
+    check_gpu, validate_environment, REMOTE_WORKSPACE
+)
 
 
 # Project paths
@@ -269,6 +272,8 @@ class VastaiRunner:
                 gpu_name=gpu_preset.gpu_name,
                 min_vram=gpu_preset.min_vram,
                 max_price=gpu_preset.max_price,
+                min_reliability=0.99,  # Higher reliability to avoid SSH failures
+                min_download=500,  # Higher min download for faster uploads
             )
 
             if not offers:
@@ -293,7 +298,7 @@ class VastaiRunner:
 
             # Step 3: Wait for instance
             print(f"\n[3/5] Waiting for instance...")
-            if not self.instance.wait_until_ready(timeout=600):
+            if not self.instance.wait_until_ready(timeout=900):  # 15 min for Docker pull
                 self.db.set_status(job.job_id, JobStatus.FAILED, "Instance failed to start")
                 return 1
 
@@ -305,17 +310,39 @@ class VastaiRunner:
             )
             print(f"Instance ready: {self.instance.ssh_command}")
 
+            # Brief delay to let SSH stabilize
+            print("Waiting for SSH to stabilize...")
+            time.sleep(20)
+
             # Check GPU
             gpu_info = check_gpu(self.instance)
             if gpu_info:
                 print(f"GPU: {gpu_info['name']}, VRAM: {gpu_info['memory_total']}")
+            else:
+                print("Warning: Could not query GPU info")
+
+            # Validate instance meets requirements
+            print("Validating instance...")
+            validation = self.instance.validate_instance()
+            if validation.get("driver_version"):
+                print(f"  Driver version: {validation['driver_version']}")
+            if validation.get("cuda_version"):
+                print(f"  CUDA version: {validation['cuda_version']}")
+            if not validation.get("valid", False):
+                errors = validation.get("errors", ["Unknown validation error"])
+                print(f"VALIDATION FAILED: {errors}")
+                self.db.set_status(job.job_id, JobStatus.FAILED, f"Instance validation failed: {errors}")
+                if self.instance.instance_id:
+                    self.instance.destroy()
+                return 1
+            print("  Validation passed")
 
             # Step 4: Setup environment and upload data
             print(f"\n[4/5] Setting up environment...")
             self.db.set_status(job.job_id, JobStatus.UPLOADING)
 
-            if not setup_environment(self.instance):
-                self.db.set_status(job.job_id, JobStatus.FAILED, "Environment setup failed")
+            if not setup_environment_with_retry(self.instance, max_retries=3):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Environment setup/validation failed after 3 attempts")
                 return 1
 
             transfer = DataTransfer(self.instance)
@@ -637,6 +664,8 @@ class VastaiRunner:
                 gpu_name=gpu_preset.gpu_name,
                 min_vram=gpu_preset.min_vram,
                 max_price=gpu_preset.max_price,
+                min_reliability=0.99,  # Higher reliability to avoid SSH failures
+                min_download=500,  # Higher min download for faster uploads
             )
 
             if not offers:
@@ -661,7 +690,7 @@ class VastaiRunner:
 
             # Step 3: Wait for instance
             print(f"\n[3/6] Waiting for instance...")
-            if not self.instance.wait_until_ready(timeout=600):
+            if not self.instance.wait_until_ready(timeout=900):  # 15 min for Docker pull
                 self.db.set_status(job.job_id, JobStatus.FAILED, "Instance failed to start")
                 return 1
 
@@ -673,17 +702,39 @@ class VastaiRunner:
             )
             print(f"Instance ready: {self.instance.ssh_command}")
 
+            # Brief delay to let SSH stabilize
+            print("Waiting for SSH to stabilize...")
+            time.sleep(20)
+
             # Check GPU
             gpu_info = check_gpu(self.instance)
             if gpu_info:
                 print(f"GPU: {gpu_info['name']}, VRAM: {gpu_info['memory_total']}")
+            else:
+                print("Warning: Could not query GPU info")
+
+            # Validate instance meets requirements
+            print("Validating instance...")
+            validation = self.instance.validate_instance()
+            if validation.get("driver_version"):
+                print(f"  Driver version: {validation['driver_version']}")
+            if validation.get("cuda_version"):
+                print(f"  CUDA version: {validation['cuda_version']}")
+            if not validation.get("valid", False):
+                errors = validation.get("errors", ["Unknown validation error"])
+                print(f"VALIDATION FAILED: {errors}")
+                self.db.set_status(job.job_id, JobStatus.FAILED, f"Instance validation failed: {errors}")
+                if self.instance.instance_id:
+                    self.instance.destroy()
+                return 1
+            print("  Validation passed")
 
             # Step 4: Setup environment and upload data
             print(f"\n[4/6] Setting up environment...")
             self.db.set_status(job.job_id, JobStatus.UPLOADING)
 
-            if not setup_environment(self.instance, use_flash_attn=True):
-                self.db.set_status(job.job_id, JobStatus.FAILED, "Environment setup failed")
+            if not setup_environment_with_retry(self.instance, max_retries=3, use_flash_attn=False):
+                self.db.set_status(job.job_id, JobStatus.FAILED, "Environment setup/validation failed after 3 attempts")
                 return 1
 
             transfer = DataTransfer(self.instance)
@@ -756,8 +807,13 @@ class VastaiRunner:
                 watchdog.stop()
 
             if ret != 0:
-                print(f"Fine-tuning failed: {stderr}")
-                self.db.set_status(job.job_id, JobStatus.FAILED, f"Training failed: {stderr[:200]}")
+                error_msg = stderr or stdout or "Unknown error"
+                # Clean non-ASCII chars for Windows console
+                error_msg_clean = error_msg.encode('ascii', errors='replace').decode('ascii')
+                print(f"Fine-tuning failed: {error_msg_clean}")
+                # Truncate safely
+                error_summary = error_msg_clean[:200] if error_msg_clean else "No error details"
+                self.db.set_status(job.job_id, JobStatus.FAILED, f"Training failed: {error_summary}")
                 return 1
 
             print("Fine-tuning complete!")
