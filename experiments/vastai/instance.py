@@ -12,7 +12,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .presets import DOCKER_IMAGE, MIN_DRIVER_VERSION
+try:
+    from .presets import DOCKER_IMAGE, MIN_DRIVER_VERSION
+except ImportError:
+    from presets import DOCKER_IMAGE, MIN_DRIVER_VERSION
+
+
+@dataclass
+class NetworkVolume:
+    """Represents a Vast.ai network volume."""
+    volume_id: int
+    size_gb: float
+    storage_cost: float  # $/GB/month
+    geolocation: str
+    reliability: float
+
+    @classmethod
+    def from_api(cls, data: Dict) -> "NetworkVolume":
+        return cls(
+            volume_id=data["id"],
+            size_gb=float(data.get("disk_space", 0)),
+            storage_cost=float(data.get("storage_cost", 0)),
+            geolocation=data.get("geolocation", "Unknown"),
+            reliability=float(data.get("reliability", 0)),
+        )
 
 
 @dataclass
@@ -112,6 +135,7 @@ class VastInstance:
         min_download: int = 100,
         num_gpus: int = 1,
         min_driver_version: Optional[int] = None,
+        geolocation: Optional[str] = None,
     ) -> List[GPUOffer]:
         """
         Search for available GPU offers.
@@ -125,6 +149,7 @@ class VastInstance:
             min_download: Minimum download speed in Mbps
             num_gpus: Number of GPUs required
             min_driver_version: Minimum NVIDIA driver version (e.g., 535 for CUDA 12.4+)
+            geolocation: Country code filter (e.g., "IS" for Iceland)
 
         Returns:
             List of GPUOffer sorted by price (cheapest first)
@@ -140,6 +165,9 @@ class VastInstance:
 
         if gpu_name:
             query_parts.append(f"gpu_name={gpu_name.replace(' ', '_')}")
+
+        if geolocation:
+            query_parts.append(f"geolocation={geolocation}")
 
         # Filter by driver version for CUDA compatibility
         if min_driver_version:
@@ -189,16 +217,20 @@ class VastInstance:
     def create(
         self,
         offer_id: int,
-        disk_gb: int = 80,
+        disk_gb: int = 10,
         image: Optional[str] = None,
+        network_volume_id: Optional[int] = None,
+        mount_path: str = "/workspace/data",
     ) -> bool:
         """
         Create a new instance from an offer.
 
         Args:
             offer_id: The offer ID to use
-            disk_gb: Disk size in GB
+            disk_gb: Local disk size in GB (minimal if using network volume)
             image: Docker image (key from IMAGES dict, full image name, or None for default from presets)
+            network_volume_id: Optional network volume ID to attach
+            mount_path: Mount path for network volume (default: /workspace/data)
 
         Returns:
             True if instance was created successfully
@@ -209,13 +241,19 @@ class VastInstance:
         else:
             docker_image = self.IMAGES.get(image, image)
 
-        ret, stdout, stderr = self._run_vastai(
+        args = [
             "create", "instance", str(offer_id),
             "--image", docker_image,
             "--disk", str(disk_gb),
             "--ssh", "--direct",
-            timeout=120,
-        )
+        ]
+
+        # Attach network volume if provided
+        if network_volume_id:
+            args.extend(["--link-volume", str(network_volume_id)])
+            args.extend(["--mount-path", mount_path])
+
+        ret, stdout, stderr = self._run_vastai(*args, timeout=120)
 
         if ret != 0:
             print(f"Error creating instance: {stderr}")
@@ -410,14 +448,145 @@ class VastInstance:
         """Alias for destroy() for consistency."""
         return self.destroy(instance_id)
 
+    # =========================================================================
+    # Network Volume Operations
+    # =========================================================================
+
+    def search_network_volumes(
+        self,
+        min_disk_space: int = 20,
+        min_reliability: float = 0.95,
+        geolocation: Optional[str] = None,
+    ) -> List[NetworkVolume]:
+        """
+        Search for available network volume offers.
+
+        Args:
+            min_disk_space: Minimum available space in GB
+            min_reliability: Minimum reliability score (0-1)
+            geolocation: Optional country code filter (e.g., "US", "NL")
+
+        Returns:
+            List of NetworkVolume sorted by storage cost (cheapest first)
+        """
+        query_parts = [
+            f"disk_space>{min_disk_space}",
+            f"reliability>{min_reliability}",
+        ]
+
+        if geolocation:
+            query_parts.append(f"geolocation={geolocation}")
+
+        query = " ".join(query_parts)
+
+        ret, stdout, stderr = self._run_vastai(
+            "search", "network-volumes", query, "--raw", "-o", "storage_cost"
+        )
+
+        if ret != 0:
+            print(f"Error searching network volumes: {stderr}")
+            return []
+
+        try:
+            data = json.loads(stdout)
+            volumes = [NetworkVolume.from_api(v) for v in data]
+            volumes.sort(key=lambda x: x.storage_cost)
+            return volumes
+        except json.JSONDecodeError:
+            print(f"Failed to parse volumes: {stdout[:200]}")
+            return []
+
+    def create_network_volume(
+        self,
+        offer_id: int,
+        size_gb: int = 30,
+        name: Optional[str] = None,
+    ) -> Optional[int]:
+        """
+        Create a network volume from an offer.
+
+        Args:
+            offer_id: The network volume offer ID
+            size_gb: Size in GB
+            name: Optional name for the volume
+
+        Returns:
+            Volume ID if created, None otherwise
+        """
+        args = ["create", "network-volume", str(offer_id), "-s", str(size_gb)]
+        if name:
+            args.extend(["-n", name])
+
+        ret, stdout, stderr = self._run_vastai(*args, timeout=60)
+
+        if ret != 0:
+            print(f"Error creating network volume: {stderr}")
+            return None
+
+        # Parse volume ID from output
+        # Format can be: "Created. {'success': True, 'volume_name': 'V.30576677', ...}"
+        # or: "{'success': True, 'new_contract': 12345}"
+        try:
+            # Try to find volume_name with ID (e.g., V.30576677)
+            match = re.search(r"'volume_name':\s*'V\.(\d+)'", stdout)
+            if match:
+                return int(match.group(1))
+
+            # Try new_contract format
+            match = re.search(r"'?new_contract'?:\s*(\d+)", stdout)
+            if match:
+                return int(match.group(1))
+
+            # Try JSON parsing
+            # Extract JSON part from output like "Created. {...}"
+            json_match = re.search(r"\{.*\}", stdout)
+            if json_match:
+                data = json.loads(json_match.group().replace("'", '"'))
+                if "volume_name" in data:
+                    # Extract ID from V.12345 format
+                    vol_match = re.search(r"V\.(\d+)", data["volume_name"])
+                    if vol_match:
+                        return int(vol_match.group(1))
+                if "new_contract" in data:
+                    return data["new_contract"]
+        except Exception as e:
+            print(f"Failed to parse volume ID: {e}, output: {stdout}")
+
+        return None
+
+    def delete_network_volume(self, volume_id: int) -> bool:
+        """Delete a network volume."""
+        ret, stdout, stderr = self._run_vastai("delete", "volume", str(volume_id))
+        return ret == 0
+
+    def show_volumes(self) -> List[Dict]:
+        """List all rented volumes."""
+        ret, stdout, stderr = self._run_vastai("show", "volumes", "--raw")
+
+        if ret != 0:
+            return []
+
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            return []
+
     def create_instance(
         self,
         offer_id: int,
         image: Optional[str] = None,
-        disk_gb: int = 80,
+        disk_gb: int = 10,
+        network_volume_id: Optional[int] = None,
+        mount_path: str = "/workspace/data",
     ) -> Optional[int]:
         """Create instance and return instance ID (alias for create)."""
-        if self.create(offer_id, disk_gb=disk_gb, image=image):
+        if self.create(
+            offer_id,
+            disk_gb=disk_gb,
+            image=image,
+            network_volume_id=network_volume_id,
+            mount_path=mount_path,
+        ):
             return self.instance_id
         return None
 

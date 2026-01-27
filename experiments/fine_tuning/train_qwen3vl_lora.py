@@ -283,6 +283,41 @@ def apply_lora(
     return model
 
 
+def collate_fn_for_vlm(batch):
+    """
+    Custom data collator for VLM training with variable-sized images.
+
+    Handles tensors that can't be stacked due to different dimensions
+    by keeping them as lists instead of stacking.
+    """
+    collated = {}
+
+    for key in batch[0].keys():
+        values = [item[key] for item in batch]
+
+        # Check if all values are tensors
+        if isinstance(values[0], torch.Tensor):
+            # Try to stack - if shapes match
+            shapes = [v.shape for v in values]
+            if len(set(shapes)) == 1:
+                # All same shape - stack normally
+                collated[key] = torch.stack(values)
+            else:
+                # Different shapes - keep as list (model should handle this)
+                # For pixel_values, image_grid_thw, etc.
+                collated[key] = values
+        elif isinstance(values[0], (list, tuple)):
+            collated[key] = values
+        else:
+            # Try default stacking for other types
+            try:
+                collated[key] = torch.tensor(values)
+            except:
+                collated[key] = values
+
+    return collated
+
+
 def create_trainer(
     model,
     processor,
@@ -307,6 +342,7 @@ def create_trainer(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=processor,
+        data_collator=collate_fn_for_vlm,  # Custom collator for variable-sized images
         callbacks=callbacks,
     )
 
