@@ -33,20 +33,28 @@ class RunPodInstance:
         gpu_type: str = "NVIDIA GeForce RTX 4090",
         image: str = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04",
         disk_gb: int = 50,
-        name: str = "benchmark"
+        name: str = "benchmark",
+        env_vars: Optional[dict] = None
     ) -> Optional[str]:
-        """Create a new pod."""
+        """Create a new pod with optional environment variables."""
         try:
-            pod = runpod.create_pod(
-                name=name,
-                image_name=image,
-                gpu_type_id=gpu_type,
-                gpu_count=1,
-                volume_in_gb=0,
-                container_disk_in_gb=disk_gb,
-                ports="22/tcp",
-                cloud_type="SECURE",
-            )
+            create_kwargs = {
+                "name": name,
+                "image_name": image,
+                "gpu_type_id": gpu_type,
+                "gpu_count": 1,
+                "volume_in_gb": 0,
+                "container_disk_in_gb": disk_gb,
+                "ports": "22/tcp",
+                "cloud_type": "SECURE",
+            }
+
+            # Add environment variables if provided
+            if env_vars:
+                create_kwargs["env"] = env_vars
+                print(f"Setting env vars: {list(env_vars.keys())}")
+
+            pod = runpod.create_pod(**create_kwargs)
             self.pod_id = pod["id"]
             print(f"Created pod {self.pod_id}")
             return self.pod_id

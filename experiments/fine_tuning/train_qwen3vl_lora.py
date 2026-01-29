@@ -86,6 +86,24 @@ MODEL_CONFIGS = {
     # Qwen2-VL series (older, but has 2B)
     "qwen2-vl-2b": "Qwen/Qwen2-VL-2B-Instruct",
     "qwen2-vl-7b": "Qwen/Qwen2-VL-7B-Instruct",
+    # InternVL2 family
+    "internvl2-2b": "OpenGVLab/InternVL2-2B",
+    "internvl2-4b": "OpenGVLab/InternVL2-4B",
+    "internvl2-8b": "OpenGVLab/InternVL2-8B",
+    # InternVL3 family
+    "internvl3-1b": "OpenGVLab/InternVL3-1B",
+    "internvl3-2b": "OpenGVLab/InternVL3-2B",
+    "internvl3-8b": "OpenGVLab/InternVL3-8B",
+    # MiniCPM-V family
+    "minicpm-v-2.6": "openbmb/MiniCPM-V-2_6",
+    "minicpm-v-4": "openbmb/MiniCPM-V-4",
+}
+
+# Architecture-specific LoRA target modules
+LORA_TARGET_MODULES = {
+    "qwen": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "internvl": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "minicpm": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
 }
 
 # Default LoRA configuration for RTX 4070
@@ -195,6 +213,25 @@ class VLMDataset(Dataset):
         return inputs
 
 
+def get_model_architecture(model_id: str) -> str:
+    """
+    Detect model architecture from model ID.
+
+    Args:
+        model_id: HuggingFace model ID or model name
+
+    Returns:
+        Architecture type: "internvl", "minicpm", or "qwen" (default)
+    """
+    model_lower = model_id.lower()
+    if "internvl" in model_lower:
+        return "internvl"
+    elif "minicpm" in model_lower:
+        return "minicpm"
+    else:
+        return "qwen"  # Default
+
+
 def create_model_and_processor(
     model_name: str,
     use_4bit: bool = True,
@@ -207,7 +244,8 @@ def create_model_and_processor(
         (model, processor) tuple
     """
     model_id = MODEL_CONFIGS.get(model_name, model_name)
-    print(f"Loading model: {model_id}")
+    architecture = get_model_architecture(model_id)
+    print(f"Loading model: {model_id} (architecture: {architecture})")
 
     # Determine if this is a Qwen3 model (requires different handling)
     is_qwen3 = "qwen3" in model_name.lower() or "Qwen3" in model_id
@@ -256,11 +294,19 @@ def create_model_and_processor(
 
 def apply_lora(
     model,
+    model_id: str,
     lora_config: Optional[Dict[str, Any]] = None,
     use_unsloth: bool = False,
 ):
     """Apply LoRA adapters to the model."""
     config = lora_config or DEFAULT_LORA_CONFIG
+
+    # Get architecture-specific target modules
+    architecture = get_model_architecture(model_id)
+    if architecture in LORA_TARGET_MODULES:
+        config = config.copy()
+        config['target_modules'] = LORA_TARGET_MODULES[architecture]
+        print(f"Using {architecture} target modules: {config['target_modules']}")
 
     if use_unsloth and UNSLOTH_AVAILABLE:
         # Unsloth handles LoRA internally
@@ -281,6 +327,16 @@ def apply_lora(
     print(f"Trainable: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.2f}%)")
 
     return model
+
+
+def find_latest_checkpoint(output_dir: Path) -> Optional[str]:
+    """Find the latest checkpoint in output directory."""
+    checkpoints = list(output_dir.glob("checkpoint-*"))
+    if not checkpoints:
+        return None
+    # Sort by step number
+    checkpoints.sort(key=lambda x: int(x.name.split("-")[1]))
+    return str(checkpoints[-1])
 
 
 def collate_fn_for_vlm(batch):
@@ -431,6 +487,16 @@ def main():
         help='Quick test with 100 samples, 1 epoch'
     )
 
+    # Resume arguments
+    parser.add_argument(
+        '--resume-from-checkpoint', type=str, default=None,
+        help='Path to checkpoint directory to resume training from'
+    )
+    parser.add_argument(
+        '--auto-resume', action='store_true',
+        help='Automatically resume from latest checkpoint in output directory'
+    )
+
     args = parser.parse_args()
 
     # Handle test run
@@ -449,6 +515,21 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Output directory: {output_dir}")
+
+    # Handle auto-resume
+    checkpoint_to_resume = None
+    if args.auto_resume:
+        checkpoint_to_resume = find_latest_checkpoint(output_dir)
+        if checkpoint_to_resume:
+            print(f"\nAuto-resume: Found checkpoint at {checkpoint_to_resume}")
+        else:
+            print("\nAuto-resume: No checkpoints found, starting fresh")
+    elif args.resume_from_checkpoint:
+        checkpoint_to_resume = args.resume_from_checkpoint
+        checkpoint_path = Path(checkpoint_to_resume)
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_to_resume}")
+        print(f"\nResuming from checkpoint: {checkpoint_to_resume}")
 
     # Setup MLflow experiment
     setup_mlflow_experiment("vlm_finetuning")
@@ -469,13 +550,14 @@ def main():
     )
 
     # Apply LoRA
+    model_id = MODEL_CONFIGS.get(args.model, args.model)
     lora_config = {
         **DEFAULT_LORA_CONFIG,
         'r': args.lora_r,
         'lora_alpha': args.lora_alpha,
         'lora_dropout': args.lora_dropout,
     }
-    model = apply_lora(model, lora_config, use_unsloth=use_unsloth)
+    model = apply_lora(model, model_id, lora_config, use_unsloth=use_unsloth)
 
     # Load datasets
     print("\nLoading datasets...")
@@ -557,7 +639,10 @@ def main():
         # Train
         print("\nStarting training...")
         start_time = time.time()
-        trainer.train()
+        if checkpoint_to_resume:
+            trainer.train(resume_from_checkpoint=checkpoint_to_resume)
+        else:
+            trainer.train()
         training_time = time.time() - start_time
 
         # Log final metrics

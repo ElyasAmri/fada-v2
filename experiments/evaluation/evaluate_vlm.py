@@ -1,12 +1,18 @@
 """
-VLM Evaluation Pipeline: Compare fine-tuned Qwen2.5-VL-7B against Gemini ground truth.
+VLM Evaluation Pipeline: Compare fine-tuned or zero-shot VLM against Gemini ground truth.
 
-Uses embedding similarity to measure how well the fine-tuned model matches
+Uses embedding similarity to measure how well the model matches
 the Gemini annotations used for training.
 
 Usage:
-    # Full evaluation
+    # Full evaluation with default model (from config.py)
     python experiments/evaluation/evaluate_vlm.py
+
+    # Zero-shot evaluation with any model
+    python experiments/evaluation/evaluate_vlm.py --model-id Qwen/Qwen2-VL-2B-Instruct --zero-shot
+
+    # Fine-tuned evaluation with custom model and adapter
+    python experiments/evaluation/evaluate_vlm.py --model-id Qwen/Qwen2.5-VL-7B-Instruct --adapter-path path/to/adapter
 
     # With custom test subset
     python experiments/evaluation/evaluate_vlm.py --test-data outputs/evaluation/test_subset.jsonl
@@ -58,15 +64,28 @@ def load_test_samples(test_path: Path) -> List[Dict]:
     return samples
 
 
+def load_predictions(predictions_path: Path) -> List[Dict]:
+    """Load predictions from JSONL file."""
+    predictions = []
+    with open(predictions_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                predictions.append(json.loads(line))
+    return predictions
+
+
 class VLMEvaluator:
-    """Evaluate fine-tuned VLM against ground truth annotations."""
+    """Evaluate fine-tuned or zero-shot VLM against ground truth annotations."""
 
     def __init__(
         self,
-        adapter_path: Path = ADAPTER_PATH,
+        model_id: str = BASE_MODEL_ID,
+        adapter_path: Optional[Path] = ADAPTER_PATH,
         use_4bit: bool = True,
         device_map: str = "auto"
     ):
+        self.model_id = model_id
         self.adapter_path = adapter_path
         self.use_4bit = use_4bit
         self.device_map = device_map
@@ -74,15 +93,14 @@ class VLMEvaluator:
         self.processor = None
 
     def load_model(self):
-        """Load fine-tuned model with LoRA adapter."""
+        """Load model (optionally with LoRA adapter for fine-tuned evaluation)."""
         import torch
         from transformers import AutoProcessor, AutoModelForImageTextToText, BitsAndBytesConfig
-        from peft import PeftModel
 
-        print(f"Loading base model: {BASE_MODEL_ID}")
+        print(f"Loading base model: {self.model_id}")
 
         self.processor = AutoProcessor.from_pretrained(
-            BASE_MODEL_ID,
+            self.model_id,
             trust_remote_code=True,
         )
 
@@ -97,21 +115,26 @@ class VLMEvaluator:
             bnb_config = None
 
         model = AutoModelForImageTextToText.from_pretrained(
-            BASE_MODEL_ID,
+            self.model_id,
             quantization_config=bnb_config,
             device_map=self.device_map,
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
         )
 
-        # Load LoRA adapter
-        print(f"Loading adapter from: {self.adapter_path}")
-        if not self.adapter_path.exists():
-            raise FileNotFoundError(f"Adapter not found at {self.adapter_path}")
-        self.model = PeftModel.from_pretrained(model, str(self.adapter_path))
-        self.model.eval()
+        # Load LoRA adapter if specified
+        if self.adapter_path is not None:
+            from peft import PeftModel
+            print(f"Loading adapter from: {self.adapter_path}")
+            if not self.adapter_path.exists():
+                raise FileNotFoundError(f"Adapter not found at {self.adapter_path}")
+            self.model = PeftModel.from_pretrained(model, str(self.adapter_path))
+            print("Fine-tuned model loaded successfully")
+        else:
+            self.model = model
+            print("Zero-shot model loaded successfully")
 
-        print("Model loaded successfully")
+        self.model.eval()
 
     def generate_response(
         self,
@@ -170,7 +193,9 @@ class VLMEvaluator:
         self,
         test_samples: List[Dict],
         checkpoint_interval: int = 50,
-        checkpoint_path: Optional[Path] = None
+        checkpoint_path: Optional[Path] = None,
+        start_index: int = 0,
+        existing_results: Optional[List[Dict]] = None,
     ) -> List[Dict]:
         """
         Run inference on all test samples.
@@ -190,10 +215,17 @@ class VLMEvaluator:
             "ground_truth": str,
             "prediction": str
         }
-        """
-        results = []
 
-        for idx, sample in enumerate(tqdm(test_samples, desc="Running inference")):
+        Args:
+            test_samples: List of test samples to process
+            checkpoint_interval: Save checkpoint every N samples
+            checkpoint_path: Path to save checkpoints
+            start_index: Start processing from this sample index (for resume)
+            existing_results: Previously computed results (for resume)
+        """
+        results = existing_results or []
+
+        for idx, sample in enumerate(tqdm(test_samples[start_index:], desc="Running inference", initial=start_index, total=len(test_samples))):
             image_path = sample['images'][0]
             messages = sample['messages']
 
@@ -218,8 +250,9 @@ class VLMEvaluator:
                 print(f"\nError processing {image_path}: {e}")
                 prediction = ""
 
+            actual_idx = start_index + idx
             results.append({
-                "sample_id": idx,
+                "sample_id": actual_idx,
                 "image_path": image_path,
                 "category": category,
                 "question": question[:100] + "..." if len(question) > 100 else question,
@@ -228,9 +261,9 @@ class VLMEvaluator:
             })
 
             # Periodic checkpoint save
-            if checkpoint_path and (idx + 1) % checkpoint_interval == 0:
+            if checkpoint_path and (actual_idx + 1) % checkpoint_interval == 0:
                 self._save_checkpoint(results, checkpoint_path)
-                print(f"\n  Checkpoint saved: {idx + 1}/{len(test_samples)} samples")
+                print(f"\n  Checkpoint saved: {actual_idx + 1}/{len(test_samples)} samples")
 
         return results
 
@@ -307,8 +340,23 @@ def print_results_summary(scores: Dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate fine-tuned VLM against ground truth")
+    parser = argparse.ArgumentParser(description="Evaluate fine-tuned or zero-shot VLM against ground truth")
 
+    # Model configuration
+    parser.add_argument(
+        '--model-id', type=str, default=BASE_MODEL_ID,
+        help='HuggingFace model ID (default: from config.py)'
+    )
+    parser.add_argument(
+        '--adapter-path', type=str, default=None,
+        help='Path to LoRA adapter (if None and --zero-shot not set, uses config.py default)'
+    )
+    parser.add_argument(
+        '--zero-shot', action='store_true',
+        help='Run zero-shot evaluation without adapter'
+    )
+
+    # Data and evaluation configuration
     parser.add_argument(
         '--test-data', type=str, default=str(STRATIFIED_TEST_DATA),
         help='Path to test subset JSONL'
@@ -339,7 +387,26 @@ def main():
         help='Custom output path for results JSON'
     )
 
+    # Resume arguments
+    parser.add_argument(
+        '--resume-from', type=str, default=None,
+        help='Path to partial predictions JSONL file to resume from'
+    )
+    parser.add_argument(
+        '--start-index', type=int, default=None,
+        help='Start evaluation from this sample index (alternative to --resume-from)'
+    )
+
     args = parser.parse_args()
+
+    # Determine adapter path
+    if args.zero_shot:
+        adapter_path = None
+    elif args.adapter_path is not None:
+        adapter_path = Path(args.adapter_path)
+    else:
+        # Use default from config.py
+        adapter_path = ADAPTER_PATH
 
     # Setup output directory
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -350,6 +417,8 @@ def main():
     print("=" * 70)
     print("VLM Evaluation Pipeline")
     print("=" * 70)
+    print(f"Model:           {args.model_id}")
+    print(f"Adapter:         {adapter_path if adapter_path else 'None (zero-shot)'}")
     print(f"Test data:       {args.test_data}")
     print(f"Embedding model: {args.embedding_model}")
     print(f"Mode:            {'inference-only' if args.inference_only else 'score-only' if args.score_only else 'full'}")
@@ -368,6 +437,21 @@ def main():
         test_samples = load_test_samples(test_path)
         print(f"\nLoaded {len(test_samples)} test samples")
 
+        # Handle resume
+        start_index = 0
+        existing_results = None
+        if args.resume_from:
+            resume_path = Path(args.resume_from)
+            if not resume_path.exists():
+                print(f"\nError: Resume file not found: {resume_path}")
+                return 1
+            existing_results = load_predictions(resume_path)
+            start_index = len(existing_results)
+            print(f"\nResuming from sample {start_index} ({len(existing_results)} already completed)")
+        elif args.start_index is not None:
+            start_index = args.start_index
+            print(f"\nStarting from sample {start_index}")
+
         # Check CUDA availability
         try:
             import torch
@@ -380,12 +464,21 @@ def main():
             print("WARNING: PyTorch not available")
 
         # Initialize evaluator
-        evaluator = VLMEvaluator(use_4bit=not args.no_4bit)
+        evaluator = VLMEvaluator(
+            model_id=args.model_id,
+            adapter_path=adapter_path,
+            use_4bit=not args.no_4bit
+        )
         evaluator.load_model()
 
         # Run inference
         checkpoint_path = OUTPUTS_DIR / f"predictions_checkpoint_{timestamp}.jsonl"
-        results = evaluator.run_inference(test_samples, checkpoint_path=checkpoint_path)
+        results = evaluator.run_inference(
+            test_samples,
+            checkpoint_path=checkpoint_path,
+            start_index=start_index,
+            existing_results=existing_results
+        )
 
         # Save predictions
         predictions_path = OUTPUTS_DIR / f"predictions_{timestamp}.jsonl"
@@ -432,8 +525,9 @@ def main():
             "timestamp": timestamp,
             "test_data": args.test_data,
             "embedding_model": args.embedding_model,
-            "base_model": BASE_MODEL_ID,
-            "adapter_path": str(ADAPTER_PATH),
+            "model_id": args.model_id,
+            "adapter_path": str(adapter_path) if adapter_path else None,
+            "zero_shot": args.zero_shot,
             "num_samples": len(results),
         },
         "scores": scores

@@ -93,6 +93,13 @@ experiments/vastai/setup_instance.sh
 # RunPod benchmark outputs
 experiments/runpod/benchmark_results/
 experiments/runpod/*.log
+experiments/runpod/remote_test.py
+
+# Dry run outputs
+experiments/dry_run/
+
+# OMC internal state
+.omc/
 
 # App directory (if not needed)
 app/
