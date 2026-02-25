@@ -4,17 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FADA (Fetal Anomaly Detection Algorithm) is a research prototype for ultrasound image analysis using deep learning. The goal is to build a conversational chatbot website where users upload ultrasound images and receive analysis. NOT for clinical use.
+FADA (Fetal Anomaly Detection Algorithm) is a research prototype for fetal ultrasound image analysis using Vision Language Models (VLMs). The project benchmarks, fine-tunes, and evaluates VLMs for automated ultrasound interpretation via 8 clinical questions per image. NOT for clinical use.
+
+### Current Focus
+
+- **VLM Benchmarking**: 50+ models tested (Phase 1), ground-truth evaluation in progress (Phase 4)
+- **Best verified score**: Qwen2.5-VL-7B fine-tuned at 81.1% (embedding similarity, 600 samples)
+- **Full dataset**: ~19,000 images, 14 anatomical classes, 18,936 annotated
 
 ### Key Project Files to Review First
-1. `docs/project/project.md` - Original project description
-2. `docs/project/spec.md` - Detailed specifications and requirements
-3. `docs/project/modular_architecture.md` - System architecture (classification to captioning evolution)
-4. `docs/project/APPROACH_VALIDATION.md` - Critical decisions and validation points
+
+1. `docs/project/project.md` - Project description and phases
+2. `docs/project/Tasks.md` - Current task status
+3. `docs/experiments/models-tracker.md` - Model evaluation status
+4. `docs/experiments/results-summary.md` - Per-category performance
+5. `docs/project/next-steps.md` - Prioritized action plan
 
 ## Key Commands
 
 ### Environment Setup (Windows)
+
 ```bash
 # IMPORTANT: Use forward slashes in bash on Windows
 ./venv/Scripts/python.exe  # Correct
@@ -27,19 +36,31 @@ source venv/Scripts/activate  # Git Bash/WSL
 pip install -r requirements.txt
 ```
 
-### Model Training
-```bash
-# Train classification model
-./venv/Scripts/python.exe src/training/train_classification.py
+### VLM Experiments
 
-# Run experiments with specific fold
-./venv/Scripts/python.exe src/training/train_classification.py --fold 1
+```bash
+# Run API model evaluation (Gemini, GPT-4o, vLLM backends)
+./venv/Scripts/python.exe experiments/api_models/test_api_vlm.py
+
+# Fine-tune with Unsloth (local, RTX 5090)
+./venv/Scripts/python.exe experiments/unsloth_vlm/train_qwen3vl.py
+
+# Fine-tune with LoRA (cloud, vast.ai/RunPod)
+./venv/Scripts/python.exe experiments/fine_tuning/train_qwen3vl_lora.py
 
 # Track experiments with MLflow
 mlflow ui --host 0.0.0.0 --port 5000
 ```
 
-### Web Interface (After model training)
+### Classification Model (Legacy)
+
+```bash
+# Train EfficientNet-B0 classification model
+./venv/Scripts/python.exe src/training/train_classification.py
+```
+
+### Web Interface
+
 ```bash
 # Run Streamlit prototype (NOT for clinical use)
 streamlit run web/app.py --server.port 8501
@@ -47,107 +68,114 @@ streamlit run web/app.py --server.port 8501
 
 ## Project Architecture
 
-### Modular Design
+### VLM Evaluation Pipeline
+
 ```
-UltrasoundAnalyzer
-+-- FeatureExtractor (backbone.py)
-|   +-- EfficientNet-B0 (frozen after initial training)
-+-- Task Heads (heads.py)
-    +-- ClassificationHead (organ detection)
-    +-- AbnormalityHead (normal/abnormal)
-    +-- AttributeHead (quality, orientation)
-    +-- CaptionHead (future)
+Dataset (19K images, 8 questions each)
++-- API Models (Gemini, GPT-4o via experiments/api_models/)
++-- Local Models (Qwen, InternVL, MiniCPM via src/inference/)
++-- Fine-tuning (Unsloth local, LoRA cloud)
++-- Evaluation (embedding similarity vs ground truth)
 ```
 
-The backbone is trained once and shared across all tasks. New heads can be added without retraining the backbone, enabling progressive enhancement.
+### Source Code (src/)
+
+```
+src/
++-- inference/           # VLM inference interfaces
+|   +-- api/             # Gemini, GPT-4o, Grok backends
+|   +-- local/           # Qwen, InternVL, MiniCPM, Moondream
++-- data/                # Dataset loading, augmentation, VLM dataset
++-- models/              # Classifier, VQA model
++-- chatbot/             # Response generation
++-- training/            # Classification training
++-- utils/               # MLflow, metrics, visualization
+```
 
 ### Key Design Decisions
-- **Backbone**: EfficientNet-B0 (best for small datasets, expects 60-75% accuracy with 250 images)
-- **Augmentation**: Heavy augmentation (10-20x) to compensate for limited data
-- **Training**: n-fold cross-validation (configurable, start n=1 for testing, n=5 for final)
-- **Response Generation**: Template-based initially, OpenAI API integration planned
-- **Web Framework**: Streamlit for prototype (NOT Gradio), React planned for production
+
+- **Primary approach**: VLM benchmarking and fine-tuning (not classification)
+- **Evaluation metric**: Embedding similarity (sentence-transformers) vs ground truth
+- **Fine-tuning**: LoRA adapters (r=16, alpha=32, all linear targets)
+- **Local training**: Unsloth on RTX 5090 (verified for 7 Qwen models)
+- **Cloud training**: vast.ai / RunPod (RTX 3090/4090 at ~$0.40/h)
+- **Web Framework**: Streamlit for prototype
 
 ## Data Structure
+
 ```
 data/Fetal Ultrasound/
-├── Brain/       # 50 images
-├── Heart/       # 50 images
-├── Abdomen/     # 50 images
-├── Femur/       # 50 images
-├── Thorax/      # 50 images
-└── *.xlsx       # Excel annotations (8 questions per image)
++-- Abodomen/            # 2,424 images (note: typo in folder name is intentional)
++-- Aorta/               # 1,308 images
++-- CRL-View/            # 1,989 images
++-- Cervical/            # 500 images
++-- Cervix/              # 1,626 images
++-- Femur/               # 1,165 images
++-- NT-View/             # 2,028 images
++-- Non_standard_NT/     # 487 images
++-- Public_Symphysis_fetal_head/  # 1,358 images
++-- Standard_NT/         # 1,508 images
++-- Thorax/              # 1,793 images
++-- Trans-cerebellum/    # 684 images
++-- Trans-thalamic/      # 1,565 images
++-- Trans-ventricular/   # 584 images
++-- annotations.xlsx     # Per-class annotations
+data/Fetal Ultrasound Annotations Final.xlsx  # Master annotations (18,936 rows)
+data/vlm_training/       # JSONL training files for VLM fine-tuning
+data/dataset_splits.json # Train/val/test split (12,014 / 1,494 / 1,494)
 ```
 
 ## Critical Context
-- **Timeline**: November for full annotations, December deadline for demo
-- **Hardware**: RTX 4070 preferred over RX 7900 XTX (better CUDA support)
-- **Accuracy Target**: No specific target, focus on demonstrating model selection process
-- **Documentation**: Every decision documented for potential research paper
+
+- **Hardware**: RTX 5090 (24GB VRAM) local, cloud GPUs for benchmarking
+- **Accuracy**: Best verified GT score is 81.1% (Qwen2.5-VL-7B fine-tuned)
+- **Key caveat**: Phase 1 proxy scores (keyword matching) are NOT comparable to Phase 2/3 GT scores (embedding similarity)
+- **Documentation**: Every decision documented for research paper
 
 ## Common Issues and Solutions
 
 ### Windows Path Issues
+
 - Always use forward slashes in bash: `./venv/Scripts/python.exe`
 - Git Bash requires Unix-style paths
 - Use `source` not `.` for activation in Git Bash
 
-### Model Selection and Training
-- **Model selection strategy**: See `docs/project/spec.md` Section 4 for complete model architecture zoo and testing order
-- **Expected performance**: 85-90% accuracy with full annotations
-- **Training approach**: Heavy augmentation, pretrained models, focal loss for imbalance
-- **Implementation note**: System designed to work seamlessly when Excel annotations are updated - just replace the Excel file and retrain
+### Cross-Platform Image Paths
 
-## MCP Tools Usage
+- Cloud scripts may fallback to dummy images when Windows paths detected
+- See GitHub issue #6 for the RunPod image path bug
 
-### Paper Search Tools
-Claude Code has access to MCP (Model Context Protocol) paper search tools. These are essential for finding state-of-the-art approaches.
+## Docs Structure
 
-#### Primary Search Commands:
-```python
-# Semantic Scholar - Best for comprehensive searches
-mcp__paper-search__search_semantic(query="fetal ultrasound", year="2023-", max_results=20)
-
-# ArXiv - Recent preprints
-mcp__paper-search__search_arxiv(query="ultrasound deep learning", max_results=10)
-
-# PubMed - Medical papers
-mcp__paper-search__search_pubmed(query="fetal anomaly detection", max_results=10)
-
-# Download papers
-mcp__paper-search__download_arxiv(paper_id="2506.08623", save_path="./docs/papers/pdfs")
 ```
-
-### Documentation Lookup:
-```python
-# Get PyTorch documentation
-mcp__context7__resolve-library-id(libraryName="pytorch")
-mcp__context7__get-library-docs(context7CompatibleLibraryID="/pytorch/pytorch", topic="vision models")
+docs/
++-- dashboard.md                  # Project overview hub
++-- project/                      # Project management
+|   +-- project.md, spec.md, Tasks.md, next-steps.md, Narrative.md
++-- experiments/                  # Experiment docs and tracking
+|   +-- models-to-test.md, models-tracker.md, results-summary.md
+|   +-- vlm/                     # VLM testing results
+|   +-- Evaluation Methodology.md, Fine-Tuning Approach.md
++-- papers/                       # Research paper artifacts
+|   +-- bibliography.md, literature_review.md, Paper Outline.md
++-- reports/                      # LaTeX report
 ```
-
-## Important Files
-- `docs/project/spec.md` - Detailed project specifications
-- `docs/project/APPROACH_VALIDATION.md` - Complete validation checklist
-- `docs/project/modular_architecture.md` - System design details
-- `docs/papers/literature_review.md` - Research findings and papers (15+ papers analyzed)
-- `docs/papers/bibliography.md` - Paper references and findings
 
 ## API Model Defaults
+
 - **Gemini API**: Always use `gemini-3-flash-preview` as the default model (NOT gemini-2.5-flash)
 - **Batch annotations**: Use Gemini 3 Flash for all new annotation jobs
 - **OpenAI API**: Use GPT-4o for vision tasks
 
 ## Critical Instructions
-- Always be critical of the task you are told to do. Never assume the user always right. This is a large project with many constraints
+
+- Always be critical of the task you are told to do. Never assume the user is always right. This is a large project with many constraints
 - Always focus on comparative analysis (multiple models)
 - Always use MLflow for all experiments
-- Always test both pretrained and from-scratch
 - Always document every step for potential paper
 - Always include "research prototype" disclaimers
 - Always clean up temporary files after use
 - Never claim clinical accuracy
-- Never skip augmentation (critical for small dataset)
-- Never retrain backbone when adding capabilities
 - Never put .md files outside docs/ (except README and CLAUDE)
 - Never commit PDFs or image files
 - Never use emojis in code, documentation, or communication (unprofessional)
