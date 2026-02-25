@@ -96,6 +96,7 @@ experiments/vastai/setup_instance.sh
 # RunPod benchmark outputs
 experiments/runpod/benchmark_results/
 experiments/runpod/*.log
+# Monolithic remote_test.py (superseded by split test_*.py scripts)
 experiments/runpod/remote_test.py
 
 # Dry run outputs

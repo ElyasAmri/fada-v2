@@ -4,10 +4,10 @@ RunPod VLM comprehensive dry run - tests ALL models.
 Two-phase testing with different transformers versions:
 
 Phase 1: transformers 4.45 (base environment)
-- remote_test_all.py - 18 models (InternVL2/3, Qwen2-VL, MiniCPM, Kimi, Llama, Phi)
+- test_transformers_445.py - 18 models (InternVL2/3, Qwen2-VL, MiniCPM, Kimi, Llama, Phi)
 
 Phase 2: transformers 4.48+ (isolated venv)
-- remote_test_new_transformers.py - 11 models (SmolVLM2, InternVL3.5, Qwen2.5-VL)
+- test_transformers_448.py - 11 models (SmolVLM2, InternVL3.5, Qwen2.5-VL)
 
 Total: 29 models tested
 
@@ -169,10 +169,10 @@ class RunPodDryRun:
         print("="*80)
 
         files = [
-            (self.project_root / "experiments" / "runpod" / "remote_test_all.py", f"{self.remote_workdir}/remote_test_all.py"),
-            (self.project_root / "experiments" / "runpod" / "remote_test_new_transformers.py", f"{self.remote_workdir}/remote_test_new_transformers.py"),
-            (self.project_root / "experiments" / "runpod" / "remote_test_gptq.py", f"{self.remote_workdir}/remote_test_gptq.py"),
-            (self.project_root / "experiments" / "runpod" / "remote_test_legacy.py", f"{self.remote_workdir}/remote_test_legacy.py"),
+            (self.project_root / "experiments" / "runpod" / "test_transformers_445.py", f"{self.remote_workdir}/test_transformers_445.py"),
+            (self.project_root / "experiments" / "runpod" / "test_transformers_448.py", f"{self.remote_workdir}/test_transformers_448.py"),
+            (self.project_root / "experiments" / "runpod" / "test_gptq_awq.py", f"{self.remote_workdir}/test_gptq_awq.py"),
+            (self.project_root / "experiments" / "runpod" / "test_legacy_models.py", f"{self.remote_workdir}/test_legacy_models.py"),
             (self.project_root / "outputs" / "evaluation" / "test_subset.jsonl", f"{self.remote_workdir}/test_subset.jsonl"),
         ]
 
@@ -224,8 +224,8 @@ class RunPodDryRun:
 
         # Use the isolated venv's Python
         python_path = f"{self.remote_workdir}/venv_new_transformers/bin/python"
-        cmd = f"{token_export}cd {self.remote_workdir} && {python_path} remote_test_new_transformers.py"
-        print(f"Command: {python_path} remote_test_new_transformers.py")
+        cmd = f"{token_export}cd {self.remote_workdir} && {python_path} test_transformers_448.py"
+        print(f"Command: {python_path} test_transformers_448.py")
 
         returncode, stdout, stderr = self.instance.run_ssh(cmd, timeout=timeout)
 
@@ -372,7 +372,7 @@ class RunPodDryRun:
                 return
 
             # Run all models with transformers 4.45 (5.0 breaks everything!)
-            self.run_test_script("remote_test_all.py", "All VLM models (transformers 4.45)", timeout=7200)
+            self.run_test_script("test_transformers_445.py", "All VLM models (transformers 4.45)", timeout=7200)
 
             # Setup and run transformers 4.48+ models in isolated venv
             if self.setup_new_transformers_venv():

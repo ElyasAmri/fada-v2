@@ -10,7 +10,7 @@ Models tested here (18 models):
 - Llama-3.2-Vision (1 model)
 - Phi-4-multimodal (1 model)
 
-Models requiring transformers 4.48+ are tested by remote_test_new_transformers.py:
+Models requiring transformers 4.48+ are tested by test_transformers_448.py:
 - SmolVLM2 series (3 models)
 - InternVL3.5 series (3 models)
 - Qwen2.5-VL series (5 models)
@@ -68,7 +68,7 @@ ALL_MODELS = [
     {"name": "phi-4-multimodal", "model_id": "microsoft/Phi-4-multimodal-instruct", "min_vram": 32},
 ]
 
-# Models requiring transformers 4.48+ (tested by remote_test_new_transformers.py):
+# Models requiring transformers 4.48+ (tested by test_transformers_448.py):
 # - SmolVLM2 series (3 models): needs 'smolvlm' architecture
 # - InternVL3.5 series (3 models): needs Qwen3Config
 # - Qwen2.5-VL series (5 models): needs newer transformers
