@@ -65,7 +65,10 @@ experiments/notebooks/
 *.ttf
 
 # Timesheets (private)
-docs/project/timesheets/
+docs/timesheets/
+
+# Obsidian config
+.obsidian/
 
 # Fine-tuned model adapters (too large for git)
 models/
