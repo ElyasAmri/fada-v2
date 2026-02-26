@@ -8,17 +8,19 @@ FADA (Fetal Anomaly Detection Algorithm) is a research prototype for fetal ultra
 
 ### Current Focus
 
-- **VLM Benchmarking**: 50+ models tested (Phase 1), ground-truth evaluation in progress (Phase 4)
+- **VLM Benchmarking**: 54 models tracked across 6 categories (current-gen: Qwen3.5, InternVL3.5, LLaVA-OV-1.5, etc.)
 - **Best verified score**: Qwen2.5-VL-7B fine-tuned at 81.1% (embedding similarity, 600 samples)
 - **Full dataset**: ~19,000 images, 14 anatomical classes, 18,936 annotated
+- **External benchmark**: U2-BENCH (ICLR 2026) -- 17/21 leaderboard models in our test list
 
 ### Key Project Files to Review First
 
 1. `docs/project/project.md` - Project description and phases
 2. `docs/project/Tasks.md` - Current task status
-3. `docs/experiments/models-tracker.md` - Model evaluation status
-4. `docs/experiments/results-summary.md` - Per-category performance
-5. `docs/project/next-steps.md` - Prioritized action plan
+3. `docs/experiments/models-to-test.md` - Model list, priority order, fine-tuning compatibility
+4. `docs/experiments/models-tracker.md` - Model evaluation status
+5. `docs/experiments/results-summary.md` - Per-category performance
+6. `docs/project/next-steps.md` - Prioritized action plan
 
 ## Key Commands
 
@@ -73,7 +75,7 @@ streamlit run web/app.py --server.port 8501
 ```
 Dataset (19K images, 8 questions each)
 +-- API Models (Gemini, GPT-4o via experiments/api_models/)
-+-- Local Models (Qwen, InternVL, MiniCPM via src/inference/)
++-- Local Models (Qwen3-VL, InternVL3.5, MiniCPM via src/inference/)
 +-- Fine-tuning (Unsloth local, LoRA cloud)
 +-- Evaluation (embedding similarity vs ground truth)
 ```
@@ -153,12 +155,15 @@ docs/
 +-- project/                      # Project management
 |   +-- project.md, spec.md, Tasks.md, next-steps.md, Narrative.md
 +-- experiments/                  # Experiment docs and tracking
-|   +-- models-to-test.md, models-tracker.md, results-summary.md
+|   +-- models-to-test.md         # 54 models, priority order, U2-BENCH cross-ref
+|   +-- models-tracker.md, results-summary.md
 |   +-- vlm/                     # VLM testing results
 |   +-- Evaluation Methodology.md, Fine-Tuning Approach.md
+|   +-- Vastai CLI Implementation.md
 +-- papers/                       # Research paper artifacts
 |   +-- bibliography.md, literature_review.md, Paper Outline.md
 +-- reports/                      # LaTeX report
++-- timesheets/                   # Private (gitignored)
 ```
 
 ## API Model Defaults
