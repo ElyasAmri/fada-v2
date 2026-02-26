@@ -105,5 +105,8 @@ experiments/dry_run/
 # OMC internal state
 .omc/
 
-# App directory (if not needed)
-app/
+# Android app build artifacts (source is tracked)
+app/android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/local.properties
