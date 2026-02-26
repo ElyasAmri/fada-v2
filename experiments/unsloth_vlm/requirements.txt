@@ -1,7 +1,8 @@
 # Unsloth VLM Fine-tuning Requirements
 # Install with: pip install -r requirements.txt
 
-# Unsloth with CUDA 12.4 support (RTX 4070)
+# Unsloth with CUDA support (RTX 5090, CUDA 12.8)
+# Adjust cu version to match your CUDA installation
 unsloth[cu124-torch250]
 
 # HuggingFace TRL for SFTTrainer

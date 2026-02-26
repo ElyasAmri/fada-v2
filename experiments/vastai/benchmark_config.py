@@ -2,6 +2,9 @@
 Benchmark configuration for VLM fine-tuning experiments.
 
 Each model will be trained on a separate vast.ai instance.
+
+NOTE: The authoritative model list is docs/experiments/models-to-test.md (54 models).
+This config contains the subset suitable for cloud fine-tuning benchmarks.
 """
 
 from dataclasses import dataclass
@@ -92,20 +95,7 @@ BENCHMARK_MODELS = [
         batch_size=1,
         gradient_accumulation=16,
     ),
-    ModelConfig(
-        name="internvl3-38b",
-        model_id="OpenGVLab/InternVL3-38B",
-        min_vram=80,
-        batch_size=1,
-        gradient_accumulation=16,
-    ),
-    ModelConfig(
-        name="internvl3-78b",
-        model_id="OpenGVLab/InternVL3-78B",
-        min_vram=160,
-        batch_size=1,
-        gradient_accumulation=16,
-    ),
+    # InternVL3-38B (80GB) and InternVL3-78B (160GB) removed - unrealistic for budget
 
     # InternVL3.5 series
     ModelConfig(
@@ -196,15 +186,32 @@ BENCHMARK_MODELS = [
         batch_size=1,
         gradient_accumulation=16,
     ),
+    # Qwen2.5-VL-72B (150GB) removed - unrealistic for budget
+
+    # Qwen3-VL series (current gen, Nov 2025)
     ModelConfig(
-        name="qwen2.5-vl-72b",
-        model_id="Qwen/Qwen2.5-VL-72B-Instruct",
-        min_vram=150,
+        name="qwen3-vl-2b",
+        model_id="Qwen/Qwen3-VL-2B-Instruct",
+        min_vram=8,
+        batch_size=1,
+        gradient_accumulation=16,
+    ),
+    ModelConfig(
+        name="qwen3-vl-4b",
+        model_id="Qwen/Qwen3-VL-4B-Instruct",
+        min_vram=12,
+        batch_size=1,
+        gradient_accumulation=16,
+    ),
+    ModelConfig(
+        name="qwen3-vl-8b",
+        model_id="Qwen/Qwen3-VL-8B-Instruct",
+        min_vram=20,
         batch_size=1,
         gradient_accumulation=16,
     ),
 
-    # Qwen2-VL series (original)
+    # Qwen2-VL series (previous gen, kept for comparison)
     ModelConfig(
         name="qwen2-vl-2b",
         model_id="Qwen/Qwen2-VL-2B-Instruct",
@@ -274,13 +281,7 @@ BENCHMARK_MODELS = [
         batch_size=1,
         gradient_accumulation=16,
     ),
-    ModelConfig(
-        name="llama-3.2-90b-vision",
-        model_id="meta-llama/Llama-3.2-90B-Vision-Instruct",
-        min_vram=180,
-        batch_size=1,
-        gradient_accumulation=16,
-    ),
+    # Llama-3.2-90B (180GB) removed - unrealistic for budget
 
     # Gemma 3 series
     ModelConfig(

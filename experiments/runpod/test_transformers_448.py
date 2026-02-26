@@ -143,8 +143,12 @@ def prepare_input(sample: Dict):
     if not image_path:
         raise ValueError("No image path found")
 
-    # Handle Windows paths on Linux
+    # Handle Windows paths on Linux (dry-run only)
+    # WARNING: This replaces real ultrasound images with a gray placeholder.
+    # Dry-run results validate model loading, NOT real image understanding.
+    # For actual evaluation, use the standalone inference script with uploaded images.
     if image_path.startswith("C:"):
+        print(f"  WARNING: Windows path detected ({image_path[:40]}...), using dummy gray image")
         image_path = "/workspace/test/test_image.png"
 
     image = Image.open(image_path).convert("RGB")
@@ -290,12 +294,16 @@ def main():
         print("ERROR: No test sample")
         return
 
-    # Create a simple test image if needed
+    # Create a dummy test image for dry-run validation
+    # NOTE: This is a gray placeholder, NOT a real ultrasound image.
+    # Dry-run only validates model loading and inference pipeline.
+    # See GitHub issue #6 for details.
     test_image_path = Path("/workspace/test/test_image.png")
     if not test_image_path.exists():
         img = Image.new('RGB', (224, 224), color=(128, 128, 128))
         img.save(test_image_path)
-        print(f"Created test image at {test_image_path}")
+        print(f"WARNING: Created DUMMY gray test image at {test_image_path}")
+        print(f"  Dry-run results validate model loading only, not real image understanding.")
 
     image, prompt = prepare_input(sample)
     print(f"Prompt: {prompt[:100]}...")

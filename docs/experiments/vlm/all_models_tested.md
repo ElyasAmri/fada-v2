@@ -302,6 +302,8 @@ _Best accuracy: 88.9%_
 
 ## Latest VLMs to Evaluate (2024-2026)
 
+> **SUPERSEDED**: This section is outdated. See `docs/experiments/models-to-test.md` for the current model list with 54 models, U2-BENCH cross-reference, and priority order.
+
 ### Top-Tier Open Source VLMs
 
 | Model         | Family   | Size                                          | Key Features                                                | Release  |
