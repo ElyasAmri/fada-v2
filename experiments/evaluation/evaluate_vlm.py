@@ -237,8 +237,8 @@ class VLMEvaluator:
                     question = content['text']
                     break
 
-            # Extract ground truth from assistant message
-            ground_truth = messages[2]['content']  # Third message is assistant
+            # Extract reference response from assistant message
+            reference_response = messages[2]['content']  # Third message is assistant
 
             # Extract category from path
             category = extract_category_from_path(image_path)
@@ -256,7 +256,7 @@ class VLMEvaluator:
                 "image_path": image_path,
                 "category": category,
                 "question": question[:100] + "..." if len(question) > 100 else question,
-                "ground_truth": ground_truth,
+                "reference_response": reference_response,
                 "prediction": prediction
             })
 
@@ -283,14 +283,15 @@ def compute_scores(
     from embedding_scorer import EmbeddingScorer
 
     predictions = [r['prediction'] for r in results]
-    ground_truths = [r['ground_truth'] for r in results]
+    # Backward-compatible: accept both 'reference_response' and legacy 'ground_truth'
+    references = [r.get('reference_response', r.get('ground_truth', '')) for r in results]
     categories = [r['category'] for r in results]
 
     # Initialize scorer (use CPU by default to avoid CUDA compatibility issues)
     scorer = EmbeddingScorer(model_name=embedding_model, device=device)
 
     # Compute similarities
-    similarities = scorer.compute_similarity(predictions, ground_truths)
+    similarities = scorer.compute_similarity(predictions, references)
 
     # Aggregate metrics
     aggregate = scorer.compute_aggregate_metrics(similarities)

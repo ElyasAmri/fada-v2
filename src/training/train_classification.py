@@ -42,31 +42,17 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Import MLflow utilities (direct import to avoid __init__.py dependencies)
-import sys
-import importlib.util
-
-# Direct import of mlflow_utils to bypass __init__.py
-mlflow_utils_path = PROJECT_ROOT / 'src' / 'utils' / 'mlflow_utils.py'
-spec = importlib.util.spec_from_file_location("mlflow_utils", mlflow_utils_path)
-mlflow_utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mlflow_utils)
-
-setup_mlflow_experiment = mlflow_utils.setup_mlflow_experiment
-log_training_config = mlflow_utils.log_training_config
-log_model_architecture = mlflow_utils.log_model_architecture
-log_evaluation_results = mlflow_utils.log_evaluation_results
-log_confusion_matrix = mlflow_utils.log_confusion_matrix
-log_training_curves = mlflow_utils.log_training_curves
-MLflowModelCheckpoint = mlflow_utils.MLflowModelCheckpoint
-log_gpu_metrics = mlflow_utils.log_gpu_metrics
-
-# Import model (direct import to bypass __init__.py)
-classifier_path = PROJECT_ROOT / 'src' / 'models' / 'classifier.py'
-spec = importlib.util.spec_from_file_location("classifier", classifier_path)
-classifier = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(classifier)
-create_model = classifier.create_model
+from src.utils.mlflow_utils import (
+    setup_mlflow_experiment,
+    log_training_config,
+    log_model_architecture,
+    log_evaluation_results,
+    log_confusion_matrix,
+    log_training_curves,
+    MLflowModelCheckpoint,
+    log_gpu_metrics,
+)
+from src.models.classifier import create_model
 
 import mlflow
 
@@ -84,7 +70,7 @@ class FetalUltrasoundDataset(Dataset):
 
     Expected structure:
         data/Fetal Ultrasound/
-            Abodomen/
+            Abdomen/
                 image1.jpg
                 image2.jpg
             Aorta/
@@ -558,7 +544,7 @@ def train_fold(
     # Calculate final metrics on best model
     logger.info(f"Loading best model from epoch {best_epoch}...")
     checkpoint_path = checkpoint_handler.save_dir / 'best_model.pth'
-    model.load_state_dict(torch.load(checkpoint_path))
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
 
     final_metrics = validate_epoch(model, val_loader, criterion, device, args.epochs)
 

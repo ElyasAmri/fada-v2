@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Check VLM availability
 try:
-    from src.inference.vlm_interface import create_top_vlms
+    from src.inference.vlm_factory import create_top_vlms
     from src.data.question_loader import get_question_loader
     VLM_AVAILABLE = True
 except ImportError:

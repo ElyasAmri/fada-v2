@@ -15,7 +15,7 @@ tags: [phase1, methods]
 ### Phase 2+ (January 2026+)
 
 - **Local GPU**: NVIDIA RTX 5090 (24GB VRAM)
-- **Cloud**: vast.ai (RTX 3090/4090/A100), RunPod (RTX 3090/4090)
+- **Cloud**: RCCG (A100 at $1.35/h, H100 at $1.90/h)
 
 ## Phase 1: Proxy Metrics (DEPRECATED for comparison)
 
@@ -52,10 +52,10 @@ Uses embedding similarity scoring with sentence-transformers against expert anno
 
 ### Dataset
 
-- **Full dataset**: ~19,000 images, 14 classes
-- **Test set**: 1,494 images
-- **Train set**: 12,014 images
-- **Val set**: 1,494 images
+- **Full dataset**: 19,019 images, 14 classes
+- **Test set**: 1,894 images
+- **Train set**: 15,231 images
+- **Val set**: 1,894 images
 - **Questions per image**: 8 (Q1-Q8)
 
 ### Verified Results

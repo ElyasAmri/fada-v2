@@ -279,8 +279,8 @@ def main():
                 question = content['text']
                 break
 
-        # Extract ground truth from assistant message
-        ground_truth = messages[2]['content']
+        # Extract reference response from assistant message
+        reference_response = messages[2]['content']
 
         # Extract category
         category = extract_category_from_path(original_image_path)
@@ -303,7 +303,7 @@ def main():
             "image_path": original_image_path,
             "category": category,
             "question": question[:100] + "..." if len(question) > 100 else question,
-            "ground_truth": ground_truth,
+            "reference_response": reference_response,
             "prediction": prediction
         })
 

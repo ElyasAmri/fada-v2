@@ -18,7 +18,7 @@ except ImportError:
     CONSTANTS_AVAILABLE = False
     logger.warning("Constants import failed, using local definitions")
     CLASSES = [
-        "Abodomen", "Aorta", "Cervical", "Cervix", "Femur",
+        "Abdomen", "Aorta", "Cervical", "Cervix", "Femur",
         "Non_standard_NT", "Public_Symphysis_fetal_head",
         "Standard_NT", "Thorax", "Trans-cerebellum",
         "Trans-thalamic", "Trans-ventricular"

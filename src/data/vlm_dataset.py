@@ -19,7 +19,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 from src.data.dataset_splits import load_splits, DATA_ROOT, SPLITS_FILE
-from src.data.question_loader import QuestionLoader
+from src.config.questions import QUESTIONS, QUESTION_COLUMNS
+from experiments.evaluation.config import VLM_SYSTEM_PROMPT
 
 
 # Default paths
@@ -31,30 +32,6 @@ VLM_TRAINING_DIR = PROJECT_ROOT / "data" / "vlm_training"
 MEDGEMMA_EXCEL = RESULTS_DIR / "medgemma_4b_responses.xlsx"
 GEMINI_CHECKPOINT = RESULTS_DIR / "checkpoint_gemini_gemini-3-flash-preview.json"
 GEMINI_COMPLETE = RESULTS_DIR / "gemini_annotations_complete.json"
-
-# Standard 8 questions
-QUESTIONS = [
-    "Anatomical Structures Identification: Identify and describe all anatomical structures visible in the image.",
-    "Fetal Orientation: Determine the orientation of the fetus based on the image (e.g., head up/down, front/back view).",
-    "Plane Evaluation: Assess if the image is taken at a standard diagnostic plane and describe its diagnostic relevance.",
-    "Biometric Measurements: Identify any measurable biometric parameters (e.g., femur length, head circumference) from the image.",
-    "Gestational Age: Estimate the gestational age of the fetus based on the visible features.",
-    "Image Quality: Assess the quality of the ultrasound image, mentioning any factors that might affect its interpretation (e.g., clarity, artifacts).",
-    "Normality / Abnormality: Determine whether the observed structures appear normal or identify any visible abnormalities or concerns.",
-    "Clinical Recommendations: Provide any relevant clinical recommendations or suggested next steps based on your interpretation."
-]
-
-# Short question names (matching Excel columns)
-QUESTION_COLUMNS = [
-    "Q1: Anatomical Structures",
-    "Q2: Fetal Orientation",
-    "Q3: Plane Evaluation",
-    "Q4: Biometric Measurements",
-    "Q5: Gestational Age",
-    "Q6: Image Quality",
-    "Q7: Normality/Abnormality",
-    "Q8: Clinical Recommendations"
-]
 
 
 @dataclass
@@ -82,7 +59,7 @@ def load_medgemma_responses(excel_path: Path = MEDGEMMA_EXCEL) -> Dict[str, Dict
 
     responses = {}
     for _, row in df.iterrows():
-        image_path = row['Full Path']  # e.g., "Abodomen/Abodomen_001.png"
+        image_path = row['Full Path']  # e.g., "Abdomen/Abdomen_001.png"
 
         image_responses = {}
         for col in QUESTION_COLUMNS:
@@ -198,11 +175,7 @@ def create_conversation_format(
     }
     """
     if system_prompt is None:
-        system_prompt = (
-            "You are an expert in fetal ultrasound imaging analysis. "
-            "Provide accurate, detailed, and clinically relevant interpretations. "
-            "Be precise and professional in your assessments."
-        )
+        system_prompt = VLM_SYSTEM_PROMPT
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -233,10 +206,7 @@ def create_multiturn_conversation(
     This format may be more efficient for training as it reuses the image.
     """
     if system_prompt is None:
-        system_prompt = (
-            "You are an expert in fetal ultrasound imaging analysis. "
-            "Provide accurate, detailed, and clinically relevant interpretations."
-        )
+        system_prompt = VLM_SYSTEM_PROMPT
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -317,8 +287,8 @@ def convert_to_vlm_dataset(
                 counts['skipped'] += 1
                 continue
 
-            # Get absolute image path for training
-            abs_image_path = str(DATA_ROOT / image_path)
+            # Get relative image path for training
+            rel_image_path = image_path  # e.g., "Abdomen/Abdomen_001.png"
 
             if format == "multiturn":
                 # Create multi-turn conversation with all Q&A
@@ -331,7 +301,7 @@ def convert_to_vlm_dataset(
                         qa_pairs.append((QUESTIONS[i], answer))
 
                 if qa_pairs:
-                    conversation = create_multiturn_conversation(abs_image_path, qa_pairs)
+                    conversation = create_multiturn_conversation(rel_image_path, qa_pairs)
                     output_files[split].write(json.dumps(conversation) + '\n')
                     counts[split] += 1
 
@@ -344,7 +314,7 @@ def convert_to_vlm_dataset(
                             answer = answer[:max_response_length] + "..."
 
                         conversation = create_conversation_format(
-                            abs_image_path,
+                            rel_image_path,
                             QUESTIONS[i],
                             answer
                         )

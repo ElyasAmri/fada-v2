@@ -31,7 +31,7 @@ class ResponseGenerator:
 
         # Clinical descriptions for each anatomical view
         self.class_descriptions = {
-            'Abodomen': {
+            'Abdomen': {
                 'name': 'Fetal Abdomen',
                 'clinical_purpose': 'abdominal circumference measurement and organ assessment',
                 'structures': ['stomach bubble', 'liver', 'umbilical vein', 'kidneys'],
@@ -313,7 +313,7 @@ if __name__ == "__main__":
         confidence=45.3,
         top_3_predictions=[
             ("Femur", 45.3),
-            ("Abodomen", 32.1),
+            ("Abdomen", 32.1),
             ("Aorta", 22.6)
         ]
     )

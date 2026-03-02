@@ -8,6 +8,8 @@ from typing import List, Dict, Optional
 import pandas as pd
 import re
 
+from src.config.questions import QUESTIONS as _CANONICAL_QUESTIONS, QUESTION_SHORT_NAMES as _CANONICAL_SHORT_NAMES
+
 
 class QuestionLoader:
     """Load and manage VQA questions from Excel annotation files"""
@@ -21,14 +23,14 @@ class QuestionLoader:
         """
         self.data_dir = Path(data_dir)
         self._questions_cache: Optional[List[str]] = None
-        self._category_files: Dict[str, Path] = {}
+        self._category_files: Dict[str, Optional[Path]] = {}
         self._scan_annotation_files()
 
     def _scan_annotation_files(self) -> None:
         """Scan for Excel annotation files and image directories"""
         # First, scan for Excel annotation files
         for excel_file in self.data_dir.glob("*_image_list.xlsx"):
-            # Extract category name (e.g., "Abodomen" from "Abodomen_image_list.xlsx")
+            # Extract category name (e.g., "Abdomen" from "Abdomen_image_list.xlsx")
             category = excel_file.stem.replace("_image_list", "")
             self._category_files[category] = excel_file
 
@@ -81,8 +83,11 @@ class QuestionLoader:
             # Fallback to hardcoded questions if no Excel files found
             return self._get_default_questions()
 
-        # Get first Excel file
-        excel_file = list(self._category_files.values())[0]
+        # Get first available Excel file (filter out None entries for dirs without Excel)
+        excel_files = [f for f in self._category_files.values() if f is not None]
+        if not excel_files:
+            return self._get_default_questions()
+        excel_file = excel_files[0]
 
         try:
             df = pd.read_excel(excel_file)
@@ -101,39 +106,21 @@ class QuestionLoader:
 
     def _get_default_questions(self) -> List[str]:
         """
-        Get default fallback questions
+        Get default fallback questions (from canonical source in src.config.questions).
 
         Returns:
             List of 8 default questions
         """
-        return [
-            "Anatomical Structures Identification: Identify and describe all anatomical structures visible in the image.",
-            "Fetal Orientation: Determine the orientation of the fetus based on the image (e.g., head up/down, front/back view).",
-            "Plane Evaluation: Assess if the image is taken at a standard diagnostic plane and describe its diagnostic relevance.",
-            "Biometric Measurements: Identify any measurable biometric parameters (e.g., femur length, head circumference) from the image.",
-            "Gestational Age: Estimate the gestational age of the fetus based on the visible features.",
-            "Image Quality: Assess the quality of the ultrasound image, mentioning any factors that might affect its interpretation (e.g., clarity, artifacts).",
-            "Normality / Abnormality: Determine whether the observed structures appear normal or identify any visible abnormalities or concerns.",
-            "Clinical Recommendations: Provide any relevant clinical recommendations or suggested next steps based on your interpretation."
-        ]
+        return list(_CANONICAL_QUESTIONS)
 
     def get_question_short_names(self) -> List[str]:
         """
         Get short names for questions (for UI display)
 
         Returns:
-            List of 8 short question names
+            List of 8 short question names (with Q# prefix)
         """
-        return [
-            "Q1: Anatomical Structures",
-            "Q2: Fetal Orientation",
-            "Q3: Plane Evaluation",
-            "Q4: Biometric Measurements",
-            "Q5: Gestational Age",
-            "Q6: Image Quality",
-            "Q7: Normality/Abnormality",
-            "Q8: Clinical Recommendations"
-        ]
+        return [f"Q{i+1}: {name}" for i, name in enumerate(_CANONICAL_SHORT_NAMES)]
 
     def get_categories(self) -> List[str]:
         """
@@ -149,7 +136,7 @@ class QuestionLoader:
         Get list of images for a category
 
         Args:
-            category: Category name (e.g., "Abodomen")
+            category: Category name (e.g., "Abdomen")
 
         Returns:
             List of image file paths

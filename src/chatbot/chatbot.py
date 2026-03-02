@@ -114,7 +114,7 @@ class UltrasoundChatbot:
         # Load weights if path provided
         if model_path and Path(model_path).exists():
             try:
-                checkpoint = torch.load(model_path, map_location=self.device)
+                checkpoint = torch.load(model_path, map_location=self.device, weights_only=True)
 
                 if 'model_state_dict' in checkpoint:
                     model.load_state_dict(checkpoint['model_state_dict'])

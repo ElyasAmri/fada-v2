@@ -9,15 +9,16 @@
 
 Trained 5 BLIP-2 VQA models specialized for different ultrasound categories:
 
-| Category | Images | Status | Model Path |
-|----------|--------|--------|------------|
-| Non_standard_NT | 487 | ✅ Trained | `outputs/blip2_1epoch/final_model` |
-| Abdomen | 2424 | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_abdomen/final_model` |
-| Femur | 1165 | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_femur/final_model` |
-| Thorax | 1793 | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_thorax/final_model` |
-| Standard_NT | 1508 | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_standard_nt/final_model` |
+| Category        | Images | Status                                    | Model Path                              |
+| --------------- | ------ | ----------------------------------------- | --------------------------------------- |
+| Non_standard_NT | 487    | ✅ Trained                                | `outputs/blip2_1epoch/final_model`      |
+| Abdomen         | 2424   | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_abdomen/final_model`     |
+| Femur           | 1165   | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_femur/final_model`       |
+| Thorax          | 1793   | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_thorax/final_model`      |
+| Standard_NT     | 1508   | ✅ Trained (5 images, 1 epoch validation) | `outputs/blip2_standard_nt/final_model` |
 
 **Training Details**:
+
 - Model: BLIP-2 OPT-2.7B with LoRA adapters
 - Quantization: 8-bit for memory efficiency
 - Training Time: ~1 minute per category (validation models)
@@ -27,6 +28,7 @@ Trained 5 BLIP-2 VQA models specialized for different ultrasound categories:
 ### 2. Training Infrastructure ✅
 
 **Created 8 Training Notebooks**:
+
 - `train_blip2_abdomen.ipynb` ✅
 - `train_blip2_femur.ipynb` ✅
 - `train_blip2_thorax.ipynb` ✅
@@ -37,6 +39,7 @@ Trained 5 BLIP-2 VQA models specialized for different ultrasound categories:
 - `train_blip2_trans_ventricular.ipynb` (awaiting labeled data)
 
 **Training Utilities**:
+
 - `test_vqa_category.py` - Test individual models
 - `evaluate_all_vqa.py` - Comprehensive evaluation of all models
 - `clear_cuda.py` - GPU memory management
@@ -48,15 +51,17 @@ Trained 5 BLIP-2 VQA models specialized for different ultrasound categories:
 Updated `web/app.py` to support dynamic, category-specific VQA model loading:
 
 **Key Features**:
+
 - Detects organ category from classification
 - Automatically loads corresponding VQA model
 - Category mapping with fallback to Non_standard_NT
 - Displays which model is loaded to user
 
 **Category Mapping**:
+
 ```python
 {
-    "Abodomen": "abdomen",
+    "Abdomen": "abdomen",
     "Femur": "femur",
     "Thorax": "thorax",
     "Standard_NT": "standard_nt",
@@ -70,16 +75,19 @@ Updated `web/app.py` to support dynamic, category-specific VQA model loading:
 Ran comprehensive evaluation on all 5 trained models:
 
 **Test Configuration**:
+
 - 3 images per category (15 total)
 - 3 standard questions per image
 - Total: 45 question-answer pairs
 
 **Results** (`outputs/vqa_evaluation_results.json`):
+
 - All models loaded successfully
 - Inference time: 3-15 seconds per question
 - Model loading time: ~20 seconds (one-time)
 
 **Observations**:
+
 - ✅ Abdomen: Good anatomical descriptions
 - ✅ Femur: Reasonable responses
 - ✅ Thorax: Detailed structure identification
@@ -91,6 +99,7 @@ Ran comprehensive evaluation on all 5 trained models:
 Fixed repetitive and nonsensical output issues:
 
 **Optimized Parameters**:
+
 ```python
 {
     "max_new_tokens": 100,
@@ -104,6 +113,7 @@ Fixed repetitive and nonsensical output issues:
 ```
 
 **Post-processing**:
+
 - Added `_clean_repetitions()` method
 - Removes repetitive phrases automatically
 - Pattern detection for 3+ word sequences
@@ -133,12 +143,15 @@ Created comprehensive documentation:
 ## Known Issues
 
 ### 1. Non_standard_NT Alphabet Output
+
 **Symptom**: Model sometimes generates "a,b,c,d..." instead of medical descriptions
 **Cause**: Unclear - possibly overfitting or training data issue
 **Mitigation**: Other categories work correctly; may need retraining with adjusted parameters
 
 ### 2. Categories Without Labeled Data
+
 4 categories cannot be trained yet:
+
 - Trans-cerebellum (brain)
 - Trans-thalamic (brain)
 - Trans-ventricular (brain)
@@ -147,7 +160,9 @@ Created comprehensive documentation:
 These require labeled Excel files in `data/Fetal Ultrasound Labeled/`.
 
 ### 3. Full-Scale Training Not Completed
+
 Validation models trained on 5 images only. Full training (hundreds/thousands of images, 3+ epochs) requires:
+
 - 1-6 hours per category
 - Sequential processing (GPU memory constraints)
 - Use `train_all_full_scale.py` when ready
@@ -155,6 +170,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ## Files Created/Modified
 
 ### New Files (20):
+
 - `notebooks/blip2_training/` (directory)
   - `train_blip2_*.ipynb` (10 notebooks with execution history)
   - `README.md` (directory documentation)
@@ -168,10 +184,12 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 - `info/work_summary_oct2.md`
 
 ### Modified Files (2):
+
 - `web/app.py` - Category-specific VQA loading
 - `src/models/vqa_model.py` - Generation parameters optimization
 
 ### Generated Outputs:
+
 - `outputs/blip2_*/` - 5 model directories with LoRA adapters
 - `outputs/vqa_evaluation_results.json` - Evaluation metrics
 
@@ -180,17 +198,21 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ### Immediate (User Action Required):
 
 1. **Test Web Interface**
+
    ```bash
    streamlit run web/app.py
    ```
+
    - Upload images from different categories
    - Verify category-specific VQA models load correctly
    - Test question answering
 
 2. **Full-Scale Training** (Optional, 3-8 hours total)
+
    ```bash
    python train_all_full_scale.py --epochs 3 --sort-by-size
    ```
+
    - Trains all 5 categories with complete datasets
    - Sorted by size (smallest first for early wins)
    - Creates production-ready models
@@ -226,6 +248,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ## Performance Metrics
 
 ### Training
+
 - **Validation Models** (5 images, 1 epoch):
   - Time: ~1 minute/category
   - Total: ~5 minutes for 5 categories
@@ -239,6 +262,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
   - **Total Estimated**: 8-10 hours
 
 ### Inference
+
 - Model Loading: ~20 seconds (one-time)
 - Single Question: 3-15 seconds
 - Batch (8 questions): ~25-60 seconds
@@ -274,6 +298,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ## Success Metrics
 
 ✅ **Goals Achieved**:
+
 - 5/5 available categories have trained VQA models
 - All models integrated into web interface
 - Comprehensive testing and evaluation completed
@@ -281,6 +306,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 - Documentation complete
 
 ⏳ **Pending User Action**:
+
 - Test web interface with category-specific models
 - Run full-scale training when desired
 - Label remaining 4 categories' data
@@ -288,6 +314,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ## Recommendations
 
 ### For Immediate Testing:
+
 1. Start Streamlit: `streamlit run web/app.py`
 2. Upload Abdomen/Femur/Thorax images
 3. Verify correct model loads
@@ -295,6 +322,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 5. Compare responses across categories
 
 ### For Production:
+
 1. Run full-scale training overnight:
    ```bash
    python train_all_full_scale.py --epochs 3 --sort-by-size
@@ -304,6 +332,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 4. Document any quality improvements
 
 ### For Research:
+
 1. Export evaluation results to compare models
 2. Calculate BLEU scores against ground truth
 3. Analyze failure cases
@@ -312,6 +341,7 @@ Validation models trained on 5 images only. Full training (hundreds/thousands of
 ## Conclusion
 
 Successfully created a multi-category VQA system for fetal ultrasound analysis:
+
 - ✅ 5 trained models (validation scale)
 - ✅ Category-specific model loading
 - ✅ Comprehensive evaluation framework
@@ -319,6 +349,7 @@ Successfully created a multi-category VQA system for fetal ultrasound analysis:
 - ✅ Complete documentation
 
 The system is ready for:
+
 1. Immediate testing with validation models
 2. Full-scale training for production deployment
 3. Further research and refinement

@@ -29,30 +29,10 @@ from peft import PeftModel
 BASE_MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
 ADAPTER_PATH = Path(__file__).parent.parent.parent / "models" / "qwen25vl7b_finetuned" / "final"
 
-# Standard questions used in training
-QUESTIONS = [
-    "Anatomical Structures Identification: Identify and describe all anatomical structures visible in the image.",
-    "Fetal Orientation: Determine the orientation of the fetus based on the image (e.g., head up/down, front/back view).",
-    "Plane Evaluation: Assess if the image is taken at a standard diagnostic plane and describe its diagnostic relevance.",
-    "Biometric Measurements: Identify any measurable biometric parameters (e.g., femur length, head circumference) from the image.",
-    "Gestational Age: Estimate the gestational age of the fetus based on the visible features.",
-    "Image Quality: Assess the quality of the ultrasound image, mentioning any factors that might affect its interpretation (e.g., clarity, artifacts).",
-    "Normality / Abnormality: Determine whether the observed structures appear normal or identify any visible abnormalities or concerns.",
-    "Clinical Recommendations: Provide any relevant clinical recommendations or suggested next steps based on your interpretation."
-]
+from src.config.questions import QUESTIONS, QUESTION_SHORT_NAMES
+from experiments.evaluation.config import VLM_SYSTEM_PROMPT
 
-QUESTION_SHORT_NAMES = [
-    "Anatomical Structures",
-    "Fetal Orientation",
-    "Plane Evaluation",
-    "Biometric Measurements",
-    "Gestational Age",
-    "Image Quality",
-    "Normality/Abnormality",
-    "Clinical Recommendations"
-]
-
-SYSTEM_PROMPT = "You are an expert in fetal ultrasound imaging analysis. Provide accurate, detailed, and clinically relevant interpretations. Be precise and professional in your assessments."
+SYSTEM_PROMPT = VLM_SYSTEM_PROMPT
 
 
 def load_model(

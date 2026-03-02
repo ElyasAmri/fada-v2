@@ -44,14 +44,15 @@ Re-run top Phase 1 models with embedding similarity scoring:
 
 ## Priority 4: Address Weak Categories
 
-| Category | MedGemma Score | Issue |
-|----------|----------------|-------|
-| Trans-cerebellum | 58% | Brain views |
-| Trans-thalamic | 57% | Brain views |
-| Trans-ventricular | 57% | Brain views |
-| NT measurements | 57% | Specialized |
+| Category          | MedGemma Score | Issue       |
+| ----------------- | -------------- | ----------- |
+| Trans-cerebellum  | 58%            | Brain views |
+| Trans-thalamic    | 57%            | Brain views |
+| Trans-ventricular | 57%            | Brain views |
+| NT measurements   | 57%            | Specialized |
 
 Options:
+
 - [ ] Category-specific fine-tuning
 - [ ] More training data for weak categories
 - [ ] Ensemble approach
@@ -65,27 +66,27 @@ Options:
 - [x] Phase 2: Qwen2.5-VL-7B fine-tuned (81.1%, 600 samples)
 - [x] Phase 3: MedGemma-27B cloud (78.81%, 709 samples)
 - [x] Classification: EfficientNet-B0 (88%, 1,494 samples)
-- [x] Infrastructure: vast.ai + RunPod
+- [x] Infrastructure: RCCG (A100/H100)
 - [x] Local testing: All 7 Qwen models with Unsloth
 
 ---
 
 ## Data Status
 
-| Set | Size | Status |
-|-----|------|--------|
-| Train | 12,014 | Ready |
-| Val | 1,494 | Ready |
-| Test | 1,494 | **Needs full evaluation** |
-| Total | 15,002 | - |
+| Set   | Size   | Status                    |
+| ----- | ------ | ------------------------- |
+| Train | 15,231 | Ready                     |
+| Val   | 1,894  | Ready                     |
+| Test  | 1,894  | **Needs full evaluation** |
+| Total | 19,019 | -                         |
 
 ---
 
 ## Comparison Matrix (What We Know)
 
-| Model | Method | Samples | Score | Comparable? |
-|-------|--------|---------|-------|-------------|
-| MiniCPM-V-2.6 | Proxy | ~250 | 88.9% | No |
-| Qwen2.5-VL-7B FT | Embedding | 600 | 81.1% | Yes |
-| MedGemma-27B | Embedding | 709 | 78.81% | Yes |
-| EfficientNet-B0 | Classification | 1,494 | 88% | Different task |
+| Model            | Method         | Samples | Score  | Comparable?    |
+| ---------------- | -------------- | ------- | ------ | -------------- |
+| MiniCPM-V-2.6    | Proxy          | ~250    | 88.9%  | No             |
+| Qwen2.5-VL-7B FT | Embedding      | 600     | 81.1%  | Yes            |
+| MedGemma-27B     | Embedding      | 709     | 78.81% | Yes            |
+| EfficientNet-B0  | Classification | 1,494   | 88%    | Different task |

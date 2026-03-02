@@ -47,7 +47,7 @@ pip install -r requirements.txt
 # Fine-tune with Unsloth (local, RTX 5090)
 ./venv/Scripts/python.exe experiments/unsloth_vlm/train_qwen3vl.py
 
-# Fine-tune with LoRA (cloud, vast.ai/RunPod)
+# Fine-tune with LoRA (cloud, RCCG A100/H100)
 ./venv/Scripts/python.exe experiments/fine_tuning/train_qwen3vl_lora.py
 
 # Track experiments with MLflow
@@ -100,14 +100,14 @@ src/
 - **Evaluation metric**: Embedding similarity (sentence-transformers) vs ground truth
 - **Fine-tuning**: LoRA adapters (r=16, alpha=32, all linear targets)
 - **Local training**: Unsloth on RTX 5090 (verified for 7 Qwen models)
-- **Cloud training**: vast.ai / RunPod (RTX 3090/4090 at ~$0.40/h)
+- **Cloud training**: RCCG (A100 at $1.35/h, H100 at $1.90/h)
 - **Web Framework**: Streamlit for prototype
 
 ## Data Structure
 
 ```
 data/Fetal Ultrasound/
-+-- Abodomen/            # 2,424 images (note: typo in folder name is intentional)
++-- Abdomen/             # 2,424 images
 +-- Aorta/               # 1,308 images
 +-- CRL-View/            # 1,989 images
 +-- Cervical/            # 500 images
@@ -124,7 +124,7 @@ data/Fetal Ultrasound/
 +-- annotations.xlsx     # Per-class annotations
 data/Fetal Ultrasound Annotations Final.xlsx  # Master annotations (18,936 rows)
 data/vlm_training/       # JSONL training files for VLM fine-tuning
-data/dataset_splits.json # Train/val/test split (12,014 / 1,494 / 1,494)
+data/dataset_splits.json # Train/val/test split (15,231 / 1,894 / 1,894)
 ```
 
 ## Critical Context
@@ -144,8 +144,8 @@ data/dataset_splits.json # Train/val/test split (12,014 / 1,494 / 1,494)
 
 ### Cross-Platform Image Paths
 
-- Cloud scripts may fallback to dummy images when Windows paths detected
-- See GitHub issue #6 for the RunPod image path bug
+- JSONL training files use relative paths (e.g., `Abdomen/Abdomen_001.png`)
+- Training script `--data-root` prepends the correct base directory at runtime
 
 ## Docs Structure
 

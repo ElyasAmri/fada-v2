@@ -50,6 +50,13 @@ class VLMDataset(Dataset):
         self.max_length = max_length
         self.samples = []
 
+        # Precompute Qwen chat template markers for label masking.
+        # This script targets Qwen models (<|im_start|>/<|im_end|> format).
+        self._response_template_ids = self.processor.tokenizer.encode(
+            "<|im_start|>assistant\n", add_special_tokens=False
+        )
+        self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+
         with open(jsonl_path, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 if max_samples and i >= max_samples:
@@ -59,6 +66,9 @@ class VLMDataset(Dataset):
                     self.samples.append(json.loads(line))
 
         print(f"Loaded {len(self.samples)} samples from {jsonl_path}")
+
+        if self.samples and not self._response_template_ids:
+            print("WARNING: Could not encode '<|im_start|>assistant\\n' -- label masking may be incorrect.")
 
     def __len__(self):
         return len(self.samples)
@@ -107,9 +117,31 @@ class VLMDataset(Dataset):
         # Squeeze batch dimension
         inputs = {k: v.squeeze(0) for k, v in inputs.items()}
 
-        # Create labels (copy input_ids, mask padding)
-        labels = inputs['input_ids'].clone()
-        labels[labels == self.processor.tokenizer.pad_token_id] = -100
+        # Create labels: mask everything except assistant response tokens.
+        # For Qwen models, responses are between <|im_start|>assistant\n ... <|im_end|>
+        input_ids = inputs['input_ids']
+        labels = torch.full_like(input_ids, -100)
+
+        if self._response_template_ids:
+            template_len = len(self._response_template_ids)
+            ids_list = input_ids.tolist()
+            i = 0
+            while i <= len(ids_list) - template_len:
+                if ids_list[i:i + template_len] == self._response_template_ids:
+                    response_start = i + template_len
+                    j = response_start
+                    while j < len(ids_list):
+                        if ids_list[j] == self._end_token_id:
+                            labels[j] = input_ids[j]
+                            break
+                        labels[j] = input_ids[j]
+                        j += 1
+                    i = j + 1
+                else:
+                    i += 1
+        else:
+            labels = input_ids.clone()
+            labels[labels == self.processor.tokenizer.pad_token_id] = -100
 
         inputs['labels'] = labels
 

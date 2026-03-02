@@ -34,18 +34,9 @@ sys.path.insert(0, str(project_root))
 from PIL import Image
 from tqdm.asyncio import tqdm_asyncio
 
-# Direct imports to avoid torch dependency from src.data.__init__
-import importlib.util
-spec = importlib.util.spec_from_file_location("question_loader", project_root / "src/data/question_loader.py")
-question_loader_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(question_loader_module)
-QuestionLoader = question_loader_module.QuestionLoader
-
-spec2 = importlib.util.spec_from_file_location("dataset_splits", project_root / "src/data/dataset_splits.py")
-dataset_splits_module = importlib.util.module_from_spec(spec2)
-spec2.loader.exec_module(dataset_splits_module)
-load_splits = dataset_splits_module.load_splits
-SPLITS_FILE = dataset_splits_module.SPLITS_FILE
+from src.data.question_loader import QuestionLoader
+from src.data.dataset_splits import load_splits, SPLITS_FILE
+from experiments.evaluation.config import API_SYSTEM_PROMPT
 
 
 # RPD (Requests Per Day) limit error patterns
@@ -58,16 +49,20 @@ RPD_ERROR_PATTERNS = [
     'daily limit',
     'requests per day',
     '429',
-    # Vertex AI specific
-    'RESOURCE_EXHAUSTED',
+    # Vertex AI specific (lowercase to match is_rpd_error() which lowercases the error string)
+    'resource_exhausted',
     'quota_exceeded',
-    'rateLimitExceeded',
+    'ratelimitexceeded',
 ]
 
 
 class RPDLimitError(Exception):
     """Raised when API rate/quota limit is hit"""
     pass
+
+
+# Evaluation temperature: low for reproducibility (T=0.7 used only in interactive inference)
+EVAL_TEMPERATURE = 0.1
 
 
 def is_rpd_error(error: Exception) -> bool:
@@ -115,23 +110,26 @@ class RateLimiter:
 
     async def acquire(self):
         """Acquire a token, waiting if necessary"""
-        async with self._lock:
-            now = time.time()
-            # Add tokens based on time elapsed
-            elapsed = now - self._last_update
-            self._tokens = min(
-                self.max_rpm / 60,  # Max 1 minute worth of tokens
-                self._tokens + elapsed * (self.max_rpm / 60)
-            )
-            self._last_update = now
+        while True:
+            wait_time = 0.0
+            async with self._lock:
+                now = time.time()
+                # Add tokens based on time elapsed
+                elapsed = now - self._last_update
+                self._tokens = min(
+                    self.max_rpm / 60,  # Max 1 minute worth of tokens
+                    self._tokens + elapsed * (self.max_rpm / 60)
+                )
+                self._last_update = now
 
-            # Wait if no tokens available
-            if self._tokens < 1:
-                wait_time = (1 - self._tokens) / (self.max_rpm / 60)
-                await asyncio.sleep(wait_time)
-                self._tokens = 0
-            else:
-                self._tokens -= 1
+                if self._tokens >= 1:
+                    self._tokens -= 1
+                    break  # Token acquired, exit loop
+                else:
+                    wait_time = (1 - self._tokens) / (self.max_rpm / 60)
+
+            # Sleep outside the lock so other coroutines can proceed
+            await asyncio.sleep(wait_time)
 
         # Also respect max concurrent
         await self._semaphore.acquire()
@@ -180,7 +178,7 @@ class AsyncGrokVLM:
         messages = [
             {
                 "role": "system",
-                "content": "You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."
+                "content": API_SYSTEM_PROMPT
             },
             {
                 "role": "user",
@@ -195,7 +193,7 @@ class AsyncGrokVLM:
             model=self.model_name,
             messages=messages,
             max_tokens=1024,
-            temperature=0.4
+            temperature=EVAL_TEMPERATURE
         )
 
         if response.choices and response.choices[0].message.content:
@@ -237,7 +235,7 @@ class AsyncOpenAIVLM:
         messages = [
             {
                 "role": "system",
-                "content": "You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."
+                "content": API_SYSTEM_PROMPT
             },
             {
                 "role": "user",
@@ -266,7 +264,7 @@ class AsyncOpenAIVLM:
                         model=self.model_name,
                         messages=messages,
                         max_tokens=1024,
-                        temperature=0.4
+                        temperature=EVAL_TEMPERATURE
                     )
 
                 if response.choices and response.choices[0].message.content:
@@ -290,7 +288,7 @@ class AsyncOpenAIVLM:
 class AsyncGeminiVLM:
     """Async wrapper for Gemini VLM"""
 
-    def __init__(self, model_name: str = "gemini-2.0-flash", api_key: Optional[str] = None):
+    def __init__(self, model_name: str = "gemini-3-flash-preview", api_key: Optional[str] = None):
         import os
         from dotenv import load_dotenv
 
@@ -315,13 +313,12 @@ class AsyncGeminiVLM:
         if self._client is None:
             await self.load()
 
-        prompt = f"""You are a medical imaging expert analyzing fetal ultrasound images.
-Provide clear, professional medical responses.
+        prompt = f"""{API_SYSTEM_PROMPT}
 
 Question: {question}"""
 
         # Gemini's generate_content is sync, run in executor
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
             lambda: self._client.generate_content([prompt, image])
@@ -386,7 +383,7 @@ class AsyncVertexAIVLM:
         import google.auth.transport.requests
 
         # Run refresh in executor (it's a sync operation)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: self._credentials.refresh(google.auth.transport.requests.Request())
@@ -410,7 +407,7 @@ class AsyncVertexAIVLM:
                     "messages": [
                         {
                             "role": "system",
-                            "content": "You are a medical imaging expert analyzing a fetal ultrasound image. Provide clear, professional medical responses based on what you observe in the image."
+                            "content": API_SYSTEM_PROMPT
                         },
                         {
                             "role": "user",
@@ -427,7 +424,7 @@ class AsyncVertexAIVLM:
                         }
                     ],
                     "max_tokens": 1024,
-                    "temperature": 0.4
+                    "temperature": EVAL_TEMPERATURE
                 }
             ]
         }
@@ -513,7 +510,7 @@ class AsyncVLLM:
         messages = [
             {
                 "role": "system",
-                "content": "You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."
+                "content": API_SYSTEM_PROMPT
             },
             {
                 "role": "user",
@@ -529,7 +526,7 @@ class AsyncVLLM:
                 model=self.model_name,
                 messages=messages,
                 max_tokens=1024,
-                temperature=0.4
+                temperature=EVAL_TEMPERATURE
             )
 
             if response.choices and response.choices[0].message.content:
@@ -546,15 +543,27 @@ def evaluate_response(response: str, category: str, question_idx: int) -> Dict[s
     fetal_keywords = ['fetal', 'fetus', 'ultrasound', 'pregnancy', 'prenatal',
                       'gestational', 'amniotic', 'placenta', 'umbilical']
 
+    # Keywords shared across multiple categories -- excluded from hallucination penalty
+    shared_keywords = {
+        'heart', 'cardiac', 'ventricle', 'atrium', 'nuchal', 'translucency',
+        'nt', 'cervical', 'crown-rump',
+    }
+
     anatomy_keywords = {
-        'Abodomen': ['abdomen', 'stomach', 'liver', 'kidney', 'bowel', 'intestine', 'bladder', 'abdominal'],
+        'Abdomen': ['abdomen', 'stomach', 'liver', 'kidney', 'bowel', 'intestine', 'bladder', 'abdominal'],
         'Aorta': ['aorta', 'heart', 'cardiac', 'vessel', 'artery', 'ventricle', 'atrium'],
-        'Brain': ['brain', 'skull', 'cerebral', 'ventricle', 'head', 'cranial', 'hemisphere'],
-        'Femur': ['femur', 'bone', 'leg', 'limb', 'thigh', 'long bone', 'skeletal'],
-        'Heart': ['heart', 'cardiac', 'ventricle', 'atrium', 'chamber', 'valve'],
-        'Thorax': ['thorax', 'chest', 'lung', 'rib', 'diaphragm', 'thoracic'],
+        'CRL-View': ['crown-rump', 'crl', 'embryo', 'crown', 'rump'],
         'Cervical': ['cervical', 'cervix', 'neck', 'spine'],
         'Cervix': ['cervix', 'cervical', 'uterus'],
+        'Femur': ['femur', 'bone', 'leg', 'limb', 'thigh', 'long bone', 'skeletal'],
+        'NT-View': ['nuchal translucency', 'nuchal', 'nt', 'translucency'],
+        'Non_standard_NT': ['nuchal', 'translucency', 'nt', 'non-standard', 'non standard'],
+        'Public_Symphysis_fetal_head': ['pubic symphysis', 'symphysis', 'head engagement', 'head position', 'fetal head'],
+        'Standard_NT': ['nuchal', 'translucency', 'nt', 'standard'],
+        'Thorax': ['thorax', 'chest', 'lung', 'rib', 'diaphragm', 'thoracic'],
+        'Trans-cerebellum': ['cerebellum', 'posterior fossa', 'cisterna magna', 'vermis', 'cerebellar'],
+        'Trans-thalamic': ['thalamus', 'thalamic', 'cavum septum pellucidum', 'falx', 'biparietal'],
+        'Trans-ventricular': ['lateral ventricle', 'choroid plexus', 'atrium', 'ventricular'],
     }
 
     has_fetal_context = any(kw in response_lower for kw in fetal_keywords)
@@ -575,7 +584,9 @@ def evaluate_response(response: str, category: str, question_idx: int) -> Dict[s
     wrong_categories = [cat for cat in anatomy_keywords.keys() if cat != category]
     for wrong_cat in wrong_categories:
         wrong_kws = anatomy_keywords.get(wrong_cat, [])
-        if any(kw in response_lower and category.lower() not in response_lower for kw in wrong_kws[:2]):
+        # Only penalize non-shared keywords to avoid false positives
+        unique_kws = [kw for kw in wrong_kws[:2] if kw not in shared_keywords]
+        if any(kw in response_lower and category.lower() not in response_lower for kw in unique_kws):
             hallucination_penalty += 0.1
 
     overall_score = (
@@ -623,8 +634,8 @@ async def process_single_question(
     except Exception as e:
         elapsed_time = time.time() - start_time
         # Check for RPD limit errors - raise to stop processing
+        # (finally block handles semaphore release, no explicit release here)
         if is_rpd_error(e):
-            rate_limiter.release()
             raise RPDLimitError(f"Rate/quota limit hit: {e}")
         return {
             'question_idx': question_idx,
@@ -713,9 +724,10 @@ async def run_parallel_evaluation(
 
         # Process images with checkpoint saving
         rpd_hit = False
+        last_checkpoint_count = len(completed_images)
         pbar = None
         if not no_progress and not quiet:
-            pbar = tqdm_asyncio(total=len(remaining_images), desc=model_name, initial=len(completed_images))
+            pbar = tqdm_asyncio(total=len(test_images), desc=model_name, initial=len(completed_images))
 
         # Process images in PARALLEL batches
         CHECKPOINT_INTERVAL = 50  # Save checkpoint every N images
@@ -806,8 +818,9 @@ async def run_parallel_evaluation(
                 if pbar:
                     pbar.update(1)
 
-            # Save checkpoint after each batch
-            if checkpoint_path and len(completed_images) % CHECKPOINT_INTERVAL < IMAGE_BATCH_SIZE:
+            # Save checkpoint after each batch (counter-based to avoid modular arithmetic issues)
+            if checkpoint_path and (len(completed_images) - last_checkpoint_count) >= CHECKPOINT_INTERVAL:
+                last_checkpoint_count = len(completed_images)
                 save_checkpoint(checkpoint_path, completed_images, model_name,
                               {'total_images': len(test_images)}, results)
                 if logger:
@@ -853,7 +866,9 @@ async def run_parallel_evaluation(
             all_scores.append(score)
             image_scores.append(score)
             per_category_scores[category].append(score)
-            per_question_scores[q_result['question_idx']].append(score)
+            q_idx = q_result['question_idx']
+            if q_idx in per_question_scores:
+                per_question_scores[q_idx].append(score)
             total_time += q_result['time']
 
             # Log errors to file
@@ -992,8 +1007,8 @@ Examples:
 
     parser.add_argument(
         "--gemini-model",
-        default="gemini-2.0-flash",
-        help="Gemini model to use (default: gemini-2.0-flash)"
+        default="gemini-3-flash-preview",
+        help="Gemini model to use (default: gemini-3-flash-preview)"
     )
 
     parser.add_argument(
@@ -1260,6 +1275,7 @@ async def main():
 
     # Run Vertex AI
     if run_vertex_ai:
+        vertex_ai = None
         try:
             checkpoint_path = output_dir / f'checkpoint_vertex_ai_{args.vertex_ai_model.replace("/", "_")}{shard_suffix}.json'
             completed_images = {}
@@ -1278,12 +1294,13 @@ async def main():
                 max_requests=args.max_requests
             )
             all_results['models'][f'VertexAI ({args.vertex_ai_model})'] = result
-
-            # Clean up aiohttp session
-            await vertex_ai.close()
         except Exception as e:
             logger.error(f"Vertex AI failed: {e}")
             print(f"[SKIP] Vertex AI: {e}")
+        finally:
+            # Clean up aiohttp session even on error
+            if vertex_ai is not None:
+                await vertex_ai.close()
 
     # Run vLLM (local server)
     if run_vllm:

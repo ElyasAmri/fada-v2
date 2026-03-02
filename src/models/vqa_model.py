@@ -19,17 +19,9 @@ class UltrasoundVQA:
     Non_standard_NT images with 8 medical questions per image.
     """
 
-    # Standard 8 questions from training data
-    STANDARD_QUESTIONS = [
-        "Anatomical Structures: List all visible anatomical structures in the image and describe their appearance",
-        "Fetal Orientation: Describe the orientation of the fetus in this ultrasound view",
-        "Plane Evaluation: Assess if the image is taken at a standard diagnostic plane and describe its diagnostic value",
-        "Biometric Measurements: Identify any biometric measurements that can be taken from this view",
-        "Gestational Age: Based on visible structures, estimate the gestational age range if possible",
-        "Image Quality: Evaluate the overall image quality, clarity, and diagnostic utility",
-        "Normality/Abnormality: Identify any visible abnormalities or deviations from normal anatomy",
-        "Clinical Recommendations: Provide clinical recommendations based on the ultrasound findings"
-    ]
+    # Standard 8 questions -- canonical source in src.config.questions.
+    # Historical wording differed slightly; now unified.
+    from src.config.questions import QUESTIONS as STANDARD_QUESTIONS
 
     def __init__(self,
                  model_path: Union[str, Path] = "outputs/blip2_1epoch/final_model",
@@ -225,11 +217,11 @@ class UltrasoundVQA:
         shortcuts = {
             "Anatomical Structures": self.STANDARD_QUESTIONS[0],
             "Fetal Orientation": self.STANDARD_QUESTIONS[1],
-            "Plane Evaluation": self.STANDARD_QUESTIONS[2],
+            "Imaging Plane": self.STANDARD_QUESTIONS[2],
             "Biometric Measurements": self.STANDARD_QUESTIONS[3],
             "Gestational Age": self.STANDARD_QUESTIONS[4],
             "Image Quality": self.STANDARD_QUESTIONS[5],
-            "Normality/Abnormality": self.STANDARD_QUESTIONS[6],
+            "Normality Assessment": self.STANDARD_QUESTIONS[6],
             "Clinical Recommendations": self.STANDARD_QUESTIONS[7]
         }
         return shortcuts

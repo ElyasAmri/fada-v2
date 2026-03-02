@@ -454,10 +454,11 @@ class VastaiRunner:
                         results.append(json.loads(line))
 
             predictions = [r['prediction'] for r in results]
-            ground_truths = [r['ground_truth'] for r in results]
+            # Backward-compatible: accept both 'reference_response' and legacy 'ground_truth'
+            references = [r.get('reference_response', r.get('ground_truth', '')) for r in results]
 
             scorer = EmbeddingScorer(device="cpu")
-            similarities = scorer.compute_similarity(predictions, ground_truths)
+            similarities = scorer.compute_similarity(predictions, references)
             metrics = scorer.compute_aggregate_metrics(similarities)
 
             return metrics['mean_similarity']

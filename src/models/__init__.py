@@ -1,7 +1,3 @@
 # FADA Models Module
-from .classifier import (
-    FetalUltrasoundClassifier12,
-    FocalLoss,
-    create_model
-)
-from .vqa_model import UltrasoundVQA
+# Lazy: submodules (classifier, vqa_model) require torch/transformers.
+# Import them directly: e.g. from src.models.classifier import create_model

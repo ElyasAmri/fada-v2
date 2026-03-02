@@ -47,7 +47,7 @@ lora_config = {
 ## Infrastructure
 
 - **Local**: RTX 5090 (24GB VRAM) with Unsloth (verified for all 7 Qwen models)
-- **Cloud**: vast.ai and RunPod (RTX 3090/4090 at ~$0.40/h)
+- **Cloud**: RCCG (A100 at $1.35/h, H100 at $1.90/h)
 
 ### Unsloth-Compatible Models
 

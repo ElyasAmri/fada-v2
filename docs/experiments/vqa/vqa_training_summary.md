@@ -11,25 +11,29 @@ Successfully trained VQA models for all available labeled ultrasound categories 
 ## Successfully Trained Categories
 
 ### 1. Non_standard_NT (Original)
+
 - **Status**: ✅ Complete
 - **Training Time**: ~1 minute
 - **Output**: `outputs/blip2_1epoch/final_model`
 - **Test Result**: Generated medical responses about anatomical structures
 
 ### 2. Abdomen
+
 - **Status**: ✅ Complete
 - **Training Time**: ~1 minute
 - **Output**: `outputs/blip2_abdomen/final_model`
 - **Test Result**: "The liver is a biconvex organ, with the right side being larger than the left."
-- **Notes**: Successfully handles Abodomen directory name
+- **Notes**: Successfully handles Abdomen directory name
 
 ### 3. Femur
+
 - **Status**: ✅ Complete
 - **Training Time**: ~1 minute
 - **Output**: `outputs/blip2_femur/final_model`
 - **Test Result**: "The left side of the image shows the lower part of the pelvis and the right side shows the upper part."
 
 ### 4. Thorax
+
 - **Status**: ✅ Complete (succeeded on retry)
 - **Training Time**: ~1 minute
 - **Output**: `outputs/blip2_thorax/final_model`
@@ -37,6 +41,7 @@ Successfully trained VQA models for all available labeled ultrasound categories 
 - **Notes**: Initial training failed with CUDA error, succeeded after clearing CUDA cache
 
 ### 5. Standard_NT
+
 - **Status**: ✅ Complete
 - **Training Time**: ~1 minute
 - **Output**: `outputs/blip2_standard_nt/final_model`
@@ -56,6 +61,7 @@ These categories will be trainable once labeled Excel files are added to `data/F
 ## Training Configuration
 
 **Model Parameters**:
+
 - Base Model: Salesforce/blip2-opt-2.7b
 - Quantization: 8-bit using BitsAndBytesConfig
 - LoRA Config:
@@ -65,6 +71,7 @@ These categories will be trainable once labeled Excel files are added to `data/F
   - dropout=0.05
 
 **Training Parameters**:
+
 - Epochs: 1 (validation run)
 - Batch Size: 1
 - Learning Rate: 1e-4
@@ -73,6 +80,7 @@ These categories will be trainable once labeled Excel files are added to `data/F
 - Total QA Pairs: ~28 train, 6 val, 6 test per category
 
 **Generation Parameters** (optimized):
+
 - max_new_tokens: 100
 - min_new_tokens: 5
 - num_beams: 3
@@ -83,6 +91,7 @@ These categories will be trainable once labeled Excel files are added to `data/F
 ## Model Performance
 
 All trained models successfully:
+
 1. Load without errors (4.21 GB GPU memory each)
 2. Generate coherent medical responses
 3. Avoid repetitive output patterns
@@ -98,6 +107,7 @@ All trained models successfully:
 ## Files Generated
 
 **Training Notebooks** (in `notebooks/blip2_training/`):
+
 - `train_blip2_1epoch.ipynb` - Non_standard_NT (original, with execution history)
 - `train_blip2_abdomen.ipynb` - Abdomen (with execution history)
 - `train_blip2_femur.ipynb` - Femur (with execution history)
@@ -112,6 +122,7 @@ All trained models successfully:
 **Note**: Executed notebooks have been consolidated with originals. Each notebook retains its execution history.
 
 **Model Outputs**:
+
 - `outputs/blip2_1epoch/` (Non_standard_NT)
 - `outputs/blip2_abdomen/`
 - `outputs/blip2_femur/`
@@ -119,6 +130,7 @@ All trained models successfully:
 - `outputs/blip2_standard_nt/`
 
 Each output directory contains:
+
 - `final_model/` - LoRA adapters and processor
 - `checkpoint-*/` - Training checkpoints
 - `training_summary.json` - Training metrics

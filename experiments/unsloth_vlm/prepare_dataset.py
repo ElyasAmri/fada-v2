@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 # Default paths
 DATA_ROOT = Path(__file__).parent.parent.parent / "data" / "Fetal Ultrasound"
-ANNOTATIONS_FILE = DATA_ROOT / "annotations.xlsx"
+ANNOTATIONS_FILE = DATA_ROOT.parent / "Fetal Ultrasound Annotations Normalized.xlsx"
 
 # Q7 prompt for normality assessment
 Q7_PROMPT = "Assess the normality of this fetal ultrasound image. Describe whether the visible structures appear normal or if there are any abnormalities."

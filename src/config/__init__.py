@@ -5,9 +5,8 @@ from .constants import (
     CLASS_DESCRIPTIONS,
     VQA_MODEL_MAPPING,
     ORGAN_INFO,
-    AVAILABLE_VLM_MODELS,
     CONFIDENCE_THRESHOLDS,
     get_display_name,
-    get_class_index,
     get_vqa_model_key,
 )
+from .questions import QUESTIONS, QUESTION_SHORT_NAMES, QUESTION_COLUMNS

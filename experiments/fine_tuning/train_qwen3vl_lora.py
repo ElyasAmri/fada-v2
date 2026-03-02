@@ -20,6 +20,7 @@ import sys
 import json
 import argparse
 import time
+import platform
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -32,15 +33,8 @@ from PIL import Image
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# MLflow imports - direct file import to avoid __init__.py dependencies
 import mlflow
-import importlib.util
-mlflow_utils_path = PROJECT_ROOT / "src" / "utils" / "mlflow_utils.py"
-spec = importlib.util.spec_from_file_location("mlflow_utils", mlflow_utils_path)
-mlflow_utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mlflow_utils)
-setup_mlflow_experiment = mlflow_utils.setup_mlflow_experiment
-MLflowTrainerCallback = mlflow_utils.MLflowTrainerCallback
+from src.utils.mlflow_utils import setup_mlflow_experiment, MLflowTrainerCallback
 
 # Try importing Unsloth, fall back to standard HF
 try:
@@ -99,12 +93,8 @@ MODEL_CONFIGS = {
     "minicpm-v-4": "openbmb/MiniCPM-V-4",
 }
 
-# Architecture-specific LoRA target modules
-LORA_TARGET_MODULES = {
-    "qwen": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    "internvl": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    "minicpm": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-}
+# LoRA target modules (identical across qwen/internvl/minicpm architectures)
+LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 
 # Default LoRA configuration for RTX 4070
 DEFAULT_LORA_CONFIG = {
@@ -139,7 +129,7 @@ DEFAULT_TRAINING_ARGS = {
     "eval_steps": 500,
     "max_grad_norm": 1.0,
     "gradient_checkpointing": True,
-    "dataloader_num_workers": 0,  # Windows compatibility
+    "dataloader_num_workers": None,
 }
 
 
@@ -152,10 +142,20 @@ class VLMDataset(Dataset):
         processor: AutoProcessor,
         max_samples: Optional[int] = None,
         max_length: int = 4096,
+        data_root: Optional[str] = None,
     ):
         self.processor = processor
         self.max_length = max_length
+        self.data_root = Path(data_root) if data_root else None
+        self._missing_count = 0
         self.samples = []
+
+        # Precompute Qwen chat template markers for label masking.
+        # This script targets Qwen models only (<|im_start|>/<|im_end|> format).
+        self._response_template_ids = self.processor.tokenizer.encode(
+            "<|im_start|>assistant\n", add_special_tokens=False
+        )
+        self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
 
         with open(jsonl_path, 'r') as f:
             for i, line in enumerate(f):
@@ -165,6 +165,11 @@ class VLMDataset(Dataset):
 
         print(f"Loaded {len(self.samples)} samples from {jsonl_path}")
 
+        # Validate template tokens on first sample
+        if self.samples and not self._response_template_ids:
+            print("WARNING: Could not encode '<|im_start|>assistant\\n' -- label masking may be incorrect. "
+                  "Falling back to padding-only masking.")
+
     def __len__(self):
         return len(self.samples)
 
@@ -173,16 +178,28 @@ class VLMDataset(Dataset):
         messages = sample['messages']
         image_paths = sample.get('images', [])
 
-        # Load images
+        # Load images (prepend data_root for relative paths)
         images = []
         for img_path in image_paths:
+            if self.data_root and not os.path.isabs(img_path):
+                full_path = (self.data_root / img_path).resolve()
+                if not full_path.is_relative_to(self.data_root.resolve()):
+                    raise ValueError(f"Path traversal detected: {img_path}")
+                img_path = str(full_path)
             try:
                 img = Image.open(img_path).convert('RGB')
                 images.append(img)
-            except Exception as e:
-                print(f"Warning: Could not load image {img_path}: {e}")
-                # Create placeholder image
+            except FileNotFoundError:
+                self._missing_count += 1
+                if self._missing_count > 10:
+                    raise RuntimeError(
+                        f"Too many missing images ({self._missing_count}). "
+                        f"Check --data-root is correct. Last missing: {img_path}"
+                    )
+                print(f"Warning: Image not found: {img_path}")
                 images.append(Image.new('RGB', (224, 224), color='gray'))
+            except Exception as e:
+                raise RuntimeError(f"Failed to load image {img_path}: {e}") from e
 
         # Apply chat template
         text = self.processor.apply_chat_template(
@@ -204,9 +221,37 @@ class VLMDataset(Dataset):
         # Squeeze batch dimension
         inputs = {k: v.squeeze(0) for k, v in inputs.items()}
 
-        # Create labels (copy input_ids, mask padding)
-        labels = inputs['input_ids'].clone()
-        labels[labels == self.processor.tokenizer.pad_token_id] = -100
+        # Create labels: mask everything except assistant response tokens.
+        # For Qwen models, assistant responses are between
+        # <|im_start|>assistant\n ... <|im_end|>
+        input_ids = inputs['input_ids']
+        labels = torch.full_like(input_ids, -100)
+
+        if self._response_template_ids:
+            # Find all assistant response boundaries and unmask them
+            template_len = len(self._response_template_ids)
+            ids_list = input_ids.tolist()
+            i = 0
+            while i <= len(ids_list) - template_len:
+                # Check for <|im_start|>assistant\n marker
+                if ids_list[i:i + template_len] == self._response_template_ids:
+                    # Unmask from after the marker until <|im_end|>
+                    response_start = i + template_len
+                    j = response_start
+                    while j < len(ids_list):
+                        if ids_list[j] == self._end_token_id:
+                            # Include the <|im_end|> token in labels
+                            labels[j] = input_ids[j]
+                            break
+                        labels[j] = input_ids[j]
+                        j += 1
+                    i = j + 1
+                else:
+                    i += 1
+        else:
+            # Fallback: mask padding only (original behavior)
+            labels = input_ids.clone()
+            labels[labels == self.processor.tokenizer.pad_token_id] = -100
 
         inputs['labels'] = labels
 
@@ -246,9 +291,6 @@ def create_model_and_processor(
     model_id = MODEL_CONFIGS.get(model_name, model_name)
     architecture = get_model_architecture(model_id)
     print(f"Loading model: {model_id} (architecture: {architecture})")
-
-    # Determine if this is a Qwen3 model (requires different handling)
-    is_qwen3 = "qwen3" in model_name.lower() or "Qwen3" in model_id
 
     if use_unsloth and UNSLOTH_AVAILABLE:
         # Use Unsloth for optimized loading
@@ -301,12 +343,11 @@ def apply_lora(
     """Apply LoRA adapters to the model."""
     config = lora_config or DEFAULT_LORA_CONFIG
 
-    # Get architecture-specific target modules
+    # All supported architectures use the same target modules
     architecture = get_model_architecture(model_id)
-    if architecture in LORA_TARGET_MODULES:
-        config = config.copy()
-        config['target_modules'] = LORA_TARGET_MODULES[architecture]
-        print(f"Using {architecture} target modules: {config['target_modules']}")
+    config = config.copy()
+    config['target_modules'] = LORA_TARGET_MODULES
+    print(f"Using {architecture} target modules: {config['target_modules']}")
 
     if use_unsloth and UNSLOTH_AVAILABLE:
         # Unsloth handles LoRA internally
@@ -368,7 +409,7 @@ def collate_fn_for_vlm(batch):
             # Try default stacking for other types
             try:
                 collated[key] = torch.tensor(values)
-            except:
+            except (TypeError, ValueError):
                 collated[key] = values
 
     return collated
@@ -389,6 +430,9 @@ def create_trainer(
         args.update(training_args)
 
     args['output_dir'] = output_dir
+
+    if args.get('dataloader_num_workers') is None:
+        args['dataloader_num_workers'] = 4 if platform.system() == "Linux" else 0
 
     training_arguments = TrainingArguments(**args)
 
@@ -428,13 +472,18 @@ def main():
     # Data arguments
     parser.add_argument(
         '--train-data', type=str,
-        default='data/vlm_training/medgemma_4b_train.jsonl',
+        default=str(PROJECT_ROOT / 'data/vlm_training/gemini_complete_train.jsonl'),
         help='Path to training JSONL file'
     )
     parser.add_argument(
         '--val-data', type=str,
-        default='data/vlm_training/medgemma_4b_val.jsonl',
+        default=str(PROJECT_ROOT / 'data/vlm_training/gemini_complete_val.jsonl'),
         help='Path to validation JSONL file'
+    )
+    parser.add_argument(
+        '--data-root', type=str,
+        default=str(PROJECT_ROOT / 'data/Fetal Ultrasound'),
+        help='Root directory for image paths in JSONL (prepended to relative paths)'
     )
     parser.add_argument(
         '--max-train-samples', type=int, default=None,
@@ -509,7 +558,7 @@ def main():
     # Create output directory
     if args.output_dir is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.output_dir = f"experiments/fine_tuning/runs/{args.model}_{timestamp}"
+        args.output_dir = str(PROJECT_ROOT / f"experiments/fine_tuning/runs/{args.model}_{timestamp}")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -565,6 +614,7 @@ def main():
         args.train_data,
         processor,
         max_samples=args.max_train_samples,
+        data_root=args.data_root,
     )
 
     eval_dataset = None
@@ -573,6 +623,7 @@ def main():
             args.val_data,
             processor,
             max_samples=args.max_val_samples,
+            data_root=args.data_root,
         )
 
     # Training arguments

@@ -58,7 +58,7 @@ def load_model():
                     pretrained=False
                 )
 
-                checkpoint = torch.load(model_path, map_location='cpu')
+                checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
 
                 if isinstance(checkpoint, dict):
                     if 'model_state_dict' in checkpoint:

@@ -42,22 +42,17 @@ sys.path.insert(0, str(project_root))
 from PIL import Image
 from dotenv import load_dotenv
 
-# Import question loader
-import importlib.util
-spec = importlib.util.spec_from_file_location("question_loader", project_root / "src/data/question_loader.py")
-question_loader_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(question_loader_module)
-QuestionLoader = question_loader_module.QuestionLoader
+from src.data.question_loader import QuestionLoader
+from experiments.evaluation.config import API_SYSTEM_PROMPT
 
 # Constants
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3-flash-preview"
 DATA_DIR = project_root / "data" / "Fetal Ultrasound"
 RESULTS_DIR = Path(__file__).parent / "results"
 BATCH_DIR = RESULTS_DIR / "batch_files"
 JOBS_FILE = RESULTS_DIR / "batch_jobs.json"
 
-SYSTEM_PROMPT = """You are a medical imaging expert analyzing fetal ultrasound images.
-Provide clear, professional medical responses."""
+SYSTEM_PROMPT = API_SYSTEM_PROMPT
 
 
 def load_env():

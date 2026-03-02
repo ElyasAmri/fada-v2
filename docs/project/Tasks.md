@@ -25,7 +25,7 @@ tags: [tasks]
 - [x] Qwen2.5-VL-7B fine-tuned to 81.1% (600 samples, embedding similarity)
 - [x] Qwen3-VL-8B Q7 baseline at 82% (50 samples)
 - [x] Unsloth fine-tuning verified for all 7 Qwen models (RTX 5090)
-- [x] Cloud infrastructure built (vast.ai + RunPod)
+- [x] Cloud infrastructure built (RCCG A100/H100)
 
 ### Completed (Phase 3: Cloud API Evaluation)
 
@@ -56,6 +56,6 @@ tags: [tasks]
 
 ## Notes
 
-- Full dataset: ~19,000 images, 14 classes, 18,936 annotated
-- Hardware: RTX 5090 (24GB VRAM) local, vast.ai/RunPod for cloud
+- Full dataset: 19,019 images, 14 classes, 18,936 annotated
+- Hardware: RTX 5090 (24GB VRAM) local, RCCG (A100/H100) for cloud
 - Best verified GT score: 81.1% (Qwen2.5-VL-7B fine-tuned)

@@ -31,9 +31,9 @@ SPLITS_FILE = PROJECT_ROOT / "data" / "dataset_splits.json"
 
 # Split configuration
 DEFAULT_CONFIG = {
-    "train_ratio": 0.70,
-    "val_ratio": 0.15,
-    "test_ratio": 0.15,
+    "train_ratio": 0.80,
+    "val_ratio": 0.10,
+    "test_ratio": 0.10,
     "random_seed": 42,
 }
 
@@ -82,9 +82,9 @@ def compute_dataset_hash(images_by_category: Dict[str, List[str]]) -> str:
 
 def create_stratified_splits(
     images_by_category: Dict[str, List[str]],
-    train_ratio: float = 0.70,
-    val_ratio: float = 0.15,
-    test_ratio: float = 0.15,
+    train_ratio: float = 0.80,
+    val_ratio: float = 0.10,
+    test_ratio: float = 0.10,
     random_seed: int = 42
 ) -> Dict[str, Dict[str, List[str]]]:
     """
@@ -102,7 +102,7 @@ def create_stratified_splits(
     """
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "Ratios must sum to 1"
 
-    np.random.seed(random_seed)
+    rng = np.random.default_rng(random_seed)
 
     splits = {
         'train': defaultdict(list),
@@ -119,7 +119,7 @@ def create_stratified_splits(
             continue
 
         # Shuffle with fixed seed
-        indices = np.random.permutation(n_images)
+        indices = rng.permutation(n_images)
 
         # Calculate split points
         n_test = max(1, int(n_images * test_ratio))
@@ -386,16 +386,16 @@ def main():
         help='Print summary of existing splits'
     )
     parser.add_argument(
-        '--train-ratio', type=float, default=0.70,
-        help='Training set ratio (default: 0.70)'
+        '--train-ratio', type=float, default=0.80,
+        help='Training set ratio (default: 0.80)'
     )
     parser.add_argument(
-        '--val-ratio', type=float, default=0.15,
-        help='Validation set ratio (default: 0.15)'
+        '--val-ratio', type=float, default=0.10,
+        help='Validation set ratio (default: 0.10)'
     )
     parser.add_argument(
-        '--test-ratio', type=float, default=0.15,
-        help='Test set ratio (default: 0.15)'
+        '--test-ratio', type=float, default=0.10,
+        help='Test set ratio (default: 0.10)'
     )
     parser.add_argument(
         '--seed', type=int, default=42,

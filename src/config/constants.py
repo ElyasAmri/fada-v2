@@ -8,9 +8,8 @@ and mappings used throughout the FADA system.
 from typing import Dict, List
 
 # 12-class labels for fetal ultrasound classification
-# NOTE: 'Abodomen' typo preserved to match original data folder names
 CLASSES: List[str] = [
-    'Abodomen',
+    'Abdomen',
     'Aorta',
     'Cervical',
     'Cervix',
@@ -26,7 +25,7 @@ CLASSES: List[str] = [
 
 # Display names for UI (corrects typos for user-facing text)
 DISPLAY_NAMES: Dict[str, str] = {
-    'Abodomen': 'Abdomen',
+    'Abdomen': 'Abdomen',
     'Aorta': 'Aortic Arch',
     'Cervical': 'Cervical View',
     'Cervix': 'Cervix',
@@ -42,7 +41,7 @@ DISPLAY_NAMES: Dict[str, str] = {
 
 # Clinical descriptions for each class
 CLASS_DESCRIPTIONS: Dict[str, str] = {
-    'Abodomen': 'Abdominal cross-section for organ assessment',
+    'Abdomen': 'Abdominal cross-section for organ assessment',
     'Aorta': 'Aortic arch view for cardiac output assessment',
     'Cervical': 'Cervical view for cervix evaluation',
     'Cervix': 'Direct cervix view for length measurement',
@@ -58,7 +57,7 @@ CLASS_DESCRIPTIONS: Dict[str, str] = {
 
 # Category to VQA model directory mapping
 VQA_MODEL_MAPPING: Dict[str, str] = {
-    'Abodomen': 'abdomen',
+    'Abdomen': 'abdomen',
     'Femur': 'femur',
     'Thorax': 'thorax',
     'Standard_NT': 'standard_nt',
@@ -90,13 +89,6 @@ ORGAN_INFO: Dict[str, str] = {
     'Transventricular Plane': 'Transventricular plane for ventricle measurement.',
 }
 
-# Available API VLM models
-AVAILABLE_VLM_MODELS: Dict[str, str] = {
-    'minicpm': 'MiniCPM-V-2.6',
-    'moondream': 'Moondream2',
-    'internvl2_2b': 'InternVL2-2B',
-}
-
 # Confidence thresholds for quality assessment
 # See config/models.yaml for detailed documentation
 CONFIDENCE_THRESHOLDS = {
@@ -112,14 +104,6 @@ MIN_IMAGE_SIZE = 10  # Minimum width/height in pixels for valid images
 def get_display_name(class_name: str) -> str:
     """Get user-friendly display name for a class."""
     return DISPLAY_NAMES.get(class_name, class_name)
-
-
-def get_class_index(class_name: str) -> int:
-    """Get the index of a class name in CLASSES list."""
-    try:
-        return CLASSES.index(class_name)
-    except ValueError:
-        return -1
 
 
 def get_vqa_model_key(category: str) -> str:

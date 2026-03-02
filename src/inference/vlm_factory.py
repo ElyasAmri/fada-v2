@@ -22,23 +22,10 @@ def create_top_vlms(use_api: bool = False, api_endpoint: str = None, api_key: st
     manager = VLMManager()
 
     if use_api:
-        # API-based models - import APIVLM only when needed
-        from src.inference.api_vlm import APIVLM
-        manager.register_model("minicpm", APIVLM(
-            api_endpoint=f"{api_endpoint}/minicpm",
-            api_key=api_key,
-            model_name="MiniCPM-V-2.6"
-        ))
-        manager.register_model("internvl2_2b", APIVLM(
-            api_endpoint=f"{api_endpoint}/internvl2_2b",
-            api_key=api_key,
-            model_name="InternVL2-2B"
-        ))
-        manager.register_model("moondream", APIVLM(
-            api_endpoint=f"{api_endpoint}/moondream",
-            api_key=api_key,
-            model_name="Moondream2"
-        ))
+        raise NotImplementedError(
+            "API-based VLM inference is no longer supported via vlm_factory. "
+            "Use experiments/api_models/test_api_vlm.py for API model evaluation."
+        )
     else:
         # Local GPU models
         if gpu_8gb:

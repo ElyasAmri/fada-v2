@@ -45,7 +45,7 @@ tmpclaude-*/
 !CLAUDE.md
 
 # Environment
-.env
+.env*
 
 # Cache
 .cache/

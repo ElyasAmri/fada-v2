@@ -79,27 +79,27 @@ class EmbeddingScorer:
     def compute_similarity(
         self,
         predictions: List[str],
-        ground_truths: List[str],
+        references: List[str],
         show_progress: bool = True
     ) -> np.ndarray:
         """
-        Compute pairwise cosine similarity between predictions and ground truths.
+        Compute pairwise cosine similarity between predictions and reference responses.
 
         Args:
             predictions: List of model predictions
-            ground_truths: List of ground truth responses
+            references: List of reference responses
 
         Returns:
             numpy array of similarity scores (one per sample)
         """
-        assert len(predictions) == len(ground_truths), \
-            f"Length mismatch: {len(predictions)} predictions vs {len(ground_truths)} ground truths"
+        assert len(predictions) == len(references), \
+            f"Length mismatch: {len(predictions)} predictions vs {len(references)} references"
 
         print("Encoding predictions...")
         pred_embeddings = self.encode_texts(predictions, show_progress)
 
-        print("Encoding ground truths...")
-        gt_embeddings = self.encode_texts(ground_truths, show_progress)
+        print("Encoding references...")
+        gt_embeddings = self.encode_texts(references, show_progress)
 
         # Compute pairwise cosine similarities (dot product of normalized vectors)
         # Since embeddings are normalized, cosine_sim = dot product

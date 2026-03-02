@@ -122,7 +122,7 @@ def generate_response(model, tokenizer, image, prompt: str, max_new_tokens: int 
             **inputs,
             max_new_tokens=max_new_tokens,
             use_cache=True,
-            temperature=0.7,
+            temperature=0.1,
             do_sample=True,
         )
 
@@ -145,7 +145,7 @@ def evaluate_model(
     Evaluate model on validation dataset.
 
     Returns dict with:
-    - predictions: List of (ground_truth, prediction, normalized_gt, normalized_pred)
+    - predictions: List of (reference_response, prediction, normalized_gt, normalized_pred)
     - metrics: Classification metrics
     """
     predictions = []
@@ -159,17 +159,17 @@ def evaluate_model(
         # Extract image and ground truth from sample
         user_content = sample["messages"][0]["content"]
         image = user_content[0]["image"]  # PIL Image
-        ground_truth = sample["messages"][1]["content"][0]["text"]
+        reference_response = sample["messages"][1]["content"][0]["text"]
 
         # Generate prediction
         prediction = generate_response(model, tokenizer, image, Q7_PROMPT)
 
         # Normalize for classification
-        gt_normalized = normalize_assessment(ground_truth)
+        gt_normalized = normalize_assessment(reference_response)
         pred_normalized = normalize_assessment(prediction)
 
         predictions.append({
-            "ground_truth": ground_truth,
+            "reference_response": reference_response,
             "prediction": prediction,
             "gt_category": gt_normalized,
             "pred_category": pred_normalized,
@@ -240,7 +240,7 @@ def print_results(results: dict):
     print("\nSample Predictions:")
     print("-" * 60)
     for i, pred in enumerate(results["predictions"][:5]):
-        print(f"\n[{i+1}] Ground Truth: {pred['ground_truth'][:80]}...")
+        print(f"\n[{i+1}] Reference: {pred['reference_response'][:80]}...")
         print(f"    Prediction:   {pred['prediction'][:80]}...")
         print(f"    Categories:   GT={pred['gt_category']}, Pred={pred['pred_category']}")
 

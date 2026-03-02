@@ -4,6 +4,8 @@ Configuration constants for VLM evaluation pipeline.
 
 from pathlib import Path
 
+from src.config.questions import QUESTIONS, QUESTION_SHORT_NAMES
+
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
@@ -18,20 +20,22 @@ ADAPTER_PATH = MODELS_DIR / "qwen25vl7b_finetuned" / "final"
 FULL_TEST_DATA = DATA_DIR / "vlm_training" / "gemini_complete_test.jsonl"
 STRATIFIED_TEST_DATA = OUTPUTS_DIR / "test_subset.jsonl"
 
-# Categories (12 total from dataset - note "Abodomen" is the actual folder name with typo)
+# Categories (14 total from dataset, sorted alphabetically)
 CATEGORIES = [
-    "Abodomen",  # Note: folder has typo
+    "Abdomen",
     "Aorta",
+    "CRL-View",
     "Cervical",
     "Cervix",
     "Femur",
+    "NT-View",
     "Non_standard_NT",
+    "Public_Symphysis_fetal_head",
     "Standard_NT",
     "Thorax",
     "Trans-cerebellum",
     "Trans-thalamic",
     "Trans-ventricular",
-    "Public_Symphysis_fetal_head"
 ]
 
 # Evaluation settings
@@ -40,30 +44,14 @@ DEFAULT_EMBEDDING_MODEL = "all-mpnet-base-v2"
 FALLBACK_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # Generation settings
-SYSTEM_PROMPT = """You are an expert in fetal ultrasound imaging analysis. Provide accurate, detailed, and clinically relevant interpretations. Be precise and professional in your assessments."""
+# Temperature policy: T=0.1 for evaluation (consistency), T=0.7 for interactive inference
+VLM_SYSTEM_PROMPT = """You are an expert in fetal ultrasound imaging analysis. Provide accurate, detailed, and clinically relevant interpretations. Be precise and professional in your assessments."""
+
+# Backward-compatible alias
+SYSTEM_PROMPT = VLM_SYSTEM_PROMPT
+
+# System prompt for API-based evaluation (Gemini, GPT-4o, Grok)
+API_SYSTEM_PROMPT = """You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."""
 
 MAX_NEW_TOKENS = 1024
 GENERATION_TEMPERATURE = 0.1  # Low for consistency
-
-# Standard questions
-QUESTIONS = [
-    "Anatomical Structures Identification: Identify and describe all anatomical structures visible in the image.",
-    "Fetal Orientation: Determine the orientation of the fetus based on the image (e.g., head up/down, front/back view).",
-    "Plane Evaluation: Assess if the image is taken at a standard diagnostic plane and describe its diagnostic relevance.",
-    "Biometric Measurements: Identify any measurable biometric parameters (e.g., femur length, head circumference) from the image.",
-    "Gestational Age: Estimate the gestational age of the fetus based on the visible features.",
-    "Image Quality: Assess the quality of the ultrasound image, mentioning any factors that might affect its interpretation (e.g., clarity, artifacts).",
-    "Normality / Abnormality: Determine whether the observed structures appear normal or identify any visible abnormalities or concerns.",
-    "Clinical Recommendations: Provide any relevant clinical recommendations or suggested next steps based on your interpretation."
-]
-
-QUESTION_SHORT_NAMES = [
-    "Anatomical Structures",
-    "Fetal Orientation",
-    "Plane Evaluation",
-    "Biometric Measurements",
-    "Gestational Age",
-    "Image Quality",
-    "Normality/Abnormality",
-    "Clinical Recommendations"
-]
