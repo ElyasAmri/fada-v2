@@ -60,7 +60,7 @@ GENERATION_TEMPERATURE = 0.1  # Low for consistency
 ANNOTATIONS_PATH = DATA_DIR / "Fetal Ultrasound Annotations Normalized.xlsx"
 
 # BERTScore model for Q8 evaluation
-BERTSCORE_MODEL = "microsoft/deberta-xlarge-mnli"
+BERTSCORE_MODEL = "roberta-large"
 
 # Gestational age bins (ordered for adjacency scoring)
 GA_BINS_ORDERED = [

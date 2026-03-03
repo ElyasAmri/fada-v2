@@ -10,7 +10,7 @@ question-appropriate metrics:
   Q5 (Gestational Age): exact bin match with adjacent-bin partial credit
   Q6 (Image Quality): exact tier match (Good/Medium/Low) with adjacency
   Q7 (Normality Assessment): exact match with binary (normal/abnormal) fallback
-  Q8 (Clinical Recommendations): BERTScore F1 (falls back to embedding sim)
+  Q8 (Clinical Recommendations): BERTScore F1
 
 All questions also get embedding cosine similarity as a secondary metric
 for backward compatibility with existing evaluation scores.
@@ -277,27 +277,14 @@ _bertscore_fn = None
 
 def _compute_bertscore_batch(
     predictions: List[str], references: List[str], model_type: str = BERTSCORE_MODEL
-) -> Optional[List[float]]:
-    """Batch compute BERTScore F1. Returns None if bert_score unavailable."""
+) -> List[float]:
+    """Batch compute BERTScore F1. Raises if bert_score is unavailable."""
     global _bertscore_fn
     if _bertscore_fn is None:
-        try:
-            from bert_score import score as bertscore
-            _bertscore_fn = bertscore
-        except ImportError:
-            logger.warning(
-                "bert-score not installed. Q8 will use embedding similarity. "
-                "Install with: pip install bert-score"
-            )
-            _bertscore_fn = False  # sentinel
-    if _bertscore_fn is False:
-        return None
-    try:
-        _, _, F1 = _bertscore_fn(predictions, references, model_type=model_type, verbose=False)
-        return [float(f) for f in F1]
-    except Exception as e:
-        logger.warning("BERTScore batch computation failed: %s", e)
-        return None
+        from bert_score import score as bertscore
+        _bertscore_fn = bertscore
+    _, _, F1 = _bertscore_fn(predictions, references, model_type=model_type, verbose=False)
+    return [float(f) for f in F1]
 
 
 # ---------------------------------------------------------------------------
@@ -658,15 +645,8 @@ class MultiMetricScorer:
             q8_preds = [scores[i].normalized_prediction for i in q8_indices]
             q8_refs = [scores[i].normalized_gt for i in q8_indices]
             bert_scores = _compute_bertscore_batch(q8_preds, q8_refs)
-
-            if bert_scores is not None:
-                for j, idx in enumerate(q8_indices):
-                    scores[idx].primary_score = bert_scores[j]
-            else:
-                # Fallback: use embedding similarity as primary
-                for idx in q8_indices:
-                    scores[idx].primary_score = scores[idx].embedding_similarity
-                    scores[idx].details["fallback"] = "embedding_similarity"
+            for j, idx in enumerate(q8_indices):
+                scores[idx].primary_score = bert_scores[j]
 
         # 5. Aggregate
         return self._aggregate_results(
