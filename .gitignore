@@ -110,3 +110,6 @@ app/android/.gradle/
 app/android/build/
 app/android/app/build/
 app/android/local.properties
+
+# RCCG credentials and connection info (private)
+rccg/

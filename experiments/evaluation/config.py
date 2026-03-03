@@ -55,3 +55,18 @@ API_SYSTEM_PROMPT = """You are a medical imaging expert analyzing fetal ultrasou
 
 MAX_NEW_TOKENS = 1024
 GENERATION_TEMPERATURE = 0.1  # Low for consistency
+
+# Ground truth annotations (sonographer, normalized)
+ANNOTATIONS_PATH = DATA_DIR / "Fetal Ultrasound Annotations Normalized.xlsx"
+
+# BERTScore model for Q8 evaluation
+BERTSCORE_MODEL = "microsoft/deberta-xlarge-mnli"
+
+# Gestational age bins (ordered for adjacency scoring)
+GA_BINS_ORDERED = [
+    "8-13 weeks", "15-20 weeks", "20-25 weeks",
+    "25-30 weeks", "30-35 weeks", "35-38 weeks",
+]
+
+# Image quality tiers (ordered for adjacency scoring)
+QUALITY_TIERS = {"good": 2, "medium": 1, "low": 0}

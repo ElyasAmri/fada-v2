@@ -25,3 +25,4 @@ from .config import (
     DEFAULT_EMBEDDING_MODEL,
 )
 from .embedding_scorer import EmbeddingScorer
+from .question_scorer import MultiMetricScorer
