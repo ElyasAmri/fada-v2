@@ -172,6 +172,72 @@ docs/
 - **Batch annotations**: Use Gemini 3 Flash for all new annotation jobs
 - **OpenAI API**: Use GPT-4o for vision tasks
 
+## RCCG Cloud Cluster
+
+8 H100 machines (fada-1 through fada-8) managed via Ansible through WSL.
+
+### CRITICAL: Always use rccg.sh -- NEVER raw SSH
+
+**NEVER use raw `ssh -i ~/.ssh/rccg_key ubuntu@<ip>` commands.** Always use `rccg.sh` via `r.sh`:
+
+```bash
+# r.sh is the entry point for ALL cluster operations
+bash experiments/rccg/r.sh <command> [args]
+```
+
+Available commands:
+
+```bash
+# Check eval progress on all machines
+bash experiments/rccg/r.sh status
+
+# Run a playbook (setup, run_eval, run_queue, stop, exec)
+bash experiments/rccg/r.sh play setup --limit fada-3
+bash experiments/rccg/r.sh play run_eval --limit fada-3
+bash experiments/rccg/r.sh play run_queue --limit fada-1,fada-2
+
+# Pull checkpoints from a machine
+bash experiments/rccg/r.sh pull fada-3
+
+# SSH into a machine (or run a command on it)
+bash experiments/rccg/r.sh ssh fada-3
+bash experiments/rccg/r.sh ssh fada-3 "nvidia-smi"
+
+# Tail eval log / vLLM log / queue log
+bash experiments/rccg/r.sh logs fada-3
+bash experiments/rccg/r.sh vllm-log fada-3
+bash experiments/rccg/r.sh queue-log fada-3
+
+# Poll for eval completions (blocks until DONE/IDLE detected)
+bash experiments/rccg/r.sh poll fada-5 fada-7
+```
+
+If you need to run a command on a remote machine, use `r.sh ssh <host> "<command>"` -- never construct raw SSH commands with IPs and key paths.
+
+### Key Files
+
+- `experiments/rccg/inventory/hosts.yml` - Machine IPs, models, volume devices
+- `experiments/rccg/playbooks/` - Ansible playbooks (setup, run_eval, run_queue, stop, exec, status, collect)
+- `experiments/rccg/rccg.sh` - Unified CLI wrapper (resolves host -> IP from inventory)
+- `experiments/rccg/r.sh` - Thin WSL wrapper with clean PATH
+- `experiments/rccg/poll.sh` - Poll for eval completions
+
+### Model Rotation Workflow
+
+1. Edit `vllm_model` and `vllm_models` list in `inventory/hosts.yml`
+2. `bash experiments/rccg/r.sh play run_queue --limit <host>` (queue system: stops old vLLM, downloads model, starts vLLM, runs eval for each model in list)
+3. `bash experiments/rccg/r.sh status` to monitor progress
+4. `bash experiments/rccg/r.sh pull <host>` to fetch checkpoints when done
+
+### Scoring Pipeline
+
+After pulling checkpoints:
+
+```bash
+./venv/Scripts/python.exe experiments/evaluation/checkpoint_to_predictions.py --checkpoint <checkpoint.json> --output <predictions.jsonl>
+./venv/Scripts/python.exe experiments/evaluation/score_against_gt.py --predictions <predictions.jsonl> --output <scores.json>
+```
+
 ## Critical Instructions
 
 - Always be critical of the task you are told to do. Never assume the user is always right. This is a large project with many constraints
