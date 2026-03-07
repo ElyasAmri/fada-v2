@@ -3,7 +3,7 @@ Multi-metric per-question scoring for VLM evaluation.
 
 Scores VLM predictions against sonographer ground truth annotations using
 question-appropriate metrics:
-  Q1 (Anatomical Structures): set F1 on canonical structure sets
+  Q1 (Anatomical Structures): synonym-expanded set F2 (recall-weighted)
   Q2 (Fetal Orientation): relaxed accuracy with presentation keyword fallback
   Q3 (Imaging Plane): relaxed accuracy with plane type keyword fallback
   Q4 (Biometric Measurements): keyword F1 on measurement types
@@ -138,8 +138,14 @@ class ScoringRecord:
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _compute_set_f1(pred_set: set, gt_set: set) -> Tuple[float, float, float]:
-    """Compute precision, recall, F1 between two sets."""
+def _compute_set_f1(
+    pred_set: set, gt_set: set, beta: float = 1.0
+) -> Tuple[float, float, float]:
+    """Compute precision, recall, F-beta between two sets.
+
+    Args:
+        beta: F-beta weight. beta=1 gives F1, beta=2 weights recall 2x.
+    """
     if not pred_set and not gt_set:
         return 1.0, 1.0, 1.0
     if not pred_set or not gt_set:
@@ -147,19 +153,74 @@ def _compute_set_f1(pred_set: set, gt_set: set) -> Tuple[float, float, float]:
     tp = len(pred_set & gt_set)
     precision = tp / len(pred_set)
     recall = tp / len(gt_set)
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-    return precision, recall, f1
+    beta2 = beta ** 2
+    fbeta = (
+        (1 + beta2) * precision * recall / (beta2 * precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
+    return precision, recall, fbeta
+
+
+# ---------------------------------------------------------------------------
+# Q1: Structure synonyms for fuzzy set matching
+# ---------------------------------------------------------------------------
+
+Q1_STRUCTURE_SYNONYMS: Dict[str, set] = {
+    "abdomen": {"abdominal wall", "abdominal area"},
+    "abdominal wall": {"abdomen", "abdominal area"},
+    "belly": {"abdomen", "abdominal wall"},
+    "head": {"fetal head", "fetal skull", "calvarium"},
+    "fetal head": {"head", "calvarium", "skull"},
+    "fetal skull": {"skull", "calvarium", "head"},
+    "skull": {"fetal skull", "calvarium"},
+    "calvarium": {"skull", "fetal skull", "calvarial bones"},
+    "calvarial bones": {"calvarium", "skull"},
+    "spine": {"vertebral column", "spinal column", "fetal spine", "vertebrae"},
+    "fetal spine": {"spine", "vertebral column"},
+    "vertebral column": {"spine", "fetal spine"},
+    "vertebrae": {"spine", "vertebral column"},
+    "brain": {"cerebrum", "intracranial structures"},
+    "intracranial structures": {"brain"},
+    "heart": {"cardiac structures", "fetal heart"},
+    "fetal heart": {"heart", "cardiac structures"},
+    "ivc": {"inferior vena cava"},
+    "inferior vena cava": {"ivc"},
+    "stomach bubble": {"stomach"},
+    "stomach": {"stomach bubble", "gastric bubble"},
+    "umbilical cord": {"umbilical"},
+    "thalami": {"thalamus"},
+    "thalamus": {"thalami"},
+    "falx": {"falx cerebri", "interhemispheric fissure"},
+    "falx cerebri": {"falx", "interhemispheric fissure"},
+    "choroid plexus": {"choroid"},
+}
+
+
+def _expand_with_synonyms(structure_set: set) -> set:
+    """Expand a set of structures with their synonyms."""
+    expanded = set(structure_set)
+    for s in structure_set:
+        if s in Q1_STRUCTURE_SYNONYMS:
+            expanded.update(Q1_STRUCTURE_SYNONYMS[s])
+    return expanded
 
 
 def _extract_presentation_keyword(text: str) -> Optional[str]:
     """Extract presentation type from orientation text."""
     tl = text.lower()
-    if "cephalic" in tl:
+    if "cephalic" in tl or "vertex" in tl or "head down" in tl or "head-down" in tl or "head first" in tl:
         return "cephalic"
+    if "frank breech" in tl or "complete breech" in tl or "footling" in tl:
+        return "breech"
+    if "feet first" in tl or "foot first" in tl:
+        return "breech"
     if "breech" in tl:
         return "breech"
     if "transverse" in tl:
         return "transverse"
+    if "oblique" in tl:
+        return "oblique"
     if "longitudinal" in tl:
         return "longitudinal"
     return None
@@ -187,10 +248,16 @@ def _extract_plane_keyword(text: str) -> Optional[str]:
         return "sagittal"
     if "coronal" in tl:
         return "coronal"
-    if "axial" in tl:
+    if "transverse" in tl or "axial" in tl or "cross-sectional" in tl or "cross sectional" in tl:
         return "axial"
     if "longitudinal" in tl:
         return "longitudinal"
+    if "lateral" in tl:
+        return "lateral"
+    if "anterior" in tl:
+        return "anterior"
+    if "posterior" in tl:
+        return "posterior"
     return None
 
 
@@ -216,6 +283,18 @@ _Q4_KEYWORDS: Dict[str, str] = {
     "nt": "NT",
     "crl": "CRL",
     "cl": "CL",
+    "inferior vena cava": "IVC",
+    "ivc": "IVC",
+    "frontomaxillary facial angle": "FMF",
+    "frontomaxillary": "FMF",
+    "fmf angle": "FMF",
+    "intracranial translucency": "IT",
+    "occipitofrontal diameter": "OFD",
+    "occipitofrontal": "OFD",
+    "ofd": "OFD",
+    "transcerebellar diameter": "TCD",
+    "tcd": "TCD",
+    "aortic diameter": "AORTIC",
 }
 
 # Pre-sorted by key length descending to match longest first
@@ -298,7 +377,7 @@ class _QuestionScorers:
         self.normalizer = normalizer
 
     def score_q1_structures(self, pred: str, gt: str) -> QuestionScore:
-        """Q1: Set F1 on anatomical structures."""
+        """Q1: Synonym-expanded set F2 (recall-weighted) on anatomical structures."""
         col = QUESTION_COLUMNS[0]
         norm_pred = self.normalizer.normalize_single(col, pred)
         norm_gt = gt  # Already normalized in the Excel
@@ -306,13 +385,31 @@ class _QuestionScorers:
         pred_set = {s.strip().lower() for s in norm_pred.split(",") if s.strip()}
         gt_set = {s.strip().lower() for s in norm_gt.split(",") if s.strip()}
 
-        precision, recall, f1 = _compute_set_f1(pred_set, gt_set)
+        # Expand both sets with synonyms for matching
+        pred_expanded = _expand_with_synonyms(pred_set)
+        gt_expanded = _expand_with_synonyms(gt_set)
+
+        # Count matches: a pred item matches if it or any synonym is in gt_expanded
+        tp_pred = sum(1 for s in pred_set if s in gt_expanded)
+        tp_gt = sum(1 for s in gt_set if s in pred_expanded)
+
+        precision = tp_pred / len(pred_set) if pred_set else 0.0
+        recall = tp_gt / len(gt_set) if gt_set else 0.0
+
+        # F-beta with beta=2 (recall-weighted)
+        beta = 2.0
+        beta2 = beta ** 2
+        f2 = (
+            (1 + beta2) * precision * recall / (beta2 * precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
 
         return QuestionScore(
             question_index=0,
             question_name=QUESTION_SHORT_NAMES[0],
-            primary_metric_name="set_f1",
-            primary_score=f1,
+            primary_metric_name="set_f2_synonym",
+            primary_score=f2,
             embedding_similarity=0.0,
             normalized_prediction=norm_pred,
             normalized_gt=norm_gt,

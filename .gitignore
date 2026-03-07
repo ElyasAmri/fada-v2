@@ -113,3 +113,4 @@ app/android/local.properties
 
 # RCCG credentials and connection info (private)
 rccg/
+huggingface

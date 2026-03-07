@@ -108,6 +108,11 @@ SPELLING_CORRECTIONS: Dict[str, str] = {
     "amnoitic": "amniotic",           # ~59 Q1
     "gentalia": "genitalia",          # ~107 Q1
     "genatalia": "genitalia",         # Q1 variant
+    # Q3-specific misspellings (sagittal variants)
+    "sagital": "sagittal",             # ~200 Q3
+    "saggital": "sagittal",            # ~50 Q3
+    "dagital": "sagittal",             # ~30 Q3 (typo, d near s on keyboard)
+    "midsagital": "midsagittal",       # ~15 Q3
 }
 
 # Pre-compile spelling regex patterns (word-boundary, case-insensitive)
@@ -1007,6 +1012,16 @@ Q1_STRUCTURE_SYNONYMS: Dict[str, str] = {
     "external os": "external os",
     "cervix": "cervix",
 
+    # --- Abbreviations ---
+    "ac": "abdominal circumference",
+    "bpd": "biparietal diameter",
+    "hc": "head circumference",
+    "crl": "crown-rump length",
+    "nt": "nuchal translucency",
+    "it": "intracranial translucency",
+    "ivc": "inferior vena cava",
+    "fmf": "frontomaxillary facial angle",
+
     # --- General ---
     "amniotic fluid": "amniotic fluid",
     "amniotic membrane": "amnion",
@@ -1089,17 +1104,17 @@ CANONICAL_MAPPINGS: Dict[str, Dict[str, str]] = {
 # Q5 regex patterns for gestational age normalization
 # Pattern 1: specific GA like "12w+4d", "12w +4d", "13w"
 _Q5_SPECIFIC_GA_PATTERN = re.compile(
-    r"^(\d{1,2})\s*w\s*(?:\+\s*(\d{1,2})\s*d)?$", re.IGNORECASE
+    r"(\d{1,2})\s*w\s*(?:\+\s*(\d{1,2})\s*d)?", re.IGNORECASE
 )
 # Pattern 2: range like "20-25 weeks", "20 -25 weeks", "20- 25 weeks",
 #             "20-25weeks", "20-25 w", "20-25", "20-25 weeksl", "20-25 weeeks"
 _Q5_RANGE_PATTERN = re.compile(
-    r"^\.?\s*(\d{1,2})\s*-\s*(\d{1,2})\s*(?:weeks?|weeeks?|weeksl?|w)?\s*$",
+    r"(\d{1,2})\s*-\s*(\d{1,2})\s*(?:weeks?|weeeks?|weeksl?|w)?",
     re.IGNORECASE,
 )
 # Pattern 3: single week like "14 weeks", "13 week", "12 w"
 _Q5_SINGLE_WEEK_PATTERN = re.compile(
-    r"^(\d{1,2})\s*(?:weeks?|w)\s*$", re.IGNORECASE
+    r"(\d{1,2})\s*(?:weeks?|w)", re.IGNORECASE
 )
 
 
@@ -1130,30 +1145,22 @@ def _normalize_q5_regex(text: str) -> Optional[str]:
     """
     clean = text.strip()
 
-    # Try specific GA (e.g., "12w+4d")
-    m = _Q5_SPECIFIC_GA_PATTERN.match(clean)
+    # Try specific GA (e.g., "12w+4d") -- search anywhere in text
+    m = _Q5_SPECIFIC_GA_PATTERN.search(clean)
     if m:
         return _weeks_to_bin(int(m.group(1)))
 
-    # Try range (e.g., "20-25 weeks")
-    m = _Q5_RANGE_PATTERN.match(clean)
+    # Try range (e.g., "20-25 weeks") -- search anywhere in text
+    m = _Q5_RANGE_PATTERN.search(clean)
     if m:
         low, high = int(m.group(1)), int(m.group(2))
         midpoint = (low + high) / 2
         return _weeks_to_bin(int(midpoint))
 
-    # Try single week (e.g., "14 weeks")
-    m = _Q5_SINGLE_WEEK_PATTERN.match(clean)
+    # Try single week (e.g., "14 weeks") -- search anywhere in text
+    m = _Q5_SINGLE_WEEK_PATTERN.search(clean)
     if m:
         return _weeks_to_bin(int(m.group(1)))
-
-    # Try extracting a leading range from text with trailing description
-    # e.g., "25-30 weeks cerebellum is fully developed"
-    m = re.match(r"^\.?\s*(\d{1,2})\s*-\s*(\d{1,2})\s*(?:weeks?|w)\b", clean, re.IGNORECASE)
-    if m:
-        low, high = int(m.group(1)), int(m.group(2))
-        midpoint = (low + high) / 2
-        return _weeks_to_bin(int(midpoint))
 
     return None
 
