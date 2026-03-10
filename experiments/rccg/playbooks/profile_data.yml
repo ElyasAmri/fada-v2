@@ -1,0 +1,56 @@
+---
+- name: Profile training data sequence lengths
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Write profiling script
+      copy:
+        dest: /tmp/profile_seqlen.py
+        content: |
+          import json, os, sys, time
+          from pathlib import Path
+          from PIL import Image
+
+          os.environ["HF_HOME"] = "/mnt/models/huggingface"
+          sys.path.insert(0, "/home/ubuntu/fada-v3")
+
+          from transformers import AutoProcessor
+          proc = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct")
+
+          data_root = Path("/home/ubuntu/fada-v3/data/Fetal Ultrasound")
+          samples = []
+          with open("/home/ubuntu/fada-v3/data/vlm_training/gt_train.jsonl") as f:
+              for i, line in enumerate(f):
+                  if i >= 50:
+                      break
+                  samples.append(json.loads(line))
+
+          lengths = []
+          for s in samples:
+              imgs = []
+              for p in s.get("images", []):
+                  full = data_root / p
+                  imgs.append(Image.open(str(full)).convert("RGB"))
+              text = proc.apply_chat_template(s["messages"], tokenize=False, add_generation_prompt=False)
+              out = proc(text=text, images=imgs if imgs else None, return_tensors="pt")
+              seq_len = out["input_ids"].shape[1]
+              lengths.append(seq_len)
+
+          import statistics
+          print(f"Samples: {len(lengths)}")
+          print(f"Min: {min(lengths)}, Max: {max(lengths)}, Mean: {statistics.mean(lengths):.0f}, Median: {statistics.median(lengths):.0f}")
+          print(f"P95: {sorted(lengths)[int(0.95*len(lengths))]}")
+          print(f"Padding waste at 4096: {(4096 - statistics.mean(lengths))/4096*100:.1f}%")
+
+    - name: Run profiler
+      shell: |
+        export HF_HOME=/mnt/models/huggingface
+        eval "$(/home/ubuntu/miniconda3/bin/conda shell.bash hook)"
+        conda activate ft-unsloth
+        python /tmp/profile_seqlen.py 2>&1
+      register: profile
+      timeout: 300
+
+    - name: Show result
+      debug:
+        msg: "{{ profile.stdout }}"

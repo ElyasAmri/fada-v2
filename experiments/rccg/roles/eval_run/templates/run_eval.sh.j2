@@ -1,0 +1,34 @@
+#!/bin/bash
+# Auto-generated eval script for {{ inventory_hostname }}
+# Model: {{ vllm_model }}
+cd {{ project_dir }}
+mkdir -p {{ results_dir }}
+
+CHECKPOINT="{{ results_dir }}/checkpoint_vllm_{{ vllm_model | replace('/', '_') }}.json"
+DONE_MARKER="{{ results_dir }}/eval_done.marker"
+RESUME_FLAG=""
+if [ -f "$CHECKPOINT" ]; then
+  echo "Resuming from checkpoint: $CHECKPOINT"
+  RESUME_FLAG="--resume $(basename $CHECKPOINT)"
+fi
+
+# Remove old done marker
+rm -f "$DONE_MARKER"
+
+# Run eval (foreground within this script, but script itself is nohup'd)
+{{ project_dir }}/venv/bin/python experiments/api_models/test_api_vlm.py \
+  --models vllm \
+  --vllm-model {{ vllm_model }} \
+  --vllm-url http://localhost:{{ vllm_port }} \
+  --split {{ split }} \
+  --output-dir {{ results_dir }} \
+  --max-rpm {{ max_rpm }} \
+  --max-concurrent {{ max_concurrent }} \
+  $RESUME_FLAG \
+  > {{ eval_log }} 2>&1
+
+# Write done marker with exit code and timestamp
+echo "exit_code=$?" > "$DONE_MARKER"
+echo "model={{ vllm_model }}" >> "$DONE_MARKER"
+echo "host={{ inventory_hostname }}" >> "$DONE_MARKER"
+echo "finished=$(date -Iseconds)" >> "$DONE_MARKER"

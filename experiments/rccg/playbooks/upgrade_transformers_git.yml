@@ -1,0 +1,9 @@
+---
+- name: Upgrade transformers from source
+  hosts: rccg
+  tasks:
+    - name: Install transformers from git
+      pip:
+        name: git+https://github.com/huggingface/transformers.git
+        state: forcereinstall
+        virtualenv: /home/ubuntu/fada-v3/venv

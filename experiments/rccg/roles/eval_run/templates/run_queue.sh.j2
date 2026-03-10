@@ -1,0 +1,130 @@
+#!/bin/bash
+# Auto-generated model queue script for {{ inventory_hostname }}
+# Runs each model in sequence: start vLLM -> eval -> kill vLLM -> next
+set -uo pipefail
+
+MODELS=({{ vllm_models | join(' ') }})
+PROJECT_DIR="{{ project_dir }}"
+RESULTS_DIR="{{ results_dir }}"
+VLLM_LOG="{{ vllm_log }}"
+VLLM_PORT="{{ vllm_port }}"
+VLLM_MAX_MODEL_LEN="{{ vllm_max_model_len }}"
+VLLM_GPU_UTIL="{{ vllm_gpu_util }}"
+QUEUE_LOG="${RESULTS_DIR}/queue.log"
+
+{% if volume_device is defined %}
+export HF_HOME={{ volume_mount }}/huggingface
+{% endif %}
+{% if hf_token is defined %}
+export HF_TOKEN={{ hf_token }}
+{% endif %}
+{% if vllm_attention_backend is defined %}
+export VLLM_ATTENTION_BACKEND={{ vllm_attention_backend }}
+{% endif %}
+{% if cuda_home is defined %}
+export CUDA_HOME={{ cuda_home }}
+export PATH=${CUDA_HOME}/bin:${PATH}
+{% endif %}
+
+{% raw %}
+log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$QUEUE_LOG"; }
+
+start_vllm() {
+  local model="$1"
+  log "Starting vLLM with $model"
+  pkill -f "vllm.entrypoints.openai.api_server" 2>/dev/null || true
+  sleep 5
+  nohup ${PROJECT_DIR}/venv/bin/python -m vllm.entrypoints.openai.api_server \
+    --model "$model" \
+    --host 0.0.0.0 \
+    --port "$VLLM_PORT" \
+    --trust-remote-code \
+    --max-model-len "$VLLM_MAX_MODEL_LEN" \
+    --gpu-memory-utilization "$VLLM_GPU_UTIL" \
+{%- endraw %}
+{%- if vllm_enforce_eager | default(false) %}
+    --enforce-eager \
+{%- endif %}
+{%- raw %}
+    > "$VLLM_LOG" 2>&1 &
+  # Wait for health (up to 10 min)
+  for i in $(seq 1 60); do
+    if ! pgrep -f "vllm.entrypoints.openai.api_server" > /dev/null 2>&1; then
+      log "FATAL: vLLM died for $model"
+      return 1
+    fi
+    STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:${VLLM_PORT}/health 2>/dev/null || echo "000")
+    if [ "$STATUS" = "200" ]; then
+      log "vLLM READY for $model after ${i}0s"
+      return 0
+    fi
+    sleep 10
+  done
+  log "TIMEOUT: vLLM failed to start for $model"
+  return 1
+}
+
+run_eval() {
+  local model="$1"
+  local safe_name="${model//\//_}"
+  local checkpoint="${RESULTS_DIR}/checkpoint_vllm_${safe_name}.json"
+  local done_marker="${RESULTS_DIR}/eval_done.marker"
+  local resume_flag=""
+
+  if [ -f "$checkpoint" ]; then
+    # Check if checkpoint is complete (1894 images)
+    local count=$(${PROJECT_DIR}/venv/bin/python -c "import json; d=json.load(open('$checkpoint')); print(len(d.get('results',{})))" 2>/dev/null || echo "0")
+    if [ "$count" -ge 1894 ]; then
+      log "SKIP: $model already complete ($count images in checkpoint)"
+      return 0
+    fi
+    log "Resuming from checkpoint for $model ($count images done)"
+    resume_flag="--resume $(basename $checkpoint)"
+  fi
+
+  rm -f "$done_marker"
+
+  log "Starting eval for $model"
+{% endraw %}
+  ${PROJECT_DIR}/venv/bin/python experiments/api_models/test_api_vlm.py \
+    --models vllm \
+    --vllm-model "$model" \
+    --vllm-url "http://localhost:${VLLM_PORT}" \
+    --split {{ split }} \
+    --output-dir "$RESULTS_DIR" \
+    --max-rpm {{ max_rpm }} \
+    --max-concurrent {{ max_concurrent }} \
+    $resume_flag \
+    > {{ eval_log }} 2>&1
+  local rc=$?
+{% raw %}
+
+  echo "exit_code=$rc" > "$done_marker"
+  echo "model=$model" >> "$done_marker"
+{% endraw %}
+  echo "host={{ inventory_hostname }}" >> "$done_marker"
+{% raw %}
+  echo "finished=$(date -Iseconds)" >> "$done_marker"
+
+  if [ $rc -eq 0 ]; then
+    log "DONE: $model (success)"
+  else
+    log "DONE: $model (exit_code=$rc)"
+  fi
+  return $rc
+}
+
+cd "$PROJECT_DIR"
+mkdir -p "$RESULTS_DIR"
+
+log "=== Queue started: ${#MODELS[@]} models ==="
+for model in "${MODELS[@]}"; do
+  log "--- Processing: $model ---"
+  if start_vllm "$model"; then
+    run_eval "$model"
+  else
+    log "SKIPPED: $model (vLLM failed to start)"
+  fi
+done
+log "=== Queue complete ==="
+{% endraw %}

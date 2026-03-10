@@ -76,7 +76,7 @@ source venv/Scripts/activate  # Git Bash
 ./venv/Scripts/activate       # PowerShell
 
 # Run conversion script
-python scripts/export_model_tflite.py
+python app/android/export_model_tflite.py
 
 # This creates: app/android/app/src/main/assets/fada_classifier.tflite
 ```
@@ -85,13 +85,13 @@ python scripts/export_model_tflite.py
 
 ```bash
 # Custom checkpoint path
-python scripts/export_model_tflite.py --checkpoint path/to/model.pth
+python app/android/export_model_tflite.py --checkpoint path/to/model.pth
 
 # Different quantization (none, float16, int8)
-python scripts/export_model_tflite.py --quantize int8
+python app/android/export_model_tflite.py --quantize int8
 
 # Skip validation
-python scripts/export_model_tflite.py --skip-validation
+python app/android/export_model_tflite.py --skip-validation
 ```
 
 ### Requirements for Conversion
@@ -127,20 +127,20 @@ cd app/android
 
 The model classifies ultrasound images into these categories:
 
-| Index | Class Name | Display Name |
-|-------|------------|--------------|
-| 0 | Abodomen | Abdomen |
-| 1 | Aorta | Aortic Arch |
-| 2 | Cervical | Cervical View |
-| 3 | Cervix | Cervix |
-| 4 | Femur | Femur |
-| 5 | Non_standard_NT | Non-standard NT |
-| 6 | Public_Symphysis_fetal_head | Fetal Head Position |
-| 7 | Standard_NT | Standard NT |
-| 8 | Thorax | Thorax |
-| 9 | Trans-cerebellum | Transcerebellar Plane |
-| 10 | Trans-thalamic | Transthalamic Plane |
-| 11 | Trans-ventricular | Transventricular Plane |
+| Index | Class Name                  | Display Name           |
+| ----- | --------------------------- | ---------------------- |
+| 0     | Abodomen                    | Abdomen                |
+| 1     | Aorta                       | Aortic Arch            |
+| 2     | Cervical                    | Cervical View          |
+| 3     | Cervix                      | Cervix                 |
+| 4     | Femur                       | Femur                  |
+| 5     | Non_standard_NT             | Non-standard NT        |
+| 6     | Public_Symphysis_fetal_head | Fetal Head Position    |
+| 7     | Standard_NT                 | Standard NT            |
+| 8     | Thorax                      | Thorax                 |
+| 9     | Trans-cerebellum            | Transcerebellar Plane  |
+| 10    | Trans-thalamic              | Transthalamic Plane    |
+| 11    | Trans-ventricular           | Transventricular Plane |
 
 ## Technical Details
 

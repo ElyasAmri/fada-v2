@@ -1,0 +1,10 @@
+---
+- name: Install additional pip dependencies
+  hosts: rccg
+  tasks:
+    - name: Install packages via pip
+      pip:
+        name:
+          - soundfile
+          - timm
+        virtualenv: /home/ubuntu/fada-v3/venv

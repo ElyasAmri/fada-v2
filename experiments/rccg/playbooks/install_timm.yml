@@ -1,0 +1,8 @@
+---
+- name: Install timm library
+  hosts: rccg
+  tasks:
+    - name: Install timm via pip
+      pip:
+        name: timm
+        virtualenv: /home/ubuntu/fada-v3/venv

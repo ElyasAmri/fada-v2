@@ -1,0 +1,22 @@
+---
+- name: Check training crash
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Check for crash details
+      shell: |
+        echo "=== Last 5 lines of log (raw) ==="
+        tail -5 /home/ubuntu/training_full.log 2>/dev/null | cat -v
+        echo "=== OOM killer check ==="
+        dmesg 2>/dev/null | grep -i "oom\|killed" | tail -5 || echo "No OOM"
+        echo "=== GPU status ==="
+        nvidia-smi 2>/dev/null | head -20
+        echo "=== qwen2.5-vl-7b_unsloth dir ==="
+        ls -la /mnt/models/fc-runs/qwen2.5-vl-7b_unsloth/ 2>/dev/null || echo "Empty or missing"
+        echo "=== llamafactory manifest ==="
+        cat /mnt/models/fc-runs/qwen2.5-vl-7b_llamafactory/run_manifest.json 2>/dev/null | head -20
+      register: crash
+
+    - name: Show
+      debug:
+        msg: "{{ crash.stdout }}"

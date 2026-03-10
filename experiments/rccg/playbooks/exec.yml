@@ -1,0 +1,23 @@
+---
+# Run arbitrary command on all RCCG machines
+# Usage: ansible-playbook playbooks/exec.yml -e "cmd='nvidia-smi'"
+- name: Execute command on all RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    - name: Validate command provided
+      fail:
+        msg: "Please provide a command: ansible-playbook playbooks/exec.yml -e \"cmd='your command'\""
+      when: cmd is not defined
+
+    - name: Run command
+      shell: "{{ cmd }}"
+      register: result
+      changed_when: false
+
+    - name: Display output
+      debug:
+        msg: |
+          === {{ inventory_hostname }} ===
+          {{ result.stdout }}

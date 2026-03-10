@@ -1,0 +1,33 @@
+---
+- name: Restart training queue with FA2
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Check current state
+      shell: |
+        echo "=== Running processes ==="
+        pgrep -af "run_queue\|train_unsloth\|train_llama" 2>/dev/null || echo "No training processes"
+        echo "=== Existing runs ==="
+        ls -la /mnt/models/fc-runs/ 2>/dev/null || echo "No fc-runs dir"
+        echo "=== Disk space ==="
+        df -h / /mnt/models
+      register: state
+
+    - name: Show state
+      debug:
+        msg: "{{ state.stdout }}"
+
+    - name: Launch training queue
+      shell: |
+        cd /home/ubuntu/fada-v3
+        # Clean up any previous test run artifacts
+        rm -rf /mnt/models/fc-runs/qwen2.5-vl-7b_unsloth /mnt/models/fc-runs/runs.jsonl
+        nohup /usr/bin/bash /home/ubuntu/run_training.sh > /home/ubuntu/training_full.log 2>&1 &
+        echo "PID: $!"
+        sleep 2
+        head -10 /home/ubuntu/training_full.log 2>/dev/null || echo "Log not yet written"
+      register: launch
+
+    - name: Show launch
+      debug:
+        msg: "{{ launch.stdout }}"

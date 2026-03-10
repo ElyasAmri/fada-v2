@@ -90,7 +90,7 @@ ORGAN_INFO: Dict[str, str] = {
 }
 
 # Confidence thresholds for quality assessment
-# See config/models.yaml for detailed documentation
+# See docs/experiments/models.yaml for detailed documentation
 CONFIDENCE_THRESHOLDS = {
     'high': 0.85,
     'good': 0.70,

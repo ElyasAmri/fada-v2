@@ -1,0 +1,110 @@
+---
+- name: Deploy FADA process monitor
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    - name: Validate target host
+      assert:
+        that: inventory_hostname == 'fada-1'
+        fail_msg: "Monitor only deploys to fada-1. Use: --limit fada-1"
+
+    - name: Create monitor directory
+      file:
+        path: /home/ubuntu/monitor
+        state: directory
+        owner: ubuntu
+
+    - name: Create /etc/fada-monitor config directory
+      file:
+        path: /etc/fada-monitor
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      become: yes
+
+    - name: Generate random API token and write env file (idempotent)
+      shell: |
+        if [ ! -f /etc/fada-monitor/env ]; then
+          TOKEN=$(openssl rand -hex 32)
+          echo "MONITOR_API_TOKEN=$TOKEN" > /etc/fada-monitor/env
+          chmod 600 /etc/fada-monitor/env
+          chown root:root /etc/fada-monitor/env
+          echo "$TOKEN"
+        else
+          grep '^MONITOR_API_TOKEN=' /etc/fada-monitor/env | cut -d= -f2-
+        fi
+      become: yes
+      register: api_token_result
+      changed_when: false
+
+    - name: Save API token locally for hook scripts
+      local_action:
+        module: copy
+        content: "{{ api_token_result.stdout }}"
+        dest: "{{ playbook_dir }}/../../../.claude/hooks/.monitor_token"
+        mode: "0600"
+      become: no
+
+    - name: Copy monitor files
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: ubuntu
+        mode: "{{ item.mode | default('0644') }}"
+      loop:
+        - { src: "../fada-monitor/monitor.py", dest: "/home/ubuntu/monitor/monitor.py", mode: "0755" }
+        - { src: "../fada-monitor/monitor_config.json", dest: "/home/ubuntu/monitor/monitor_config.json" }
+
+    - name: Install flask in ft-unsloth env
+      shell: /home/ubuntu/miniconda3/envs/ft-unsloth/bin/pip install flask
+      register: pip_result
+      changed_when: "'already satisfied' not in pip_result.stdout"
+
+    - name: Configure logrotate for monitor log
+      copy:
+        dest: /etc/logrotate.d/fada-monitor
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          /home/ubuntu/monitor/monitor.log {
+              daily
+              rotate 7
+              compress
+              delaycompress
+              missingok
+              notifempty
+              copytruncate
+          }
+      become: yes
+
+    - name: Copy systemd unit
+      copy:
+        src: "../fada-monitor/fada-monitor.service"
+        dest: /etc/systemd/system/fada-monitor.service
+      become: yes
+
+    - name: Reload systemd and start monitor
+      systemd:
+        name: fada-monitor
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+      become: yes
+
+    - name: Wait for server to start
+      uri:
+        url: "http://localhost:9731/health"
+        headers:
+          Authorization: "Bearer {{ api_token_result.stdout }}"
+        return_content: yes
+      register: health
+      retries: 5
+      delay: 2
+      until: health.status == 200
+
+    - name: Show health check
+      debug:
+        msg: "{{ health.json }}"

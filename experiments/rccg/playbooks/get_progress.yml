@@ -1,0 +1,23 @@
+---
+- name: Get training progress
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get progress
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Log size ==="
+        wc -c /home/ubuntu/training_full.log
+        echo "=== tqdm progress (last carriage return line) ==="
+        tail -c 5000 /home/ubuntu/training_full.log | tr '\r' '\n' | grep -E 'it/s|s/it' | tail -3
+        echo "=== Queue status ==="
+        tail -c 5000 /home/ubuntu/training_full.log | tr '\r' '\n' | grep -E 'Completed:|Training complete|Training:' | tail -5
+        echo "=== Process check ==="
+        ps aux | grep run_queue | grep -v grep | head -3
+        ps aux | grep train_unsloth | grep -v grep | head -3
+      register: progress
+
+    - name: Show
+      debug:
+        msg: "{{ progress.stdout }}"

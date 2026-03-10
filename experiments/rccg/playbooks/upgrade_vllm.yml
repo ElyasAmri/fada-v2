@@ -1,0 +1,9 @@
+---
+- name: Upgrade vLLM
+  hosts: rccg
+  tasks:
+    - name: Upgrade vllm package
+      pip:
+        name: vllm
+        state: latest
+        virtualenv: /home/ubuntu/fada-v3/venv

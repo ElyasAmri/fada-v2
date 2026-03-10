@@ -1,0 +1,61 @@
+---
+- name: Kill all training and restart clean
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Kill queue and training processes
+      shell: |
+        # Kill run_queue.py processes by PID (not pkill which kills ansible)
+        for pid in $(ps aux | grep 'run_queue.py' | grep -v grep | awk '{print $2}'); do
+          kill -9 $pid 2>/dev/null || true
+        done
+        sleep 2
+        # Kill any GPU processes
+        for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null); do
+          kill -9 $pid 2>/dev/null || true
+        done
+        sleep 3
+        echo "=== GPU ==="
+        nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader 2>/dev/null || echo "GPU clear"
+        echo "=== Queue processes ==="
+        ps aux | grep run_queue | grep -v grep || echo "none"
+      register: kill_result
+      ignore_errors: true
+
+    - name: Show kill result
+      debug:
+        msg: "{{ kill_result.stdout | default('kill step failed') }}"
+
+    - name: Push updated files
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      loop:
+        - src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/config.json
+          dest: /home/ubuntu/fada-v3/experiments/framework_comparison/config.json
+        - src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/wrappers/train_unsloth.py
+          dest: /home/ubuntu/fada-v3/experiments/framework_comparison/wrappers/train_unsloth.py
+
+    - name: Clean runs and launch
+      shell: |
+        rm -rf /mnt/models/fc-runs/*
+        nohup /home/ubuntu/launch_fc.sh > /home/ubuntu/training_full.log 2>&1 &
+        echo "PID: $!"
+
+    - name: Wait for first steps
+      pause:
+        seconds: 420
+
+    - name: Check progress
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Queue count ==="
+        ps aux | grep run_queue | grep -v grep | wc -l
+        echo "=== Progress ==="
+        tail -c 5000 /home/ubuntu/training_full.log | tr '\r' '\n' | grep -E 'it/s|s/it|Training complete|Training:|Completed:' | tail -10
+      register: status
+
+    - name: Show
+      debug:
+        msg: "{{ status.stdout }}"

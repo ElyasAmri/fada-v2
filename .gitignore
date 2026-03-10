@@ -75,9 +75,6 @@ models/
 outputs/
 experiments/fine_tuning/runs/
 
-# Sisyphus internal state
-.sisyphus/
-
 # Accidental files
 3.5.1
 
@@ -112,5 +109,11 @@ app/android/app/build/
 app/android/local.properties
 
 # RCCG credentials and connection info (private)
-rccg/
 huggingface
+
+# Monitor/tunnel secret tokens
+.tunnel_token
+.monitor_token
+
+# Deleted webhook data directory
+webhooks/

@@ -1,0 +1,37 @@
+---
+- name: Install CUDA 12.8 toolkit
+  hosts: rccg
+  become: true
+  tasks:
+    - name: Check if CUDA 12.8 already installed
+      stat:
+        path: /usr/local/cuda-12.8/bin/nvcc
+      register: cuda_check
+
+    - name: Skip if already installed
+      debug:
+        msg: "{{ inventory_hostname }}: CUDA 12.8 already installed"
+      when: cuda_check.stat.exists
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 300
+      when: not cuda_check.stat.exists
+
+    - name: Install cuda-toolkit-12-8
+      apt:
+        name: cuda-toolkit-12-8
+        state: present
+      async: 1800
+      poll: 30
+      when: not cuda_check.stat.exists
+
+    - name: Verify installation
+      command: /usr/local/cuda-12.8/bin/nvcc --version
+      register: nvcc_out
+      changed_when: false
+
+    - name: Show nvcc version
+      debug:
+        msg: "{{ inventory_hostname }}: {{ nvcc_out.stdout_lines[-1] }}"

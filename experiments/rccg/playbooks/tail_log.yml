@@ -1,0 +1,16 @@
+---
+- name: Tail training log
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get recent log
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Last 20 lines ==="
+        tail -c 3000 /home/ubuntu/training_full.log 2>/dev/null | tr '\r' '\n' | grep -v '^$' | tail -20
+      register: log
+
+    - name: Show
+      debug:
+        msg: "{{ log.stdout }}"

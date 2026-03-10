@@ -1,0 +1,70 @@
+---
+- name: Collect results from all RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  vars:
+    local_results_dir: "../results/collected"
+    checkpoint_name: "checkpoint_vllm_{{ vllm_model | replace('/', '_') }}.json"
+
+  tasks:
+    - name: Create local results directory
+      local_action:
+        module: file
+        path: "{{ local_results_dir }}"
+        state: directory
+      run_once: yes
+
+    - name: Check if checkpoint exists
+      stat:
+        path: "{{ results_dir }}/{{ checkpoint_name }}"
+      register: cp_check
+
+    - name: Get checkpoint image count
+      shell: |
+        python3 -c "import json; d=json.load(open('{{ results_dir }}/{{ checkpoint_name }}')); print(len(d.get('completed_images',{})))"
+      register: cp_count
+      when: cp_check.stat.exists
+      changed_when: false
+
+    - name: Display checkpoint info
+      debug:
+        msg: "{{ inventory_hostname }} ({{ vllm_model }}): {{ cp_count.stdout | default('0') }}/{{ total_test_images }} images"
+
+    - name: Fetch checkpoint file
+      fetch:
+        src: "{{ results_dir }}/{{ checkpoint_name }}"
+        dest: "{{ local_results_dir }}/{{ inventory_hostname }}_{{ checkpoint_name }}"
+        flat: yes
+      when: cp_check.stat.exists
+
+    - name: Find latest results JSON
+      shell: ls -t {{ results_dir }}/vlm_results_*.json 2>/dev/null | head -1
+      register: latest_results
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch results file
+      fetch:
+        src: "{{ latest_results.stdout }}"
+        dest: "{{ local_results_dir }}/{{ inventory_hostname }}_results.json"
+        flat: yes
+      when: latest_results.stdout | length > 0
+
+    - name: Find latest log
+      shell: ls -t {{ results_dir }}/vlm_test_*.log 2>/dev/null | head -1
+      register: latest_log
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch log file
+      fetch:
+        src: "{{ latest_log.stdout }}"
+        dest: "{{ local_results_dir }}/{{ inventory_hostname }}_eval.log"
+        flat: yes
+      when: latest_log.stdout | length > 0
+
+    - name: Summary
+      debug:
+        msg: "All results collected to {{ local_results_dir }}/"
+      run_once: yes

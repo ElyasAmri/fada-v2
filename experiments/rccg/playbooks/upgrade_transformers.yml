@@ -1,0 +1,9 @@
+---
+- name: Upgrade transformers
+  hosts: rccg
+  tasks:
+    - name: Upgrade transformers package
+      pip:
+        name: transformers
+        state: latest
+        virtualenv: /home/ubuntu/fada-v3/venv

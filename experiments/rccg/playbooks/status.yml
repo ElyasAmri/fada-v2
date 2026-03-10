@@ -1,0 +1,66 @@
+---
+- name: Check status of all RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  vars:
+    checkpoint_name: "checkpoint_vllm_{{ vllm_model | replace('/', '_') }}.json"
+
+  tasks:
+    - name: Check vLLM health
+      uri:
+        url: "http://localhost:{{ vllm_port }}/health"
+        method: GET
+      register: vllm_health
+      failed_when: false
+      changed_when: false
+
+    - name: Check which model is served
+      uri:
+        url: "http://localhost:{{ vllm_port }}/v1/models"
+        method: GET
+      register: vllm_models
+      failed_when: false
+      changed_when: false
+
+    - name: Check eval process
+      shell: pgrep -f "[t]est_api_vlm.py" || true
+      register: eval_proc
+      changed_when: false
+
+    - name: Get GPU utilization
+      shell: nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader
+      register: gpu_util
+      changed_when: false
+
+    - name: Get eval log tail
+      shell: tail -1 {{ eval_log }} 2>/dev/null || echo "No log"
+      register: eval_progress
+      changed_when: false
+
+    - name: Check disk space
+      shell: df -h / | tail -1 | awk '{print $4 " free (" $5 " used)"}'
+      register: disk
+      changed_when: false
+
+    - name: Check checkpoint progress
+      shell: |
+        if [ -f "{{ results_dir }}/{{ checkpoint_name }}" ]; then
+          python3 -c "import json; d=json.load(open('{{ results_dir }}/{{ checkpoint_name }}')); print(len(d.get('completed_images',{})))"
+        else
+          echo "0"
+        fi
+      register: checkpoint_count
+      changed_when: false
+
+    - name: Display status
+      debug:
+        msg: |
+          === {{ inventory_hostname }} ({{ ansible_host }}) ===
+          Model:      {{ vllm_model }}
+          vLLM:       {{ 'HEALTHY' if (vllm_health.status | default(0)) == 200 else 'DOWN' }}
+          Eval:       {{ 'RUNNING' if eval_proc.stdout | length > 0 else 'STOPPED' }}
+          GPU:        {{ gpu_util.stdout }}
+          Progress:   {{ checkpoint_count.stdout }}/{{ total_test_images }} images
+          Disk:       {{ disk.stdout }}
+          Log:        {{ eval_progress.stdout[-120:] if eval_progress.stdout | length > 120 else eval_progress.stdout }}

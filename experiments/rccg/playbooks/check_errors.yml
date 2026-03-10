@@ -1,0 +1,26 @@
+---
+- name: Check detailed errors per run
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get Unsloth run errors
+      shell: |
+        echo "=== Unsloth run errors ==="
+        for model in qwen2.5-vl-7b qwen3-vl-8b qwen3.5-9b mistral-small-3.2-24b phi-4-multimodal; do
+          echo "--- ${model}_unsloth ---"
+          cat /mnt/models/fc-runs/${model}_unsloth/run_manifest.json 2>/dev/null | python3 -c "
+        import sys,json
+        try:
+          m=json.load(sys.stdin)
+          print(f\"status: {m.get('status')}\")
+          print(f\"error: {m.get('error','')[:200]}\")
+        except: print('no manifest')
+        "
+        done
+        echo "=== Full log error summary ==="
+        grep "Training: FAILED\|Training: complete\|CUDA out of memory\|No config file\|tensor size" /home/ubuntu/training_full.log | head -20
+      register: errors
+
+    - name: Show
+      debug:
+        msg: "{{ errors.stdout }}"

@@ -1,0 +1,71 @@
+---
+- name: Launch evaluation across RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  vars:
+    checkpoint_name: "checkpoint_vllm_{{ vllm_model | replace('/', '_') }}.json"
+
+  tasks:
+    - name: Check if eval is already running
+      shell: pgrep -f "[t]est_api_vlm.py" || true
+      register: eval_check
+      changed_when: false
+
+    - name: Warn if eval already running
+      debug:
+        msg: "WARNING: eval already running on {{ inventory_hostname }} (PID {{ eval_check.stdout }}). Skipping."
+      when: eval_check.stdout | length > 0
+
+    - name: Verify vLLM is healthy
+      uri:
+        url: "http://localhost:{{ vllm_port }}/health"
+        method: GET
+      register: vllm_health
+      when: eval_check.stdout | length == 0
+
+    - name: Check for existing checkpoint
+      stat:
+        path: "{{ results_dir }}/{{ checkpoint_name }}"
+      register: cp_check
+      when: eval_check.stdout | length == 0
+
+    - name: Get checkpoint progress
+      shell: |
+        python3 -c "import json; d=json.load(open('{{ results_dir }}/{{ checkpoint_name }}')); print(len(d.get('completed_images',{})))"
+      register: cp_count
+      when: eval_check.stdout | length == 0 and cp_check.stat.exists
+      changed_when: false
+
+    - name: Display pre-launch info
+      debug:
+        msg: >
+          {{ inventory_hostname }}: model={{ vllm_model }},
+          checkpoint={{ cp_count.stdout | default('0') }}/{{ total_test_images }} images
+      when: eval_check.stdout | length == 0
+
+    - name: Deploy eval script from template
+      template:
+        src: ../roles/eval_run/templates/run_eval.sh.j2
+        dest: /tmp/run_eval.sh
+        mode: "0755"
+      when: eval_check.stdout | length == 0
+
+    - name: Launch eval with nohup
+      shell: nohup bash /tmp/run_eval.sh > /dev/null 2>&1 &
+      register: eval_launch
+      when: eval_check.stdout | length == 0
+
+    - name: Verify eval process started
+      shell: sleep 2 && pgrep -f "[t]est_api_vlm.py" || echo "FAILED"
+      register: verify
+      changed_when: false
+      when: eval_check.stdout | length == 0
+
+    - name: Display launch result
+      debug:
+        msg: >
+          {{ inventory_hostname }}:
+          {{ 'RUNNING' if verify.stdout | default('') != 'FAILED' else 'FAILED TO START' }}
+          (model: {{ vllm_model }})
+      when: eval_check.stdout | length == 0

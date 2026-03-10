@@ -1,0 +1,24 @@
+---
+- name: Check training log details
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Check for errors and step times
+      shell: |
+        echo "=== OOM/errors ==="
+        grep -iE "OOM|CUDA out of memory|OutOfMemoryError|RuntimeError" /home/ubuntu/training_full.log | tail -5
+        echo "=== Completed runs ==="
+        grep "Training complete" /home/ubuntu/training_full.log
+        echo "=== Step times ==="
+        tail -c 2000 /home/ubuntu/training_full.log | tr '\r' '\n' | grep -E "^\s+\d+%" | tail -5
+        echo "=== Unsloth run dirs ==="
+        for d in /mnt/models/fc-runs/*_unsloth/; do
+          name=$(basename "$d")
+          files=$(ls "$d" 2>/dev/null | wc -l)
+          echo "$name: $files files"
+        done
+      register: log
+
+    - name: Show
+      debug:
+        msg: "{{ log.stdout }}"

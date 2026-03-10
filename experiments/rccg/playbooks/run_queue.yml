@@ -1,0 +1,46 @@
+---
+- name: Run model queue on RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    - name: Skip if no model queue defined
+      debug:
+        msg: "{{ inventory_hostname }}: No vllm_models list defined, skipping"
+      when: vllm_models is not defined or vllm_models | length == 0
+
+    - name: Check if queue is already running
+      shell: pgrep -f "[r]un_queue.sh" || true
+      register: queue_check
+      changed_when: false
+      when: vllm_models is defined and vllm_models | length > 0
+
+    - name: Warn if queue already running
+      debug:
+        msg: "WARNING: queue already running on {{ inventory_hostname }}. Skipping."
+      when: vllm_models is defined and vllm_models | length > 0 and queue_check.stdout | length > 0
+
+    - name: Deploy queue script from template
+      template:
+        src: ../roles/eval_run/templates/run_queue.sh.j2
+        dest: /tmp/run_queue.sh
+        mode: "0755"
+      when: vllm_models is defined and vllm_models | length > 0 and queue_check.stdout | length == 0
+
+    - name: Launch queue with nohup
+      shell: nohup bash /tmp/run_queue.sh > /dev/null 2>&1 &
+      when: vllm_models is defined and vllm_models | length > 0 and queue_check.stdout | length == 0
+
+    - name: Verify queue process started
+      shell: sleep 2 && pgrep -f "[r]un_queue.sh" || echo "FAILED"
+      register: verify
+      changed_when: false
+      when: vllm_models is defined and vllm_models | length > 0 and queue_check.stdout | length == 0
+
+    - name: Display launch result
+      debug:
+        msg: >
+          {{ inventory_hostname }}:
+          {{ 'QUEUE STARTED' if verify.stdout | default('') != 'FAILED' else 'FAILED TO START' }}
+          ({{ vllm_models | length }} models: {{ vllm_models | join(', ') }})
+      when: vllm_models is defined and vllm_models | length > 0 and queue_check.stdout | length == 0

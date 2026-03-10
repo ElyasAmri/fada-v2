@@ -1,0 +1,56 @@
+---
+- name: Push optimizations and restart training
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Kill GPU processes
+      shell: |
+        for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null); do
+          kill -9 $pid 2>/dev/null
+        done
+        sleep 3
+        nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null || echo "GPU clear"
+
+    - name: Push updated config
+      copy:
+        src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/config.json
+        dest: /home/ubuntu/fada-v3/experiments/framework_comparison/config.json
+
+    - name: Push updated train_unsloth.py
+      copy:
+        src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/wrappers/train_unsloth.py
+        dest: /home/ubuntu/fada-v3/experiments/framework_comparison/wrappers/train_unsloth.py
+
+    - name: Verify changes
+      shell: |
+        echo "=== batch/grad_accum ==="
+        grep -E "batch_size|accumulation|workers" /home/ubuntu/fada-v3/experiments/framework_comparison/config.json
+        echo "=== TF32/pin ==="
+        grep -E "tf32|pin_memory|prefetch" /home/ubuntu/fada-v3/experiments/framework_comparison/wrappers/train_unsloth.py
+      register: verify
+
+    - name: Show verify
+      debug:
+        msg: "{{ verify.stdout }}"
+
+    - name: Clean and launch Unsloth only
+      shell: |
+        rm -rf /mnt/models/fc-runs/*
+        nohup /home/ubuntu/launch_fc.sh > /home/ubuntu/training_full.log 2>&1 &
+        echo "PID: $!"
+
+    - name: Wait for model loading and first steps
+      pause:
+        seconds: 360
+
+    - name: Check progress
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Recent log ==="
+        tail -c 1500 /home/ubuntu/training_full.log 2>/dev/null | tr '\r' '\n' | grep -v '^$' | grep -v 'Loading weights' | tail -15
+      register: check
+
+    - name: Show progress
+      debug:
+        msg: "{{ check.stdout }}"

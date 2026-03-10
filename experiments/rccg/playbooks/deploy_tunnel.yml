@@ -1,0 +1,57 @@
+---
+- name: Deploy Cloudflare Tunnel for fada-monitor
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    - name: Validate target host
+      assert:
+        that: inventory_hostname == 'fada-1'
+        fail_msg: "Tunnel only deploys to fada-1. Use: --limit fada-1"
+
+    - name: Download cloudflared deb
+      get_url:
+        url: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        dest: /tmp/cloudflared.deb
+        mode: '0644'
+        timeout: 120
+
+    - name: Install cloudflared deb
+      apt:
+        deb: /tmp/cloudflared.deb
+      become: yes
+
+    - name: Verify cloudflared
+      shell: cloudflared --version
+      register: cf_version
+      changed_when: false
+
+    - name: Show version
+      debug:
+        msg: "{{ cf_version.stdout }}"
+
+    - name: Install cloudflared as service with tunnel token
+      shell: |
+        cloudflared service uninstall 2>/dev/null || true
+        cloudflared service install "{{ tunnel_token }}"
+      become: yes
+      register: service_result
+
+    - name: Ensure cloudflared is running
+      systemd:
+        name: cloudflared
+        state: started
+        enabled: yes
+      become: yes
+
+    - name: Wait for tunnel to connect
+      pause:
+        seconds: 5
+
+    - name: Verify tunnel connectivity
+      shell: cloudflared tunnel info 2>&1 | head -5 || echo "tunnel running"
+      register: tunnel_info
+
+    - name: Show tunnel status
+      debug:
+        msg: "{{ tunnel_info.stdout }}"

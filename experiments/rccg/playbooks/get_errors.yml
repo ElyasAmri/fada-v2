@@ -1,0 +1,16 @@
+---
+- name: Get first model error
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get qwen2.5 error from log
+      shell: |
+        echo "=== First error traceback ==="
+        grep -A 20 "Traceback" /home/ubuntu/training_full.log | head -30
+        echo "=== All FAILED lines with context ==="
+        grep -B 2 "Training: FAILED" /home/ubuntu/training_full.log | head -20
+      register: errors
+
+    - name: Show
+      debug:
+        msg: "{{ errors.stdout }}"

@@ -1,0 +1,5 @@
+{"timestamp": "2026-03-09T12:29:41.309141", "model": "Qwen/Qwen2.5-VL-7B-Instruct", "framework": "unsloth", "phase": "complete", "status": "ok"}
+{"timestamp": "2026-03-09T15:10:02.224037", "model": "Qwen/Qwen3-VL-8B-Instruct", "framework": "unsloth", "phase": "complete", "status": "ok"}
+{"timestamp": "2026-03-09T21:01:38.005402", "model": "Qwen/Qwen3.5-9B", "framework": "unsloth", "phase": "complete", "status": "ok"}
+{"timestamp": "2026-03-09T21:02:05.155371", "model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506", "framework": "unsloth", "phase": "train", "status": "failed"}
+{"timestamp": "2026-03-09T21:02:15.311721", "model": "microsoft/Phi-4-multimodal-instruct", "framework": "unsloth", "phase": "train", "status": "failed"}

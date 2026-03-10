@@ -1,0 +1,33 @@
+---
+- name: Stop evaluation on all RCCG machines
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    - name: Check if eval is running
+      shell: pgrep -f "[t]est_api_vlm.py" || true
+      register: eval_check
+      changed_when: false
+
+    - name: Display current status
+      debug:
+        msg: "{{ inventory_hostname }}: {{ 'eval running (PID ' + eval_check.stdout + ')' if eval_check.stdout | length > 0 else 'no eval running' }}"
+
+    - name: Kill eval process
+      shell: |
+        kill $(pgrep -f "[t]est_api_vlm.py") 2>/dev/null || true
+        sleep 2
+        # Force kill if still alive
+        kill -9 $(pgrep -f "[t]est_api_vlm.py") 2>/dev/null || true
+      when: eval_check.stdout | length > 0
+
+    - name: Verify eval stopped
+      shell: pgrep -f "[t]est_api_vlm.py" || true
+      register: verify_stop
+      changed_when: false
+      when: eval_check.stdout | length > 0
+
+    - name: Display result
+      debug:
+        msg: "{{ inventory_hostname }}: {{ 'STOPPED' if verify_stop.stdout | default('') | length == 0 else 'STILL RUNNING - manual intervention needed' }}"
+      when: eval_check.stdout | length > 0

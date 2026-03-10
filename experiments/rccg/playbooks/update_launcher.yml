@@ -1,0 +1,27 @@
+---
+- name: Update launch script for Unsloth-only run
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Update launch_fc.sh to run Unsloth only with skip-eval
+      copy:
+        content: |
+          #!/bin/bash
+          export HF_HOME=/mnt/models/huggingface
+          export PIP_CACHE_DIR=/mnt/models/pip-cache
+          export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+          cd /home/ubuntu/fada-v3
+          exec /home/ubuntu/fada-v3/venv/bin/python -u experiments/framework_comparison/run_queue.py \
+              --output-base /mnt/models/fc-runs \
+              --filter-framework unsloth \
+              --skip-eval
+        dest: /home/ubuntu/launch_fc.sh
+        mode: '0755'
+
+    - name: Show updated script
+      shell: cat /home/ubuntu/launch_fc.sh
+      register: script
+
+    - name: Show
+      debug:
+        msg: "{{ script.stdout }}"

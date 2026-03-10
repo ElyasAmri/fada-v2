@@ -1,0 +1,35 @@
+---
+- name: Install vLLM nightly (dev build with Qwen3.5 support)
+  hosts: rccg
+  tasks:
+    - name: Check current vLLM version
+      shell: /home/ubuntu/fada-v3/venv/bin/pip show vllm 2>/dev/null | grep Version || echo "not installed"
+      register: vllm_before
+      changed_when: false
+
+    - name: Show current version
+      debug:
+        msg: "{{ inventory_hostname }}: vLLM {{ vllm_before.stdout }}"
+
+    - name: Install vLLM nightly wheel
+      shell: >
+        /home/ubuntu/fada-v3/venv/bin/pip install -U vllm
+        --pre
+        --extra-index-url https://wheels.vllm.ai/nightly
+        2>&1 | tail -20
+      register: install_result
+      async: 1800
+      poll: 30
+
+    - name: Show install result
+      debug:
+        msg: "{{ install_result.stdout_lines[-5:] }}"
+
+    - name: Check new vLLM version
+      shell: /home/ubuntu/fada-v3/venv/bin/pip show vllm 2>/dev/null | grep Version
+      register: vllm_after
+      changed_when: false
+
+    - name: Show new version
+      debug:
+        msg: "{{ inventory_hostname }}: vLLM {{ vllm_after.stdout }}"

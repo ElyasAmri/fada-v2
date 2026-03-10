@@ -1,0 +1,53 @@
+---
+- name: Force kill everything and clean restart
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Force kill all python by PID
+      shell: |
+        echo "=== Before ==="
+        nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv,noheader 2>/dev/null
+        # Kill every python process by finding PIDs
+        for pid in $(pgrep -f python); do kill -9 $pid 2>/dev/null; done
+        # Also kill the zombie GPU process specifically
+        kill -9 32313 2>/dev/null || true
+        sleep 5
+        echo "=== After ==="
+        nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv,noheader 2>/dev/null || echo "GPU clear"
+        pgrep -a python 2>/dev/null || echo "No python"
+      register: kill
+
+    - name: Show
+      debug:
+        msg: "{{ kill.stdout }}"
+
+    - name: Check what completed before restart
+      shell: |
+        echo "=== Completed runs ==="
+        for d in /mnt/models/fc-runs/*/; do
+          [ -d "$d" ] || continue
+          name=$(basename "$d")
+          if [ -f "$d/run_manifest.json" ]; then
+            status=$(python3 -c "import json; print(json.load(open('${d}run_manifest.json'))['status'])" 2>/dev/null || echo "?")
+            echo "$name: $status"
+          else
+            echo "$name: no manifest"
+          fi
+        done
+      register: runs
+
+    - name: Show runs
+      debug:
+        msg: "{{ runs.stdout }}"
+
+    - name: Clean all runs and restart fresh
+      shell: |
+        rm -rf /mnt/models/fc-runs/*
+        cd /home/ubuntu/fada-v3
+        nohup /usr/bin/bash /home/ubuntu/run_training.sh > /home/ubuntu/training_full.log 2>&1 &
+        echo "PID: $!"
+      register: launch
+
+    - name: Show
+      debug:
+        msg: "{{ launch.stdout }}"

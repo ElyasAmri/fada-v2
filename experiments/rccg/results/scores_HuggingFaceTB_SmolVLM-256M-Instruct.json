@@ -1,0 +1,748 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-06T19:35:23.977090",
+    "predictions_file": "experiments\\rccg\\results\\predictions_HuggingFaceTB_SmolVLM-256M-Instruct.jsonl",
+    "annotations_file": "C:\\Users\\elyas\\workspace\\fada-v3\\data\\Fetal Ultrasound Annotations Normalized.xlsx",
+    "num_matched": 15080,
+    "num_unmatched": 72
+  },
+  "overall": {
+    "primary_score_mean": 0.24410611123076495,
+    "embedding_similarity_mean": 0.3111447120651378,
+    "num_samples": 15080
+  },
+  "per_question": {
+    "Q1: Anatomical Structures": {
+      "metric_name": "set_f2_synonym",
+      "primary_mean": 0.06197924496898694,
+      "primary_std": 0.1253814909635661,
+      "embedding_similarity_mean": 0.41902048709686224,
+      "normalization_rate": 0.9957559681697613,
+      "num_samples": 1885
+    },
+    "Q2: Fetal Orientation": {
+      "metric_name": "relaxed_accuracy",
+      "primary_mean": 0.014854111405835544,
+      "primary_std": 0.08489058297161586,
+      "embedding_similarity_mean": 0.3095959312917383,
+      "normalization_rate": 0.9824933687002653,
+      "num_samples": 1885
+    },
+    "Q3: Imaging Plane": {
+      "metric_name": "relaxed_accuracy",
+      "primary_mean": 0.0,
+      "primary_std": 0.0,
+      "embedding_similarity_mean": 0.08217730835445759,
+      "normalization_rate": 0.9984084880636604,
+      "num_samples": 1885
+    },
+    "Q4: Biometric Measurements": {
+      "metric_name": "keyword_f1",
+      "primary_mean": 0.09893899204244032,
+      "primary_std": 0.292673168174158,
+      "embedding_similarity_mean": 0.0896511643438227,
+      "normalization_rate": 0.9920424403183024,
+      "num_samples": 1885
+    },
+    "Q5: Gestational Age": {
+      "metric_name": "exact_bin_match",
+      "primary_mean": 0.2872679045092838,
+      "primary_std": 0.42294560712059837,
+      "embedding_similarity_mean": 0.6845114232794399,
+      "normalization_rate": 0.9761273209549072,
+      "num_samples": 1885
+    },
+    "Q6: Image Quality": {
+      "metric_name": "exact_tier_match",
+      "primary_mean": 0.1610079575596817,
+      "primary_std": 0.3673578217044609,
+      "embedding_similarity_mean": 0.317813952534462,
+      "normalization_rate": 0.996816976127321,
+      "num_samples": 1885
+    },
+    "Q7: Normality Assessment": {
+      "metric_name": "exact_match_with_binary",
+      "primary_mean": 0.5217506631299734,
+      "primary_std": 0.2315994699669025,
+      "embedding_similarity_mean": 0.4639219208212881,
+      "normalization_rate": 0.9973474801061007,
+      "num_samples": 1885,
+      "confusion_matrix": {
+        "TP": 0,
+        "TN": 1722,
+        "FP": 26,
+        "FN": 28,
+        "sensitivity": 0.0,
+        "specificity": 0.9851258581235698
+      }
+    },
+    "Q8: Clinical Recommendations": {
+      "metric_name": "bertscore_f1",
+      "primary_mean": 0.8070500162299179,
+      "primary_std": 0.02884465457235187,
+      "embedding_similarity_mean": 0.12246550879903158,
+      "normalization_rate": 0.9522546419098143,
+      "num_samples": 1885
+    }
+  },
+  "per_category": {
+    "Abdomen": {
+      "primary_score_mean": 0.20045243500037055,
+      "embedding_similarity_mean": 0.2904074206276728,
+      "num_samples": 1936,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.03614222542111886,
+          "embedding_similarity_mean": 0.38047409046841557,
+          "num_samples": 242
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.28733359208746145,
+          "num_samples": 242
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.08662531869139614,
+          "num_samples": 242
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.05712471887361535,
+          "num_samples": 242
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.14256198347107438,
+          "embedding_similarity_mean": 0.608292444709165,
+          "num_samples": 242
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.16115702479338842,
+          "embedding_similarity_mean": 0.33024418113891746,
+          "num_samples": 242
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4628099173553719,
+          "embedding_similarity_mean": 0.4446129164589215,
+          "num_samples": 242
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8009483289620107,
+          "embedding_similarity_mean": 0.12855210259348954,
+          "num_samples": 242
+        }
+      }
+    },
+    "Aorta": {
+      "primary_score_mean": 0.22028380074508735,
+      "embedding_similarity_mean": 0.2788654962402339,
+      "num_samples": 1040,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.01222431414739107,
+          "embedding_similarity_mean": 0.28095883280038836,
+          "num_samples": 130
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.20803578667915784,
+          "num_samples": 130
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.058995842131284566,
+          "num_samples": 130
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.056650373654869884,
+          "num_samples": 130
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.10384615384615385,
+          "embedding_similarity_mean": 0.7719634644687176,
+          "num_samples": 130
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.35384615384615387,
+          "embedding_similarity_mean": 0.28790548838531743,
+          "num_samples": 130
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.48846153846153845,
+          "embedding_similarity_mean": 0.3771101833249514,
+          "num_samples": 130
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8038922456594614,
+          "embedding_similarity_mean": 0.18930399847718385,
+          "num_samples": 130
+        }
+      }
+    },
+    "CRL-View": {
+      "primary_score_mean": 0.2880722781809194,
+      "embedding_similarity_mean": 0.33142762886818855,
+      "num_samples": 1576,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.044804044609055974,
+          "embedding_similarity_mean": 0.4468340414155483,
+          "num_samples": 197
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.2407349298429217,
+          "num_samples": 197
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.07465014910930531,
+          "num_samples": 197
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.01015228426395939,
+          "embedding_similarity_mean": 0.0753131462686558,
+          "num_samples": 197
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.5786802030456852,
+          "embedding_similarity_mean": 0.6767738125651016,
+          "num_samples": 197
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.09137055837563451,
+          "embedding_similarity_mean": 0.28336313409437686,
+          "num_samples": 197
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.7639593908629442,
+          "embedding_similarity_mean": 0.7628513932190268,
+          "num_samples": 197
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8156117442900759,
+          "embedding_similarity_mean": 0.0909004244305723,
+          "num_samples": 197
+        }
+      }
+    },
+    "Cervical": {
+      "primary_score_mean": 0.2539679878997858,
+      "embedding_similarity_mean": 0.36311025872826574,
+      "num_samples": 400,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.09147450689320218,
+          "embedding_similarity_mean": 0.45396423459053037,
+          "num_samples": 50
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.03,
+          "embedding_similarity_mean": 0.4781491905450821,
+          "num_samples": 50
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.009240908455103636,
+          "num_samples": 50
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.04,
+          "embedding_similarity_mean": 0.07793021880090237,
+          "num_samples": 50
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.1,
+          "embedding_similarity_mean": 0.6885146749019623,
+          "num_samples": 50
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.17212524890899658,
+          "num_samples": 50
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.92,
+          "embedding_similarity_mean": 0.9110973733663559,
+          "num_samples": 50
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8502693963050842,
+          "embedding_similarity_mean": 0.11386022025719285,
+          "num_samples": 50
+        }
+      }
+    },
+    "Cervix": {
+      "primary_score_mean": 0.21232275435586093,
+      "embedding_similarity_mean": 0.2953663370810646,
+      "num_samples": 1288,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.01776167341924836,
+          "embedding_similarity_mean": 0.40552849095800647,
+          "num_samples": 161
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.027950310559006212,
+          "embedding_similarity_mean": 0.24439461760639403,
+          "num_samples": 161
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.05158265563225524,
+          "num_samples": 161
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.06949289543380649,
+          "num_samples": 161
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.18012422360248448,
+          "embedding_similarity_mean": 0.7068992075250016,
+          "num_samples": 161
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.2111801242236025,
+          "embedding_similarity_mean": 0.3823526286930771,
+          "num_samples": 161
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.468944099378882,
+          "embedding_similarity_mean": 0.37911123606544106,
+          "num_samples": 161
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.7926216036636636,
+          "embedding_similarity_mean": 0.12356896473453467,
+          "num_samples": 161
+        }
+      }
+    },
+    "Femur": {
+      "primary_score_mean": 0.23486984211779816,
+      "embedding_similarity_mean": 0.32141466044194467,
+      "num_samples": 904,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.04464281734760653,
+          "embedding_similarity_mean": 0.2919972457848819,
+          "num_samples": 113
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.3377430011740828,
+          "num_samples": 113
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.16105629668562813,
+          "num_samples": 113
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0766961651917404,
+          "embedding_similarity_mean": 0.1797188688234418,
+          "num_samples": 113
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.2743362831858407,
+          "embedding_similarity_mean": 0.7181112391099466,
+          "num_samples": 113
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.21238938053097345,
+          "embedding_similarity_mean": 0.3592051323668092,
+          "num_samples": 113
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4778761061946903,
+          "embedding_similarity_mean": 0.36372026926384565,
+          "num_samples": 113
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.7930179844915339,
+          "embedding_similarity_mean": 0.15976523032692153,
+          "num_samples": 113
+        }
+      }
+    },
+    "NT-View": {
+      "primary_score_mean": 0.2825142185626984,
+      "embedding_similarity_mean": 0.36536536851089846,
+      "num_samples": 1616,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.15028550061923487,
+          "embedding_similarity_mean": 0.5567949273540537,
+          "num_samples": 202
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.4191665885103221,
+          "num_samples": 202
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.0885152493852495,
+          "num_samples": 202
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0049504950495049506,
+          "embedding_similarity_mean": 0.1567150946374577,
+          "num_samples": 202
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.5816831683168316,
+          "embedding_similarity_mean": 0.6756494985801158,
+          "num_samples": 202
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.10396039603960396,
+          "embedding_similarity_mean": 0.31345555516384027,
+          "num_samples": 202
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.6064356435643564,
+          "embedding_similarity_mean": 0.6021755609550689,
+          "num_samples": 202
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8127985449120549,
+          "embedding_similarity_mean": 0.1104504735010796,
+          "num_samples": 202
+        }
+      }
+    },
+    "Non_standard_NT": {
+      "primary_score_mean": 0.22041874927272442,
+      "embedding_similarity_mean": 0.31558007602778043,
+      "num_samples": 376,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.05199252492744357,
+          "embedding_similarity_mean": 0.48503855092728393,
+          "num_samples": 47
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.34288249743428634,
+          "num_samples": 47
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.03731388067628475,
+          "num_samples": 47
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.14993121395719813,
+          "num_samples": 47
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.44680851063829785,
+          "embedding_similarity_mean": 0.719997411078595,
+          "num_samples": 47
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.0425531914893617,
+          "embedding_similarity_mean": 0.28061522630617974,
+          "num_samples": 47
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4148936170212766,
+          "embedding_similarity_mean": 0.4124875873961347,
+          "num_samples": 47
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8071021501054155,
+          "embedding_similarity_mean": 0.09637424044628093,
+          "num_samples": 47
+        }
+      }
+    },
+    "Public_Symphysis_fetal_head": {
+      "primary_score_mean": 0.23718210147493574,
+      "embedding_similarity_mean": 0.2664565947751894,
+      "num_samples": 1080,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.21447923739805405,
+          "embedding_similarity_mean": 0.33920342094368405,
+          "num_samples": 135
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.018518518518518517,
+          "embedding_similarity_mean": 0.23514514904883171,
+          "num_samples": 135
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": -0.005809770082985913,
+          "num_samples": 135
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.04118180331532602,
+          "num_samples": 135
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.23703703703703705,
+          "embedding_similarity_mean": 0.7545798211737915,
+          "num_samples": 135
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.08148148148148149,
+          "embedding_similarity_mean": 0.3761325320435895,
+          "num_samples": 135
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4962962962962963,
+          "embedding_similarity_mean": 0.30835852167672584,
+          "num_samples": 135
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8496442410680983,
+          "embedding_similarity_mean": 0.08286128008255252,
+          "num_samples": 135
+        }
+      }
+    },
+    "Standard_NT": {
+      "primary_score_mean": 0.2296606456713901,
+      "embedding_similarity_mean": 0.29744479098496335,
+      "num_samples": 1192,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.06020709127428752,
+          "embedding_similarity_mean": 0.4515577142420631,
+          "num_samples": 149
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.3496976395281369,
+          "num_samples": 149
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.048746250657327225,
+          "num_samples": 149
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.15189088413479343,
+          "num_samples": 149
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.48322147651006714,
+          "embedding_similarity_mean": 0.686477117665462,
+          "num_samples": 149
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.09395973154362416,
+          "embedding_similarity_mean": 0.23994223248438548,
+          "num_samples": 149
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.39932885906040266,
+          "embedding_similarity_mean": 0.38712066480102353,
+          "num_samples": 149
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8005680069827393,
+          "embedding_similarity_mean": 0.06412582436651491,
+          "num_samples": 149
+        }
+      }
+    },
+    "Thorax": {
+      "primary_score_mean": 0.3312418663191037,
+      "embedding_similarity_mean": 0.32514325775142355,
+      "num_samples": 1432,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.05351793404182839,
+          "embedding_similarity_mean": 0.3809210392100185,
+          "num_samples": 179
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.3752501596535384,
+          "num_samples": 179
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.17205065399325092,
+          "num_samples": 179
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.9106145251396648,
+          "embedding_similarity_mean": 0.08338931719018094,
+          "num_samples": 179
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.15921787709497207,
+          "embedding_similarity_mean": 0.6524738457116335,
+          "num_samples": 179
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.2569832402234637,
+          "embedding_similarity_mean": 0.3678043496134228,
+          "num_samples": 179
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4748603351955307,
+          "embedding_similarity_mean": 0.44875410558166784,
+          "num_samples": 179
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.7947410188573699,
+          "embedding_similarity_mean": 0.12050259105767534,
+          "num_samples": 179
+        }
+      }
+    },
+    "Trans-cerebellum": {
+      "primary_score_mean": 0.21932785433687502,
+      "embedding_similarity_mean": 0.2957996524432126,
+      "num_samples": 544,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.025087793208484525,
+          "embedding_similarity_mean": 0.4769545578781296,
+          "num_samples": 68
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.08088235294117647,
+          "embedding_similarity_mean": 0.2690342265893431,
+          "num_samples": 68
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.10702718191725366,
+          "num_samples": 68
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.014705882352941176,
+          "embedding_similarity_mean": 0.05351710474282941,
+          "num_samples": 68
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.16911764705882354,
+          "embedding_similarity_mean": 0.6714697441853145,
+          "num_samples": 68
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.21323529411764705,
+          "embedding_similarity_mean": 0.30442512287374807,
+          "num_samples": 68
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4485294117647059,
+          "embedding_similarity_mean": 0.36046447435065226,
+          "num_samples": 68
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8030644532512216,
+          "embedding_similarity_mean": 0.12350480700843036,
+          "num_samples": 68
+        }
+      }
+    },
+    "Trans-thalamic": {
+      "primary_score_mean": 0.21058957806085918,
+      "embedding_similarity_mean": 0.3106974542591503,
+      "num_samples": 1232,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.015916302091490676,
+          "embedding_similarity_mean": 0.4884916168044914,
+          "num_samples": 154
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.06168831168831169,
+          "embedding_similarity_mean": 0.31877086749421313,
+          "num_samples": 154
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.09180515890868453,
+          "num_samples": 154
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.04437229437229436,
+          "embedding_similarity_mean": 0.05286157418453655,
+          "num_samples": 154
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.14285714285714285,
+          "embedding_similarity_mean": 0.6794811062478496,
+          "num_samples": 154
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.14935064935064934,
+          "embedding_similarity_mean": 0.31851627641393765,
+          "num_samples": 154
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4707792207792208,
+          "embedding_similarity_mean": 0.35770953584510784,
+          "num_samples": 154
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.7997527033477635,
+          "embedding_similarity_mean": 0.1779434981743817,
+          "num_samples": 154
+        }
+      }
+    },
+    "Trans-ventricular": {
+      "primary_score_mean": 0.21580665584085834,
+      "embedding_similarity_mean": 0.3028736136681079,
+      "num_samples": 464,
+      "per_question": {
+        "Q1: Anatomical Structures": {
+          "primary_mean": 0.0125386786726017,
+          "embedding_similarity_mean": 0.4836984983292119,
+          "num_samples": 58
+        },
+        "Q2: Fetal Orientation": {
+          "primary_mean": 0.07758620689655173,
+          "embedding_similarity_mean": 0.3271159380674362,
+          "num_samples": 58
+        },
+        "Q3: Imaging Plane": {
+          "primary_mean": 0.0,
+          "embedding_similarity_mean": 0.10816432253040116,
+          "num_samples": 58
+        },
+        "Q4: Biometric Measurements": {
+          "primary_mean": 0.034482758620689655,
+          "embedding_similarity_mean": 0.06849811152266018,
+          "num_samples": 58
+        },
+        "Q5: Gestational Age": {
+          "primary_mean": 0.1724137931034483,
+          "embedding_similarity_mean": 0.663227566485775,
+          "num_samples": 58
+        },
+        "Q6: Image Quality": {
+          "primary_mean": 0.1896551724137931,
+          "embedding_similarity_mean": 0.2849849381580435,
+          "num_samples": 58
+        },
+        "Q7: Normality Assessment": {
+          "primary_mean": 0.4396551724137931,
+          "embedding_similarity_mean": 0.33856347395942127,
+          "num_samples": 58
+        },
+        "Q8: Clinical Recommendations": {
+          "primary_mean": 0.8001214646059891,
+          "embedding_similarity_mean": 0.14873606029191408,
+          "num_samples": 58
+        }
+      }
+    }
+  }
+}

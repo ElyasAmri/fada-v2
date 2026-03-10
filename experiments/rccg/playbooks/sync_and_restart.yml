@@ -1,0 +1,32 @@
+---
+- name: Push config and restart training
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Push updated config.json
+      copy:
+        src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/config.json
+        dest: /home/ubuntu/fada-v3/experiments/framework_comparison/config.json
+
+    - name: Verify config changes
+      shell: |
+        grep -E "max_seq_length|dataloader_num_workers|gradient_checkpointing" /home/ubuntu/fada-v3/experiments/framework_comparison/config.json
+      register: verify
+
+    - name: Show config
+      debug:
+        msg: "{{ verify.stdout }}"
+
+    - name: Clean previous runs and restart
+      shell: |
+        rm -rf /mnt/models/fc-runs/qwen2.5-vl-7b_unsloth /mnt/models/fc-runs/qwen2.5-vl-7b_llamafactory /mnt/models/fc-runs/runs.jsonl
+        cd /home/ubuntu/fada-v3
+        nohup /usr/bin/bash /home/ubuntu/run_training.sh > /home/ubuntu/training_full.log 2>&1 &
+        echo "PID: $!"
+        sleep 3
+        tail -5 /home/ubuntu/training_full.log 2>/dev/null || echo "Log not ready"
+      register: launch
+
+    - name: Show launch
+      debug:
+        msg: "{{ launch.stdout }}"

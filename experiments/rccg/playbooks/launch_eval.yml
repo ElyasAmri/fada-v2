@@ -1,0 +1,61 @@
+---
+- name: Launch HF+PEFT evaluation for completed framework comparison runs
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Push eval scripts
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0755"
+      loop:
+        - src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/eval_adapter.sh
+          dest: /home/ubuntu/fada-v3/experiments/framework_comparison/eval_adapter.sh
+        - src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/eval_hf_peft.py
+          dest: /home/ubuntu/fada-v3/experiments/framework_comparison/eval_hf_peft.py
+        - src: /mnt/c/Users/elyas/workspace/fada-v3/experiments/framework_comparison/launch_eval.sh
+          dest: /home/ubuntu/launch_eval.sh
+
+    - name: Ensure checkpoint_to_predictions.py exists
+      shell: |
+        cd /home/ubuntu/fada-v3
+        if [ ! -f experiments/evaluation/checkpoint_to_predictions.py ]; then
+          git show HEAD:experiments/evaluation/checkpoint_to_predictions.py > experiments/evaluation/checkpoint_to_predictions.py
+          echo "Extracted from git"
+        else
+          echo "Already exists"
+        fi
+      register: ctp_check
+
+    - name: Show checkpoint_to_predictions status
+      debug:
+        msg: "{{ ctp_check.stdout }}"
+
+    - name: Kill any existing GPU processes
+      shell: |
+        for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null); do
+          kill -9 $pid 2>/dev/null
+        done
+        sleep 3
+        nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null || echo "GPU clear"
+
+    - name: Launch eval
+      shell: |
+        nohup bash /home/ubuntu/launch_eval.sh > /home/ubuntu/eval.log 2>&1 &
+        echo "PID: $!"
+
+    - name: Wait for model loading
+      pause:
+        seconds: 60
+
+    - name: Check initial status
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Log ==="
+        tail -20 /home/ubuntu/eval.log 2>/dev/null || echo "No log yet"
+      register: status
+
+    - name: Show status
+      debug:
+        msg: "{{ status.stdout }}"

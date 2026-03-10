@@ -1,0 +1,324 @@
+---
+- name: Setup RCCG machines for VLM evaluation
+  hosts: rccg
+  gather_facts: no
+
+  tasks:
+    # ==================== CONNECTIVITY ====================
+    - name: Test connectivity
+      ping:
+
+    - name: Check GPU availability
+      shell: nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader
+      register: gpu_info
+      changed_when: false
+
+    - name: Check disk space
+      shell: df -h / | tail -1 | awk '{print $2, "total,", $4, "free,", $5, "used"}'
+      register: disk_info
+      changed_when: false
+
+    - name: Display machine info
+      debug:
+        msg: "{{ inventory_hostname }}: GPU={{ gpu_info.stdout }} | Disk={{ disk_info.stdout }} | Model={{ vllm_model }}"
+
+    # ==================== VOLUME ====================
+    - name: Check if volume is already mounted
+      shell: mountpoint -q {{ volume_mount }} 2>/dev/null && echo MOUNTED || echo NOT_MOUNTED
+      register: vol_mount_check
+      changed_when: false
+      when: volume_device is defined
+
+    - name: Check volume device exists
+      stat:
+        path: "{{ volume_device }}"
+      register: vol_device_check
+      when: volume_device is defined and 'NOT_MOUNTED' in vol_mount_check.stdout
+
+    - name: Mount volume
+      shell: |
+        sudo mkdir -p {{ volume_mount }}
+        sudo mount {{ volume_device }} {{ volume_mount }}
+        sudo chown ubuntu:ubuntu {{ volume_mount }}
+        echo "mounted"
+      when: >
+        volume_device is defined
+        and 'NOT_MOUNTED' in vol_mount_check.stdout
+        and vol_device_check.stat.exists
+      register: vol_mounted
+
+    - name: Verify volume has HF cache
+      shell: |
+        if [ -d "{{ volume_mount }}/huggingface/hub" ]; then
+          COUNT=$(ls {{ volume_mount }}/huggingface/hub/ | grep -c "^models--" || echo 0)
+          echo "$COUNT models cached"
+        else
+          echo "0 models cached (no HF cache on volume)"
+        fi
+      register: vol_hf_check
+      changed_when: false
+      when: volume_device is defined
+
+    - name: Display volume info
+      debug:
+        msg: "{{ inventory_hostname }}: volume={{ volume_mount }} | {{ vol_hf_check.stdout | default('no volume configured') }}"
+      when: volume_device is defined
+
+    # ==================== REPOSITORY ====================
+    - name: Check if repo exists
+      stat:
+        path: "{{ project_dir }}/.git"
+      register: repo_check
+
+    - name: Clone repository
+      shell: git clone {{ repo_url }} {{ project_dir }}
+      when: not repo_check.stat.exists
+
+    - name: Pull latest code
+      shell: cd {{ project_dir }} && git pull
+      when: repo_check.stat.exists
+      changed_when: false
+
+    # ==================== SYSTEM PACKAGES ====================
+    - name: Install required system packages
+      shell: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq python3.10-venv unzip curl
+      changed_when: false
+
+    - name: Verify python3.10 exists
+      shell: python3.10 --version
+      register: py310_check
+      changed_when: false
+
+    # ==================== VIRTUAL ENVIRONMENT ====================
+    - name: Check if venv pip works
+      shell: "{{ project_dir }}/venv/bin/pip --version 2>/dev/null && echo OK || echo BROKEN"
+      register: venv_pip_check
+      changed_when: false
+
+    - name: Remove broken venv
+      shell: rm -rf {{ project_dir }}/venv
+      when: "'BROKEN' in venv_pip_check.stdout"
+
+    - name: Create venv with python3.10
+      shell: python3.10 -m venv {{ project_dir }}/venv
+      when: "'BROKEN' in venv_pip_check.stdout"
+
+    - name: Verify venv works
+      shell: "{{ project_dir }}/venv/bin/python --version && {{ project_dir }}/venv/bin/pip --version"
+      register: venv_verify
+      changed_when: false
+
+    - name: Display venv info
+      debug:
+        msg: "{{ inventory_hostname }}: {{ venv_verify.stdout_lines | join(', ') }}"
+
+    - name: Install Python packages in venv
+      shell: |
+        {{ project_dir }}/venv/bin/pip install {{ pip_packages | join(' ') }} 2>&1 | tail -3
+      register: pip_install
+      changed_when: false
+      failed_when: pip_install.rc != 0
+      async: 900
+      poll: 30
+
+    # ==================== DATASET ====================
+    - name: Check if dataset directory exists
+      stat:
+        path: "{{ ultrasound_dir }}"
+      register: data_check
+
+    - name: Download dataset from Google Drive
+      shell: |
+        {{ project_dir }}/venv/bin/pip install --quiet gdown
+        {{ project_dir }}/venv/bin/gdown --id {{ gdrive_file_id }} -O /tmp/fetal_ultrasound.zip
+        # Verify download succeeded (expect >1GB)
+        SIZE=$(stat -c%s /tmp/fetal_ultrasound.zip 2>/dev/null || echo 0)
+        if [ "$SIZE" -lt 1000000000 ]; then
+          echo "FATAL: Download failed or incomplete (${SIZE} bytes)"
+          rm -f /tmp/fetal_ultrasound.zip
+          exit 1
+        fi
+        echo "Downloaded $(( SIZE / 1048576 ))MB"
+      when: not data_check.stat.exists
+      register: download_result
+      async: 600
+      poll: 30
+
+    - name: Unzip dataset
+      shell: |
+        mkdir -p {{ data_dir }}
+        cd {{ data_dir }}
+        unzip -q /tmp/fetal_ultrasound.zip
+        rm -f /tmp/fetal_ultrasound.zip
+      when: not data_check.stat.exists
+
+    - name: Verify dataset
+      shell: |
+        COUNT=$(find "{{ ultrasound_dir }}" -name "*.png" | wc -l)
+        echo "$COUNT images found"
+        if [ "$COUNT" -lt 1000 ]; then
+          echo "FATAL: Expected 15000+ images, got $COUNT"
+          exit 1
+        fi
+      register: image_count
+      changed_when: false
+
+    - name: Display dataset info
+      debug:
+        msg: "{{ inventory_hostname }}: {{ image_count.stdout_lines | first }}"
+
+    - name: Generate dataset splits if missing
+      shell: |
+        if [ -f "{{ project_dir }}/data/dataset_splits.json" ]; then
+          echo "splits already exist"
+        else
+          cd {{ project_dir }}
+          {{ project_dir }}/venv/bin/python -m src.data.dataset_splits --generate 2>&1 | tail -3
+          echo "splits generated"
+        fi
+      register: splits_result
+      changed_when: "'generated' in splits_result.stdout"
+
+    # ==================== RESULTS DIRECTORY ====================
+    - name: Create results directory
+      file:
+        path: "{{ results_dir }}"
+        state: directory
+
+    - name: Copy existing results to safe location
+      shell: |
+        cp -n {{ project_dir }}/experiments/api_models/results/*.json {{ results_dir }}/ 2>/dev/null || true
+      changed_when: false
+
+    # ==================== vLLM SERVER ====================
+    - name: Check if vLLM is healthy
+      uri:
+        url: "http://localhost:{{ vllm_port }}/health"
+        method: GET
+      register: vllm_health
+      failed_when: false
+      changed_when: false
+
+    - name: Check which model is being served
+      shell: |
+        curl -s http://localhost:{{ vllm_port }}/v1/models 2>/dev/null \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null \
+          || echo "none"
+      register: current_model
+      changed_when: false
+
+    - name: Kill vLLM if serving wrong model
+      shell: |
+        kill $(pgrep -f "[v]llm.entrypoints.openai.api_server") 2>/dev/null || true
+        # Wait for port to be freed
+        for i in $(seq 1 15); do
+          if ! curl -s http://localhost:{{ vllm_port }}/health > /dev/null 2>&1; then
+            echo "port freed after ${i}s"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "warning: port still in use after 15s"
+      register: kill_result
+      when: >
+        (vllm_health.status | default(-1)) == 200
+        and current_model.stdout != vllm_model
+
+    - name: Determine if vLLM needs start
+      set_fact:
+        vllm_needs_start: >-
+          {{ (vllm_health.status | default(-1)) != 200
+             or current_model.stdout != vllm_model }}
+
+    - name: Display vLLM pre-start status
+      debug:
+        msg: >-
+          {{ inventory_hostname }}:
+          {{ 'vLLM already running with correct model' if not (vllm_needs_start | bool) else
+             'Starting vLLM with ' + vllm_model }}
+
+    - name: Check disk space before model download
+      shell: |
+        FREE_KB=$(df / | tail -1 | awk '{print $4}')
+        FREE_GB=$((FREE_KB / 1048576))
+        echo "${FREE_GB}G free"
+        if [ "$FREE_GB" -lt 10 ]; then
+          echo "FATAL: Only ${FREE_GB}G free. Cleaning HF cache..."
+          rm -rf ~/.cache/huggingface ~/.cache/pip
+          FREE_KB=$(df / | tail -1 | awk '{print $4}')
+          FREE_GB=$((FREE_KB / 1048576))
+          echo "After cleanup: ${FREE_GB}G free"
+          if [ "$FREE_GB" -lt 10 ]; then
+            echo "FATAL: Still only ${FREE_GB}G free. Cannot proceed."
+            exit 1
+          fi
+        fi
+      register: disk_check
+      when: vllm_needs_start | bool
+
+    - name: Start vLLM server
+      shell: |
+        {% if volume_device is defined %}
+        export HF_HOME={{ volume_mount }}/huggingface
+        {% endif %}
+        {% if hf_token is defined %}
+        export HF_TOKEN={{ hf_token }}
+        {% endif %}
+        nohup {{ project_dir }}/venv/bin/python -m vllm.entrypoints.openai.api_server \
+          --model {{ vllm_model }} \
+          --host 0.0.0.0 \
+          --port {{ vllm_port }} \
+          --trust-remote-code \
+          --max-model-len {{ vllm_max_model_len }} \
+          --gpu-memory-utilization {{ vllm_gpu_util }} \
+          > {{ vllm_log }} 2>&1 &
+        echo "vLLM started with PID $!"
+      when: vllm_needs_start | bool
+
+    - name: Wait for vLLM with progress
+      shell: |
+        for i in $(seq 1 60); do
+          # Fail fast if process died
+          if ! pgrep -f "vllm.entrypoints.openai.api_server" > /dev/null 2>&1; then
+            echo "FATAL: vLLM process died after ${i}0s. Last log lines:"
+            tail -20 {{ vllm_log }} 2>/dev/null
+            exit 1
+          fi
+          # Check health endpoint
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:{{ vllm_port }}/health 2>/dev/null || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "READY after ${i}0 seconds"
+            exit 0
+          fi
+          # Show last log line for progress visibility
+          LAST=$(tail -1 {{ vllm_log }} 2>/dev/null | head -c 200)
+          echo "[${i}/60] $LAST"
+          sleep 10
+        done
+        echo "TIMEOUT after 600s. Last log lines:"
+        tail -10 {{ vllm_log }} 2>/dev/null
+        exit 1
+      register: vllm_wait
+      when: vllm_needs_start | bool
+
+    - name: Verify vLLM serves correct model
+      shell: |
+        SERVED=$(curl -s http://localhost:{{ vllm_port }}/v1/models \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+        if [ "$SERVED" = "{{ vllm_model }}" ]; then
+          echo "OK: serving {{ vllm_model }}"
+        else
+          echo "MISMATCH: expected {{ vllm_model }}, got $SERVED"
+          exit 1
+        fi
+      register: model_verify
+      changed_when: false
+
+    - name: Final status
+      debug:
+        msg: >-
+          {{ inventory_hostname }}: READY
+          | Model: {{ vllm_model }}
+          | {{ vllm_wait.stdout_lines | default(['already running']) | last }}

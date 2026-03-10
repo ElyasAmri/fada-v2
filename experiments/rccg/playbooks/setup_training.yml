@@ -1,0 +1,158 @@
+---
+- name: Setup RCCG machine for framework comparison fine-tuning
+  hosts: rccg
+  gather_facts: no
+
+  vars:
+    conda_dir: "{{ ansible_env.HOME | default('/home/ubuntu') }}/miniconda3"
+    fc_dir: "{{ project_dir }}/experiments/framework_comparison"
+
+  tasks:
+    # ==================== CONNECTIVITY ====================
+    - name: Test connectivity
+      ping:
+
+    - name: Check GPU availability
+      shell: nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader
+      register: gpu_info
+      changed_when: false
+
+    - name: Display machine info
+      debug:
+        msg: "{{ inventory_hostname }}: GPU={{ gpu_info.stdout }}"
+
+    # ==================== REPOSITORY ====================
+    - name: Pull latest code
+      shell: cd {{ project_dir }} && git pull
+      changed_when: false
+
+    # ==================== MINICONDA ====================
+    - name: Check if conda exists
+      shell: "{{ conda_dir }}/bin/conda --version 2>/dev/null && echo OK || echo MISSING"
+      register: conda_check
+      changed_when: false
+
+    - name: Download miniconda
+      shell: |
+        wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+        bash /tmp/miniconda.sh -b -p {{ conda_dir }}
+        rm -f /tmp/miniconda.sh
+        {{ conda_dir }}/bin/conda init bash
+      when: "'MISSING' in conda_check.stdout"
+
+    - name: Verify conda
+      shell: "{{ conda_dir }}/bin/conda --version"
+      register: conda_version
+      changed_when: false
+
+    - name: Display conda version
+      debug:
+        msg: "{{ inventory_hostname }}: {{ conda_version.stdout }}"
+
+    # ==================== VOLUME ====================
+    - name: Check if volume is mounted
+      shell: mountpoint -q {{ volume_mount }} 2>/dev/null && echo MOUNTED || echo NOT_MOUNTED
+      register: vol_check
+      changed_when: false
+      when: volume_device is defined
+
+    - name: Mount volume
+      shell: |
+        sudo mkdir -p {{ volume_mount }}
+        sudo mount {{ volume_device }} {{ volume_mount }}
+        sudo chown ubuntu:ubuntu {{ volume_mount }}
+      when: >
+        volume_device is defined
+        and 'NOT_MOUNTED' in vol_check.stdout
+
+    # ==================== DATASET ====================
+    - name: Check dataset exists
+      stat:
+        path: "{{ ultrasound_dir }}"
+      register: data_check
+
+    - name: Verify dataset
+      shell: |
+        COUNT=$(find "{{ ultrasound_dir }}" -name "*.png" | wc -l)
+        echo "$COUNT images"
+      register: image_count
+      changed_when: false
+      when: data_check.stat.exists
+
+    - name: Display dataset info
+      debug:
+        msg: "{{ inventory_hostname }}: {{ image_count.stdout | default('dataset missing - run setup.yml first') }}"
+
+    # ==================== TRAINING DATA ====================
+    - name: Check training data exists
+      stat:
+        path: "{{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl"
+      register: train_data_check
+
+    - name: Fail if training data missing
+      fail:
+        msg: "Training data not found. Upload data/vlm_training/ to the machine first."
+      when: not train_data_check.stat.exists
+
+    - name: Check training data sample count
+      shell: wc -l < "{{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl"
+      register: train_count
+      changed_when: false
+
+    - name: Display training data info
+      debug:
+        msg: "{{ inventory_hostname }}: {{ train_count.stdout }} training samples"
+
+    # ==================== CONDA ENVIRONMENTS ====================
+    - name: Run setup_all.sh to create conda environments
+      shell: |
+        export PATH="{{ conda_dir }}/bin:$PATH"
+        eval "$({{ conda_dir }}/bin/conda shell.bash hook)"
+        bash {{ fc_dir }}/setup/setup_all.sh 2>&1 | tail -20
+      register: setup_result
+      async: 3600
+      poll: 60
+
+    - name: Display setup result
+      debug:
+        msg: "{{ setup_result.stdout_lines | last }}"
+
+    # ==================== DATA CONVERSION ====================
+    - name: Check if ShareGPT data already exists
+      stat:
+        path: "{{ project_dir }}/data/vlm_training/gemini_complete_train_sharegpt.jsonl"
+      register: sharegpt_check
+
+    - name: Convert training data to ShareGPT format
+      shell: |
+        export PATH="{{ conda_dir }}/bin:$PATH"
+        eval "$({{ conda_dir }}/bin/conda shell.bash hook)"
+        conda run -n ft-eval python {{ fc_dir }}/convert_to_sharegpt.py \
+          --input {{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl \
+          --output {{ project_dir }}/data/vlm_training/gemini_complete_train_sharegpt.jsonl
+        conda run -n ft-eval python {{ fc_dir }}/convert_to_sharegpt.py \
+          --input {{ project_dir }}/data/vlm_training/gemini_complete_val.jsonl \
+          --output {{ project_dir }}/data/vlm_training/gemini_complete_val_sharegpt.jsonl
+      when: not sharegpt_check.stat.exists
+
+    # ==================== DRY RUN TEST ====================
+    - name: Dry run test (print run matrix)
+      shell: |
+        export PATH="{{ conda_dir }}/bin:$PATH"
+        eval "$({{ conda_dir }}/bin/conda shell.bash hook)"
+        conda run -n ft-eval python {{ fc_dir }}/run_queue.py --dry-run
+      register: dry_run
+      changed_when: false
+
+    - name: Display run matrix
+      debug:
+        msg: "{{ dry_run.stdout_lines }}"
+
+    # ==================== FINAL STATUS ====================
+    - name: Final status
+      debug:
+        msg: >-
+          {{ inventory_hostname }}: READY for framework comparison
+          | GPU: {{ gpu_info.stdout }}
+          | Training samples: {{ train_count.stdout }}
+          | Launch: conda run -n ft-eval python {{ fc_dir }}/run_queue.py

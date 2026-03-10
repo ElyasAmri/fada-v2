@@ -1,0 +1,14 @@
+---
+- name: Stop training
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Kill training processes
+      shell: |
+        pkill -f "run_queue\|train_unsloth\|train_llama\|run_training" 2>/dev/null || true
+        sleep 2
+        pgrep -af "run_queue\|train_unsloth\|python.*train" 2>/dev/null || echo "All training processes stopped"
+      register: result
+    - name: Show
+      debug:
+        msg: "{{ result.stdout }}"

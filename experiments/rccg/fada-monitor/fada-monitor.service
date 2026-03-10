@@ -1,0 +1,17 @@
+[Unit]
+Description=FADA Process Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/monitor
+EnvironmentFile=/etc/fada-monitor/env
+ExecStart=/home/ubuntu/miniconda3/envs/ft-unsloth/bin/python monitor.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/ubuntu/monitor/monitor.log
+StandardError=append:/home/ubuntu/monitor/monitor.log
+
+[Install]
+WantedBy=multi-user.target

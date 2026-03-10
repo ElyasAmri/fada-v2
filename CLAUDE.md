@@ -207,9 +207,6 @@ bash experiments/rccg/r.sh ssh fada-3 "nvidia-smi"
 bash experiments/rccg/r.sh logs fada-3
 bash experiments/rccg/r.sh vllm-log fada-3
 bash experiments/rccg/r.sh queue-log fada-3
-
-# Poll for eval completions (blocks until DONE/IDLE detected)
-bash experiments/rccg/r.sh poll fada-5 fada-7
 ```
 
 If you need to run a command on a remote machine, use `r.sh ssh <host> "<command>"` -- never construct raw SSH commands with IPs and key paths.
@@ -217,10 +214,10 @@ If you need to run a command on a remote machine, use `r.sh ssh <host> "<command
 ### Key Files
 
 - `experiments/rccg/inventory/hosts.yml` - Machine IPs, models, volume devices
-- `experiments/rccg/playbooks/` - Ansible playbooks (setup, run_eval, run_queue, stop, exec, status, collect)
+- `experiments/rccg/playbooks/` - Ansible playbooks (setup, run_eval, run_queue, stop, exec, status, collect, deploy_monitor, deploy_tunnel)
 - `experiments/rccg/rccg.sh` - Unified CLI wrapper (resolves host -> IP from inventory)
 - `experiments/rccg/r.sh` - Thin WSL wrapper with clean PATH
-- `experiments/rccg/poll.sh` - Poll for eval completions
+- `experiments/rccg/fada-monitor/` - Process monitor server (see below)
 
 ### Model Rotation Workflow
 
@@ -228,6 +225,45 @@ If you need to run a command on a remote machine, use `r.sh ssh <host> "<command
 2. `bash experiments/rccg/r.sh play run_queue --limit <host>` (queue system: stops old vLLM, downloads model, starts vLLM, runs eval for each model in list)
 3. `bash experiments/rccg/r.sh status` to monitor progress
 4. `bash experiments/rccg/r.sh pull <host>` to fetch checkpoints when done
+
+### Process Monitor (fada-monitor)
+
+Lightweight HTTP server running on RCCG machines that watches ML processes, tracks GPU stats, and queues completion events. Accessible via Cloudflare Tunnel -- no open ports or SSH needed.
+
+**URL**: `https://fada-monitor.elyasamri.com`
+
+**Endpoints**:
+
+- `GET /health` - Server liveness, watched process count, pending event count
+- `GET /processes` - Monitored processes with CPU/mem/runtime
+- `GET /events` - Unprocessed completion events (process_started, process_completed)
+- `POST /events/ack` - Acknowledge events (body: `{"ids": ["..."]}`)
+- `GET /gpu` - nvidia-smi summary (utilization, memory, temperature)
+
+**Architecture**:
+
+- `experiments/rccg/fada-monitor/monitor.py` - Single-file Flask server, `/proc` scanning, event queue
+- `experiments/rccg/fada-monitor/monitor_config.json` - Watch patterns (eval_hf_peft.py, launch_eval.sh, etc.)
+- Runs as systemd service (`fada-monitor.service`) on the remote
+- Cloudflare Tunnel (`cloudflared`) exposes localhost:9731 to the public URL
+
+**Claude Code Integration** (`.claude/hooks/`):
+
+- `check-remote-events.sh` - Curls `/events`, acks consumed events, writes `event_result.json`
+- Registered as both `Stop` and `SessionStart` hook in `.claude/settings.local.json`
+- Stop hook: if eval finishes while Claude is on, triggers continuation (exit 2)
+- SessionStart hook: if eval finished while Claude was off, triggers response on startup
+- `wait-for-remote.sh` - SSH-based polling hook (marker file pattern, for manual use)
+
+**Deployment**:
+
+```bash
+# Deploy/update monitor server
+experiments/rccg/r.sh play deploy_monitor --limit fada-1
+
+# Deploy/update Cloudflare Tunnel (token in experiments/rccg/fada-monitor/.tunnel_token)
+TOKEN=$(cat experiments/rccg/fada-monitor/.tunnel_token) && experiments/rccg/r.sh play deploy_tunnel --limit fada-1 -e "tunnel_token=$TOKEN"
+```
 
 ### Scoring Pipeline
 

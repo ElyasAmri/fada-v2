@@ -1,0 +1,38 @@
+[
+  {
+    "run_dir": "qwen2.5-vl-7b_unsloth",
+    "model": "Qwen/Qwen2.5-VL-7B-Instruct",
+    "framework": "unsloth",
+    "status": "complete",
+    "training_time_seconds": 23289.9,
+    "final_loss": 0.06422818899154663,
+    "gpu_memory_peak_gb": 27.5,
+    "primary_score": null,
+    "f2_score": null,
+    "per_question_scores": {}
+  },
+  {
+    "run_dir": "qwen3-vl-8b_unsloth",
+    "model": "Qwen/Qwen3-VL-8B-Instruct",
+    "framework": "unsloth",
+    "status": "complete",
+    "training_time_seconds": 9590.1,
+    "final_loss": 0.06523653268814086,
+    "gpu_memory_peak_gb": 25.44,
+    "primary_score": null,
+    "f2_score": null,
+    "per_question_scores": {}
+  },
+  {
+    "run_dir": "qwen3.5-9b_unsloth",
+    "model": "Qwen/Qwen3.5-9B",
+    "framework": "unsloth",
+    "status": "complete",
+    "training_time_seconds": 21062.6,
+    "final_loss": 0.0368995726108551,
+    "gpu_memory_peak_gb": 33.85,
+    "primary_score": null,
+    "f2_score": null,
+    "per_question_scores": {}
+  }
+]

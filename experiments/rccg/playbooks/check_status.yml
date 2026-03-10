@@ -1,0 +1,29 @@
+---
+- name: Check training status
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get status
+      shell: |
+        echo "=== GPU ==="
+        nvidia-smi | grep -E 'MiB|Pwr' | head -2
+        echo "=== Queue progress ==="
+        grep -E "Training:|Completed:|SKIP:|FAILED" /home/ubuntu/training_full.log | tail -15
+        echo "=== Recent progress ==="
+        tail -c 3000 /home/ubuntu/training_full.log | tr '\r' '\n' | grep -v '^$' | tail -15
+        echo "=== Run dirs ==="
+        for d in /mnt/models/fc-runs/*_unsloth/; do
+          name=$(basename "$d")
+          if [ -f "${d}run_manifest.json" ]; then
+            status=$(python3 -c "import json; m=json.load(open('${d}run_manifest.json')); print(m.get('status','?'), '|', round(m.get('training_time_seconds',0)/60,1), 'min', '|', 'loss:', m.get('final_loss','?'))" 2>/dev/null)
+            echo "$name: $status"
+          else
+            files=$(ls "$d" 2>/dev/null | wc -l)
+            echo "$name: no manifest ($files files)"
+          fi
+        done
+      register: status
+
+    - name: Show
+      debug:
+        msg: "{{ status.stdout }}"

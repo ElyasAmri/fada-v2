@@ -1,0 +1,13 @@
+---
+- name: Get full error
+  hosts: rccg
+  gather_facts: no
+  tasks:
+    - name: Get ValueError details
+      shell: |
+        grep -A 5 "ValueError" /home/ubuntu/training_full.log | head -20
+      register: err
+
+    - name: Show
+      debug:
+        msg: "{{ err.stdout }}"
