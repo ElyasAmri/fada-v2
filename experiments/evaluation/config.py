@@ -64,8 +64,9 @@ INTERACTIVE_TEMPERATURE = 0.4  # Higher temperature for interactive inference
 # Ground truth annotations (sonographer, normalized)
 ANNOTATIONS_PATH = DATA_DIR / "Fetal Ultrasound Annotations Normalized.xlsx"
 
-# BERTScore model for Q8 evaluation
-BERTSCORE_MODEL = "roberta-large"
+# BERTScore models for Q8 evaluation
+BERTSCORE_MODEL = "roberta-large"  # General-domain (primary, backward-compat)
+BERTSCORE_MODEL_CLINICAL = "emilyalsentzer/Bio_ClinicalBERT"  # Clinical domain (L3)
 
 # Gestational age bins (ordered for adjacency scoring)
 GA_BINS_ORDERED = [

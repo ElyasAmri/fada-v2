@@ -33,6 +33,7 @@ from .config import (
     DEFAULT_EMBEDDING_MODEL,
     ANNOTATIONS_PATH,
     BERTSCORE_MODEL,
+    BERTSCORE_MODEL_CLINICAL,
     GA_BINS_ORDERED,
     QUALITY_TIERS,
     SCORING_PIPELINE_VERSION,
@@ -429,14 +430,18 @@ _bertscore_fn = None
 
 
 def _compute_bertscore_batch(
-    predictions: List[str], references: List[str], model_type: str = BERTSCORE_MODEL
+    predictions: List[str], references: List[str], model_type: str = BERTSCORE_MODEL,
+    num_layers: Optional[int] = None,
 ) -> List[float]:
     """Batch compute BERTScore F1. Raises if bert_score is unavailable."""
     global _bertscore_fn
     if _bertscore_fn is None:
         from bert_score import score as bertscore
         _bertscore_fn = bertscore
-    _, _, F1 = _bertscore_fn(predictions, references, model_type=model_type, verbose=False)
+    kwargs = {"model_type": model_type, "verbose": False}
+    if num_layers is not None:
+        kwargs["num_layers"] = num_layers
+    _, _, F1 = _bertscore_fn(predictions, references, **kwargs)
     return [float(f) for f in F1]
 
 
@@ -831,6 +836,17 @@ class MultiMetricScorer:
                     scores[idx].primary_score = 0.0
                     scores[idx].details["bertscore_error"] = str(e)
 
+            # L3: Clinical BERTScore as secondary metric
+            try:
+                clinical_scores = _compute_bertscore_batch(
+                    q8_preds, q8_refs, model_type=BERTSCORE_MODEL_CLINICAL,
+                    num_layers=12,  # Bio_ClinicalBERT is BERT-base (12 layers)
+                )
+                for j, idx in enumerate(q8_indices):
+                    scores[idx].details["bertscore_clinical_f1"] = clinical_scores[j]
+            except Exception as e:
+                logger.warning("Clinical BERTScore failed (non-fatal): %s", e)
+
         # 5. Aggregate
         result = self._aggregate_results(
             scores, records, unmatched, predictions_file
@@ -887,6 +903,7 @@ class MultiMetricScorer:
                 "git_commit_hash": _get_git_hash(),
                 "embedding_model": DEFAULT_EMBEDDING_MODEL,
                 "bertscore_model": BERTSCORE_MODEL,
+                "bertscore_model_clinical": BERTSCORE_MODEL_CLINICAL,
                 "annotations_file_hash": _file_sha256(self.annotations_path),
             },
             "overall": {
@@ -953,6 +970,13 @@ class MultiMetricScorer:
                 cm["cm_coverage"] = cm["classified_count"] / len(q_scores) if q_scores else 0.0
                 entry["confusion_matrix"] = cm
                 entry["balanced_accuracy"] = cm["balanced_accuracy"]
+
+            # Q8: aggregate clinical BERTScore if available
+            if q_idx == 7:
+                clinical_vals = [s.details.get("bertscore_clinical_f1") for s in q_scores
+                                 if s.details.get("bertscore_clinical_f1") is not None]
+                if clinical_vals:
+                    entry["bertscore_clinical_mean"] = float(np.mean(clinical_vals))
 
             result["per_question"][q_name] = entry
 
