@@ -53,8 +53,8 @@ else
 fi
 
 # 5. Check training data
-if [ -f "$PROJECT_DIR/data/vlm_training/gemini_complete_train.jsonl" ]; then
-    TRAIN_COUNT=$(wc -l < "$PROJECT_DIR/data/vlm_training/gemini_complete_train.jsonl")
+if [ -f "$PROJECT_DIR/data/vlm_training/gt_train.jsonl" ]; then
+    TRAIN_COUNT=$(wc -l < "$PROJECT_DIR/data/vlm_training/gt_train.jsonl")
     echo "$TRAIN_COUNT training samples"
 else
     echo "WARNING: Training data not found"
@@ -88,11 +88,11 @@ setup_env "ft-eval" "requirements_eval.txt"
 
 # 7. Convert data to ShareGPT format
 echo "--- Data conversion ---"
-if [ ! -f "$PROJECT_DIR/data/vlm_training/gemini_complete_train_sharegpt.jsonl" ]; then
+if [ ! -f "$PROJECT_DIR/data/vlm_training/gt_train_sharegpt.jsonl" ]; then
     "$VENV/bin/python" "$FC_DIR/convert_to_sharegpt.py" \
-        --input "$PROJECT_DIR/data/vlm_training/gemini_complete_train.jsonl"
+        --input "$PROJECT_DIR/data/vlm_training/gt_train.jsonl"
     "$VENV/bin/python" "$FC_DIR/convert_to_sharegpt.py" \
-        --input "$PROJECT_DIR/data/vlm_training/gemini_complete_val.jsonl"
+        --input "$PROJECT_DIR/data/vlm_training/gt_val.jsonl"
 else
     echo "ShareGPT data already exists"
 fi

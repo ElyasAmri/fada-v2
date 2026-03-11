@@ -12,7 +12,7 @@
 # Exit 0 = no events (no continuation)
 # Exit 2 = events found (triggers Claude Code continuation)
 
-set -uo pipefail
+set -o pipefail
 
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESULT="$HOOK_DIR/event_result.json"

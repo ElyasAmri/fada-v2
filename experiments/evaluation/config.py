@@ -17,7 +17,7 @@ BASE_MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
 ADAPTER_PATH = MODELS_DIR / "qwen25vl7b_finetuned" / "final"
 
 # Test data
-FULL_TEST_DATA = DATA_DIR / "vlm_training" / "gemini_complete_test.jsonl"
+FULL_TEST_DATA = DATA_DIR / "vlm_training" / "gt_test.jsonl"
 STRATIFIED_TEST_DATA = OUTPUTS_DIR / "test_subset.jsonl"
 
 # Categories (14 total from dataset, sorted alphabetically)

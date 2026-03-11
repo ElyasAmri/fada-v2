@@ -122,9 +122,10 @@ data/Fetal Ultrasound/
 +-- Trans-thalamic/      # 1,565 images
 +-- Trans-ventricular/   # 584 images
 +-- annotations.xlsx     # Per-class annotations
-data/Fetal Ultrasound Annotations Final.xlsx  # Master annotations (18,936 rows)
-data/vlm_training/       # JSONL training files for VLM fine-tuning
+data/Fetal Ultrasound Annotations Normalized.xlsx  # Master GT annotations (18,936 rows)
+data/vlm_training/       # Sonographer GT files (gt_train/val/test.jsonl, ShareGPT variants)
 data/dataset_splits.json # Train/val/test split (15,231 / 1,894 / 1,894)
+data/archive/            # Gemini pseudo-labels, legacy training formats, old annotations
 ```
 
 ## Critical Context

@@ -86,7 +86,7 @@
     # ==================== TRAINING DATA ====================
     - name: Check training data exists
       stat:
-        path: "{{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl"
+        path: "{{ project_dir }}/data/vlm_training/gt_train.jsonl"
       register: train_data_check
 
     - name: Fail if training data missing
@@ -95,7 +95,7 @@
       when: not train_data_check.stat.exists
 
     - name: Check training data sample count
-      shell: wc -l < "{{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl"
+      shell: wc -l < "{{ project_dir }}/data/vlm_training/gt_train.jsonl"
       register: train_count
       changed_when: false
 
@@ -120,7 +120,7 @@
     # ==================== DATA CONVERSION ====================
     - name: Check if ShareGPT data already exists
       stat:
-        path: "{{ project_dir }}/data/vlm_training/gemini_complete_train_sharegpt.jsonl"
+        path: "{{ project_dir }}/data/vlm_training/gt_train_sharegpt.jsonl"
       register: sharegpt_check
 
     - name: Convert training data to ShareGPT format
@@ -128,11 +128,11 @@
         export PATH="{{ conda_dir }}/bin:$PATH"
         eval "$({{ conda_dir }}/bin/conda shell.bash hook)"
         conda run -n ft-eval python {{ fc_dir }}/convert_to_sharegpt.py \
-          --input {{ project_dir }}/data/vlm_training/gemini_complete_train.jsonl \
-          --output {{ project_dir }}/data/vlm_training/gemini_complete_train_sharegpt.jsonl
+          --input {{ project_dir }}/data/vlm_training/gt_train.jsonl \
+          --output {{ project_dir }}/data/vlm_training/gt_train_sharegpt.jsonl
         conda run -n ft-eval python {{ fc_dir }}/convert_to_sharegpt.py \
-          --input {{ project_dir }}/data/vlm_training/gemini_complete_val.jsonl \
-          --output {{ project_dir }}/data/vlm_training/gemini_complete_val_sharegpt.jsonl
+          --input {{ project_dir }}/data/vlm_training/gt_val.jsonl \
+          --output {{ project_dir }}/data/vlm_training/gt_val_sharegpt.jsonl
       when: not sharegpt_check.stat.exists
 
     # ==================== DRY RUN TEST ====================

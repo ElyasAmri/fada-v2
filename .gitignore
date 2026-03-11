@@ -36,6 +36,7 @@ tmpclaude-*/
 
 # Data
 /data/
+/data/archive/
 
 # Documents
 *.pdf
@@ -74,6 +75,7 @@ docs/timesheets/
 models/
 outputs/
 experiments/fine_tuning/runs/
+experiments/framework_comparison/runs/
 
 # Accidental files
 3.5.1

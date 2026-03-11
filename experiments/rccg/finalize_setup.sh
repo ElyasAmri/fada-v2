@@ -18,21 +18,21 @@ PROJECT_DIR=/home/ubuntu/fada-v3
 VENV=$PROJECT_DIR/venv
 cd "$PROJECT_DIR"
 
-if [ -f "data/vlm_training/gemini_complete_train_sharegpt.jsonl" ]; then
+if [ -f "data/vlm_training/gt_train_sharegpt.jsonl" ]; then
     echo "ShareGPT train data already exists"
 else
     echo "Converting train data to ShareGPT..."
     $VENV/bin/python experiments/framework_comparison/convert_to_sharegpt.py \
-        --input data/vlm_training/gemini_complete_train.jsonl
+        --input data/vlm_training/gt_train.jsonl
     echo "Train conversion done"
 fi
 
-if [ -f "data/vlm_training/gemini_complete_val_sharegpt.jsonl" ]; then
+if [ -f "data/vlm_training/gt_val_sharegpt.jsonl" ]; then
     echo "ShareGPT val data already exists"
 else
     echo "Converting val data to ShareGPT..."
     $VENV/bin/python experiments/framework_comparison/convert_to_sharegpt.py \
-        --input data/vlm_training/gemini_complete_val.jsonl
+        --input data/vlm_training/gt_val.jsonl
     echo "Val conversion done"
 fi
 

@@ -329,8 +329,8 @@ class VastaiTrainer:
         train_cmd = f"""
         cd /workspace/fada-finetune && python train.py \\
             --model {model} \\
-            --train-data data/gemini_complete_train.jsonl \\
-            --val-data data/gemini_complete_val.jsonl \\
+            --train-data data/gt_train.jsonl \\
+            --val-data data/gt_val.jsonl \\
             --epochs {epochs} \\
             --batch-size {batch_size} \\
             --gradient-accumulation {grad_accum} \\

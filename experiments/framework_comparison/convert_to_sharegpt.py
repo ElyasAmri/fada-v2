@@ -9,7 +9,7 @@ ShareGPT format:
 
 Usage:
     python experiments/framework_comparison/convert_to_sharegpt.py
-    python experiments/framework_comparison/convert_to_sharegpt.py --input data/vlm_training/gemini_complete_val.jsonl --output data/vlm_training/gemini_complete_val_sharegpt.jsonl
+    python experiments/framework_comparison/convert_to_sharegpt.py --input data/vlm_training/gt_val.jsonl --output data/vlm_training/gt_val_sharegpt.jsonl
 """
 
 import argparse
@@ -78,7 +78,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert HF chat JSONL to ShareGPT format")
     parser.add_argument(
         "--input", type=Path,
-        default=PROJECT_ROOT / "data/vlm_training/gemini_complete_train.jsonl",
+        default=PROJECT_ROOT / "data/vlm_training/gt_train.jsonl",
         help="Input JSONL file in HF chat format",
     )
     parser.add_argument(

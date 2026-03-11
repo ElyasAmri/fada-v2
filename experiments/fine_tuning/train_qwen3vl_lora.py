@@ -472,12 +472,12 @@ def main():
     # Data arguments
     parser.add_argument(
         '--train-data', type=str,
-        default=str(PROJECT_ROOT / 'data/vlm_training/gemini_complete_train.jsonl'),
+        default=str(PROJECT_ROOT / 'data/vlm_training/gt_train.jsonl'),
         help='Path to training JSONL file'
     )
     parser.add_argument(
         '--val-data', type=str,
-        default=str(PROJECT_ROOT / 'data/vlm_training/gemini_complete_val.jsonl'),
+        default=str(PROJECT_ROOT / 'data/vlm_training/gt_val.jsonl'),
         help='Path to validation JSONL file'
     )
     parser.add_argument(

@@ -596,12 +596,12 @@ class VastaiRunner:
 
         # Default training data paths
         if train_data is None:
-            train_data = PROJECT_ROOT / "data" / "vlm_training" / "gemini_complete_train.jsonl"
+            train_data = PROJECT_ROOT / "data" / "vlm_training" / "gt_train.jsonl"
         else:
             train_data = Path(train_data)
 
         if val_data is None:
-            val_data = PROJECT_ROOT / "data" / "vlm_training" / "gemini_complete_val.jsonl"
+            val_data = PROJECT_ROOT / "data" / "vlm_training" / "gt_val.jsonl"
         else:
             val_data = Path(val_data)
 

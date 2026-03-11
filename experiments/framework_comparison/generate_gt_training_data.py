@@ -7,6 +7,7 @@ using the sonographer's ground truth annotations (not Gemini).
 Output:
     data/vlm_training/gt_train.jsonl      (~121K samples)
     data/vlm_training/gt_val.jsonl        (~15K samples)
+    data/vlm_training/gt_test.jsonl       (~15K samples)
 """
 
 import json
@@ -64,7 +65,7 @@ def main():
     with open(splits_path) as f:
         splits_data = json.load(f)
 
-    for split_name in ["train", "val"]:
+    for split_name in ["train", "val", "test"]:
         split_images = splits_data["splits"][split_name]
         output_path = output_dir / f"gt_{split_name}.jsonl"
 
