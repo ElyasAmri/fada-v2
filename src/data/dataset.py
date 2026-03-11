@@ -43,6 +43,7 @@ class FetalUltrasoundDataset12Class(Dataset):
         """
         self.data_root = Path(data_root)
         self.transform = transform
+        self._fallback_count = 0
 
         # Verify data root exists
         if not self.data_root.exists():
@@ -144,17 +145,24 @@ class FetalUltrasoundDataset12Class(Dataset):
         except FileNotFoundError:
             logger.error(f"Image file not found: {img_path}")
             # Return black image as fallback for missing files
+            self._fallback_count += 1
             return self._get_fallback_image(), label
 
         except (IOError, OSError) as e:
             # Handles PIL.UnidentifiedImageError and other IO issues
             logger.error(f"Error reading image {img_path}: {e}")
+            self._fallback_count += 1
             return self._get_fallback_image(), label
 
         except Exception as e:
             # Log unexpected errors but don't crash training
             logger.error(f"Unexpected error loading {img_path}: {type(e).__name__}: {e}")
+            self._fallback_count += 1
             return self._get_fallback_image(), label
+
+    @property
+    def fallback_count(self):
+        return self._fallback_count
 
     def _get_fallback_image(self) -> torch.Tensor:
         """Return a black fallback image for error cases."""

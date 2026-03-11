@@ -60,55 +60,62 @@ Metrics: primary_score = weighted multi-metric average, embed_sim = embedding si
 Scoring pipeline v2 (Mar 5): Q5 regex fix, Q2/Q3 keyword expansion, Q1/Q4 abbreviation expansion.
 Scoring pipeline v3 (Mar 6): Q1 synonym matching + F2, Q3 transverse synonym, GT spelling fixes. All 46 models rescored (54 total including later additions).
 
-| Rank | Model                                   | Size | Primary | EmbedSim |
-| ---- | --------------------------------------- | ---- | ------- | -------- |
-| 1    | Qwen/Qwen3.5-35B-A3B                    | 35B  | 0.3650  | 0.3569   |
-| 2    | google/gemma-3-12b-it                   | 12B  | 0.3629  | 0.3641   |
-| 3    | OpenGVLab/InternVL3_5-4B                | 4B   | 0.3491  | 0.3946   |
-| 4    | Qwen/Qwen3.5-4B                         | 4B   | 0.3460  | 0.3627   |
-| 5    | Qwen/Qwen3.5-9B                         | 9B   | 0.3439  | 0.3662   |
-| 6    | openbmb/MiniCPM-V-4_5                   | 8B   | 0.3409  | 0.4059   |
-| 7    | Qwen/Qwen3-VL-2B-Instruct               | 2B   | 0.3407  | 0.4013   |
-| 8    | OpenGVLab/InternVL3_5-8B                | 8B   | 0.3403  | 0.4067   |
-| 9    | moonshotai/Kimi-VL-A3B-Instruct         | 3B   | 0.3347  | 0.4057   |
-| 10   | mistralai/Mistral-Small-3.1-24B         | 24B  | 0.3292  | 0.4024   |
-| 11   | Qwen/Qwen3-VL-8B-Instruct               | 8B   | 0.3288  | 0.3866   |
-| 12   | google/gemma-3-4b-it                    | 4B   | 0.3277  | 0.3399   |
-| 13   | google/gemma-3-27b-it                   | 27B  | 0.3243  | 0.3686   |
-| 14   | Qwen/Qwen2-VL-2B-Instruct               | 2B   | 0.3218  | 0.3720   |
-| 15   | JZPeterPan/MedVLM-R1                    | 7B   | 0.3217  | 0.3791   |
-| 16   | Qwen/Qwen3-VL-8B-Thinking               | 8B   | 0.3212  | 0.3572   |
-| 17   | Qwen/Qwen3.5-0.8B                       | 0.8B | 0.3210  | 0.3771   |
-| 18   | Qwen/Qwen3.5-2B                         | 2B   | 0.3207  | 0.3745   |
-| 19   | OpenGVLab/InternVL2-8B                  | 8B   | 0.3149  | 0.3768   |
-| 20   | moonshotai/Kimi-VL-A3B-Thinking         | 3B   | 0.3144  | 0.3717   |
-| 21   | Qwen/Qwen3-VL-4B-Instruct               | 4B   | 0.3136  | 0.3898   |
-| 22   | rhymes-ai/Aria                          | 25B  | 0.3051  | 0.3814   |
-| 23   | google/medgemma-4b-it                   | 4B   | 0.3035  | 0.4044   |
-| 24   | Qwen/Qwen2.5-VL-7B-Instruct             | 7B   | 0.2935  | 0.3828   |
-| 25   | OpenGVLab/InternVL2-4B                  | 4B   | 0.2933  | 0.3523   |
-| 26   | openbmb/MiniCPM-o-2_6                   | 8B   | 0.2929  | 0.3920   |
-| 27   | openbmb/MiniCPM-V-2_6                   | 8B   | 0.2924  | 0.3941   |
-| 28   | OpenGVLab/InternVL2-2B                  | 2B   | 0.2900  | 0.3787   |
-| 29   | Qwen/Qwen2-VL-7B-Instruct               | 7B   | 0.2897  | 0.3897   |
-| 30   | HuggingFaceTB/SmolVLM2-2.2B-Instruct    | 2.2B | 0.2868  | 0.3778   |
-| 31   | Qwen/Qwen2.5-Omni-7B                    | 7B   | 0.2800  | 0.4014   |
-| 32   | google/gemma-3n-E4B-it                  | 4B   | 0.2787  | 0.3065   |
-| 33   | OpenGVLab/InternVL2-1B                  | 1B   | 0.2779  | 0.3606   |
-| 34   | HuggingFaceM4/Idefics3-8B-Llama3        | 8B   | 0.2759  | 0.3782   |
-| 35   | Qwen/Qwen2.5-VL-3B-Instruct             | 3B   | 0.2639  | 0.3788   |
-| 36   | microsoft/Phi-3.5-vision-instruct       | 4B   | 0.2602  | 0.3406   |
-| 37   | HuggingFaceTB/SmolVLM-256M-Instruct     | 256M | 0.2441  | 0.3111   |
-| 38   | HuggingFaceTB/SmolVLM-500M-Instruct     | 500M | 0.2078  | 0.3541   |
-| 39   | lmms-lab/llava-onevision-qwen2-7b-ov-hf | 7B   | 0.1663  | 0.1606   |
-| 40   | allenai/Molmo2-8B                       | 8B   | 0.1260  | 0.0155   |
-| 41   | OpenGVLab/InternVL2_5-4B                | 4B   | 0.1256  | -0.0088  |
-| 42   | mistral-community/pixtral-12b           | 12B  | 0.1256  | -0.0088  |
-| 43   | microsoft/Phi-4-multimodal-instruct     | 14B  | 0.1205  | 0.0466   |
-| 44   | Qwen/Qwen3.5-27B                        | 27B  | 0.1124  | 0.0330   |
-| 45   | NVlabs/Eagle2.5-8B                      | 8B   | 0.0960  | 0.0410   |
+| Rank | Model                                   | Size | Primary | EmbedSim | Error% |
+| ---- | --------------------------------------- | ---- | ------- | -------- | ------ |
+| 1    | Qwen/Qwen3.5-35B-A3B                    | 35B  | 0.3650  | 0.3569   | TBD    |
+| 2    | google/gemma-3-12b-it                   | 12B  | 0.3629  | 0.3641   | TBD    |
+| 3    | OpenGVLab/InternVL3_5-4B                | 4B   | 0.3491  | 0.3946   | TBD    |
+| 4    | Qwen/Qwen3.5-4B                         | 4B   | 0.3460  | 0.3627   | TBD    |
+| 5    | Qwen/Qwen3.5-9B                         | 9B   | 0.3439  | 0.3662   | TBD    |
+| 6    | openbmb/MiniCPM-V-4_5                   | 8B   | 0.3409  | 0.4059   | TBD    |
+| 7    | Qwen/Qwen3-VL-2B-Instruct               | 2B   | 0.3407  | 0.4013   | TBD    |
+| 8    | OpenGVLab/InternVL3_5-8B                | 8B   | 0.3403  | 0.4067   | TBD    |
+| 9    | moonshotai/Kimi-VL-A3B-Instruct         | 3B   | 0.3347  | 0.4057   | TBD    |
+| 10   | mistralai/Mistral-Small-3.1-24B         | 24B  | 0.3292  | 0.4024   | TBD    |
+| 11   | Qwen/Qwen3-VL-8B-Instruct               | 8B   | 0.3288  | 0.3866   | TBD    |
+| 12   | google/gemma-3-4b-it                    | 4B   | 0.3277  | 0.3399   | TBD    |
+| 13   | google/gemma-3-27b-it                   | 27B  | 0.3243  | 0.3686   | TBD    |
+| 14   | Qwen/Qwen2-VL-2B-Instruct               | 2B   | 0.3218  | 0.3720   | TBD    |
+| 15   | JZPeterPan/MedVLM-R1                    | 7B   | 0.3217  | 0.3791   | TBD    |
+| 16   | Qwen/Qwen3-VL-8B-Thinking               | 8B   | 0.3212  | 0.3572   | TBD    |
+| 17   | Qwen/Qwen3.5-0.8B                       | 0.8B | 0.3210  | 0.3771   | TBD    |
+| 18   | Qwen/Qwen3.5-2B                         | 2B   | 0.3207  | 0.3745   | TBD    |
+| 19   | OpenGVLab/InternVL2-8B                  | 8B   | 0.3149  | 0.3768   | TBD    |
+| 20   | moonshotai/Kimi-VL-A3B-Thinking         | 3B   | 0.3144  | 0.3717   | TBD    |
+| 21   | Qwen/Qwen3-VL-4B-Instruct               | 4B   | 0.3136  | 0.3898   | TBD    |
+| 22   | rhymes-ai/Aria                          | 25B  | 0.3051  | 0.3814   | TBD    |
+| 23   | google/medgemma-4b-it                   | 4B   | 0.3035  | 0.4044   | TBD    |
+| 24   | Qwen/Qwen2.5-VL-7B-Instruct             | 7B   | 0.2935  | 0.3828   | TBD    |
+| 25   | OpenGVLab/InternVL2-4B                  | 4B   | 0.2933  | 0.3523   | TBD    |
+| 26   | openbmb/MiniCPM-o-2_6                   | 8B   | 0.2929  | 0.3920   | TBD    |
+| 27   | openbmb/MiniCPM-V-2_6                   | 8B   | 0.2924  | 0.3941   | TBD    |
+| 28   | OpenGVLab/InternVL2-2B                  | 2B   | 0.2900  | 0.3787   | TBD    |
+| 29   | Qwen/Qwen2-VL-7B-Instruct               | 7B   | 0.2897  | 0.3897   | TBD    |
+| 30   | HuggingFaceTB/SmolVLM2-2.2B-Instruct    | 2.2B | 0.2868  | 0.3778   | TBD    |
+| 31   | Qwen/Qwen2.5-Omni-7B                    | 7B   | 0.2800  | 0.4014   | TBD    |
+| 32   | google/gemma-3n-E4B-it                  | 4B   | 0.2787  | 0.3065   | TBD    |
+| 33   | OpenGVLab/InternVL2-1B                  | 1B   | 0.2779  | 0.3606   | TBD    |
+| 34   | HuggingFaceM4/Idefics3-8B-Llama3        | 8B   | 0.2759  | 0.3782   | TBD    |
+| 35   | Qwen/Qwen2.5-VL-3B-Instruct             | 3B   | 0.2639  | 0.3788   | TBD    |
+| 36   | microsoft/Phi-3.5-vision-instruct       | 4B   | 0.2602  | 0.3406   | TBD    |
+| 37   | HuggingFaceTB/SmolVLM-256M-Instruct     | 256M | 0.2441  | 0.3111   | TBD    |
+| 38   | HuggingFaceTB/SmolVLM-500M-Instruct     | 500M | 0.2078  | 0.3541   | TBD    |
+| 39   | lmms-lab/llava-onevision-qwen2-7b-ov-hf | 7B   | 0.1663  | 0.1606   | TBD    |
 
-Models 40-45 have severe output issues (connection errors, formatting failures, chat template errors).
+## Models with Output Issues
+
+The following models produced severely degraded scores due to connection errors, formatting failures, or chat template errors. Error rates should be populated from score files.
+
+<!-- TODO: populate Error% values from score files for each model below -->
+
+| Model                               | Size | Primary | EmbedSim | Error% | Issue                        |
+| ----------------------------------- | ---- | ------- | -------- | ------ | ---------------------------- |
+| allenai/Molmo2-8B                   | 8B   | 0.1260  | 0.0155   | TBD    | Output formatting failure    |
+| OpenGVLab/InternVL2_5-4B            | 4B   | 0.1256  | -0.0088  | TBD    | Chat template error          |
+| mistral-community/pixtral-12b       | 12B  | 0.1256  | -0.0088  | TBD    | Connection/formatting errors |
+| microsoft/Phi-4-multimodal-instruct | 14B  | 0.1205  | 0.0466   | TBD    | Output formatting failure    |
+| Qwen/Qwen3.5-27B                    | 27B  | 0.1124  | 0.0330   | TBD    | Output formatting failure    |
+| NVlabs/Eagle2.5-8B                  | 8B   | 0.0960  | 0.0410   | TBD    | Output formatting failure    |
 
 ### Incompatible with vLLM
 

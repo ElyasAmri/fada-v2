@@ -51,3 +51,13 @@ Uses embedding similarity scoring with sentence-transformers against expert anno
 - Brain sub-views (Trans-cerebellum, Trans-thalamic, Trans-ventricular) score ~57-58% consistently
 - Q7 has 95% "normal" class imbalance
 - Embedding similarity not yet validated against human expert judgment
+
+## Known Limitations
+
+### Image-Level Splitting
+
+Dataset splitting is performed at the image level, not the patient level, because no patient identifiers are available in the dataset. This means images from the same patient may appear in both training and test sets, potentially inflating performance estimates. This is a known limitation that affects all reported scores.
+
+### Partial Credit Scoring
+
+Questions Q2 (Orientation), Q3 (Imaging Plane), Q5 (Gestational Age), Q6 (Image Quality), and Q7 (Normality) use a partial credit scheme where keyword-level agreement scores 0.5 instead of 0 or 1. The 0.5 threshold was chosen as a simple midpoint but has not been subject to sensitivity analysis. Different partial credit values could affect relative model rankings.

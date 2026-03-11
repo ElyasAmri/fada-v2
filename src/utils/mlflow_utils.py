@@ -530,6 +530,36 @@ def log_gpu_metrics() -> Dict[str, Any]:
     return metrics
 
 
+def log_environment():
+    """Log environment info to MLflow for reproducibility."""
+    import platform
+    import subprocess as _subprocess
+
+    try:
+        git_hash = _subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=_subprocess.DEVNULL
+        ).strip().decode()
+    except Exception:
+        git_hash = "unknown"
+
+    mlflow.set_tag("mlflow.source.git.commit", git_hash)
+    mlflow.log_param("python_version", platform.python_version())
+    mlflow.log_param("platform", platform.platform())
+    try:
+        import torch
+        mlflow.log_param("torch_version", torch.__version__)
+        mlflow.log_param("cuda_version", torch.version.cuda or "none")
+    except ImportError:
+        pass
+    try:
+        freeze = _subprocess.check_output(
+            ["pip", "freeze"], stderr=_subprocess.DEVNULL
+        ).decode()
+        mlflow.log_text(freeze, "pip_freeze.txt")
+    except Exception:
+        pass
+
+
 def log_inference_metrics(
     latency_ms: float,
     model_size_mb: float,

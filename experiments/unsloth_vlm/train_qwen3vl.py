@@ -71,6 +71,7 @@ def load_model():
     import sys
     sys.stdout.flush()
 
+    # TODO: Pin HuggingFace model revision for reproducibility (see #40)
     model, tokenizer = FastVisionModel.from_pretrained(
         MODEL_NAME,
         load_in_4bit=True,

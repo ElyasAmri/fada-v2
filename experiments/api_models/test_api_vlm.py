@@ -36,7 +36,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from src.data.question_loader import QuestionLoader
 from src.data.dataset_splits import load_splits, SPLITS_FILE
-from experiments.evaluation.config import API_SYSTEM_PROMPT
+from experiments.evaluation.config import API_SYSTEM_PROMPT, GENERATION_TEMPERATURE as EVAL_TEMPERATURE
 
 
 # RPD (Requests Per Day) limit error patterns
@@ -60,9 +60,6 @@ class RPDLimitError(Exception):
     """Raised when API rate/quota limit is hit"""
     pass
 
-
-# Evaluation temperature: low for reproducibility (T=0.7 used only in interactive inference)
-EVAL_TEMPERATURE = 0.1
 
 
 def is_rpd_error(error: Exception) -> bool:
@@ -252,7 +249,7 @@ class AsyncOpenAIVLM:
 
         for attempt in range(max_retries):
             try:
-                # GPT-5.x models use max_completion_tokens and don't support custom temperature
+                # GPT-5.x does not support custom temperature; results use API default (~1.0). See issue #38.
                 if self.model_name.startswith("gpt-5"):
                     response = await self._client.chat.completions.create(
                         model=self.model_name,
@@ -321,7 +318,10 @@ Question: {question}"""
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: self._client.generate_content([prompt, image])
+            lambda: self._client.generate_content(
+                [prompt, image],
+                generation_config={"temperature": EVAL_TEMPERATURE}
+            )
         )
 
         # Guard against safety-blocked or empty responses

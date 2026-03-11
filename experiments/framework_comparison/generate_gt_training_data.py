@@ -20,11 +20,10 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config.questions import QUESTIONS, QUESTION_COLUMNS
+from experiments.evaluation.config import EVAL_SYSTEM_PROMPT as SYSTEM_PROMPT
 
 # Build column -> full question text mapping from canonical source
 QUESTIONS_MAP = dict(zip(QUESTION_COLUMNS, QUESTIONS))
-
-SYSTEM_PROMPT = "You are an expert in fetal ultrasound imaging analysis. Provide accurate and clinically relevant interpretations."
 
 
 def create_sample(image_path: str, question_text: str, answer: str) -> dict:
@@ -90,7 +89,8 @@ def main():
 
         print(f"{split_name}: {len(samples)} samples from {sum(len(v) for v in split_images.values())} images ({missing} missing annotations)")
         if missing > 0:
-            print(f"  NOTE: {missing} images have no annotations (unannotated by sonographer). This is expected.")
+            print(f"WARNING: {missing} images have no annotations and were excluded")
+            print(f"  NOTE: These images are unannotated by sonographer. This is expected.")
 
     print("Done!")
 

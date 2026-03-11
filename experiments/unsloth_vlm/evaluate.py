@@ -126,8 +126,7 @@ def generate_response(model, tokenizer, image, prompt: str, max_new_tokens: int 
             **inputs,
             max_new_tokens=max_new_tokens,
             use_cache=True,
-            temperature=0.1,
-            do_sample=True,
+            do_sample=False,
         )
 
     # Decode response (skip input tokens)

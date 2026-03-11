@@ -32,7 +32,7 @@ from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
-SCORING_MODE = "pseudo_label"
+SCORING_MODE = "ground_truth"  # Fixed from "pseudo_label" (L1)
 
 from .config import (
     BASE_MODEL_ID,

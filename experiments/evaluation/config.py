@@ -4,6 +4,8 @@ Configuration constants for VLM evaluation pipeline.
 
 from pathlib import Path
 
+# Scoring pipeline version (C6: tracked for reproducibility)
+SCORING_PIPELINE_VERSION = "4.0"
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -44,16 +46,20 @@ FALLBACK_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # Generation settings
 # Temperature policy: T=0.1 for evaluation (consistency), T=0.7 for interactive inference
-VLM_SYSTEM_PROMPT = """You are an expert in fetal ultrasound imaging analysis. Provide accurate, detailed, and clinically relevant interpretations. Be precise and professional in your assessments."""
 
-# Backward-compatible alias
-SYSTEM_PROMPT = VLM_SYSTEM_PROMPT
+# Unified evaluation system prompt (H4: single prompt for all models)
+EVAL_SYSTEM_PROMPT = """You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."""
 
-# System prompt for API-based evaluation (Gemini, GPT-4o, Grok)
-API_SYSTEM_PROMPT = """You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."""
+# Backward-compatible aliases -- both point to the unified prompt
+VLM_SYSTEM_PROMPT = EVAL_SYSTEM_PROMPT
+API_SYSTEM_PROMPT = EVAL_SYSTEM_PROMPT
+
+# Legacy alias
+SYSTEM_PROMPT = EVAL_SYSTEM_PROMPT
 
 MAX_NEW_TOKENS = 1024
 GENERATION_TEMPERATURE = 0.1  # Low for consistency
+INTERACTIVE_TEMPERATURE = 0.4  # Higher temperature for interactive inference
 
 # Ground truth annotations (sonographer, normalized)
 ANNOTATIONS_PATH = DATA_DIR / "Fetal Ultrasound Annotations Normalized.xlsx"

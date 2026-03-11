@@ -36,6 +36,7 @@ tmpclaude-*/
 
 # Data
 /data/
+!data/dataset_splits.json
 /data/archive/
 
 # Documents

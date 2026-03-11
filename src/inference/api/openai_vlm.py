@@ -17,7 +17,7 @@ load_dotenv(find_dotenv('.env.local'))
 
 from openai import OpenAI
 from src.inference.vlm_interface import VLMInterface
-from experiments.evaluation.config import API_SYSTEM_PROMPT
+from experiments.evaluation.config import API_SYSTEM_PROMPT, INTERACTIVE_TEMPERATURE
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ class OpenAIVLM(VLMInterface):
                     model=self.model_name_id,
                     messages=messages,
                     max_tokens=1024,
-                    temperature=0.4
+                    temperature=INTERACTIVE_TEMPERATURE
                 )
 
             if response.choices and response.choices[0].message.content:

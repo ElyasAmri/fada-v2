@@ -294,6 +294,7 @@ def create_model_and_processor(
 
     if use_unsloth and UNSLOTH_AVAILABLE:
         # Use Unsloth for optimized loading
+        # TODO: Pin HuggingFace model revision for reproducibility (see #40)
         model, processor = FastModel.from_pretrained(
             model_id,
             max_seq_length=2048,

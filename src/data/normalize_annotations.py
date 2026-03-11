@@ -1155,6 +1155,8 @@ def _normalize_q5_regex(text: str) -> Optional[str]:
     if m:
         low, high = int(m.group(1)), int(m.group(2))
         midpoint = (low + high) / 2
+        # NOTE: int(midpoint) truncates toward zero, creating systematic bias toward lower GA bins.
+        # Wide ranges (e.g., "11-23 weeks") collapse to a single bin. See issue #46.
         return _weeks_to_bin(int(midpoint))
 
     # Try single week (e.g., "14 weeks") -- search anywhere in text

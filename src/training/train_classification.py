@@ -661,8 +661,8 @@ def main():
     args = parser.parse_args()
 
     # Set random seed
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
+    from src.utils.seed import set_all_seeds
+    set_all_seeds(args.seed)
 
     # Setup MLflow experiment
     logger.info(f"Setting up MLflow experiment: {args.experiment_name}")

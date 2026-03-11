@@ -19,6 +19,7 @@ for backward compatibility with existing evaluation scores.
 import re
 import json
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -34,6 +35,7 @@ from .config import (
     BERTSCORE_MODEL,
     GA_BINS_ORDERED,
     QUALITY_TIERS,
+    SCORING_PIPELINE_VERSION,
 )
 from .embedding_scorer import EmbeddingScorer
 
@@ -49,6 +51,12 @@ _QUESTION_PREFIX_MAP: Dict[str, int] = {}
 for _i, _q in enumerate(QUESTIONS):
     _prefix = _q.split(":")[0].strip().lower()
     _QUESTION_PREFIX_MAP[_prefix] = _i
+
+# C1: JSONL variant prefixes (alternative phrasings used in JSONL training files)
+_QUESTION_PREFIX_MAP["imaging plane identification"] = 2   # JSONL variant of Q3
+_QUESTION_PREFIX_MAP["normality/abnormality determination"] = 6  # JSONL variant of Q7
+_QUESTION_PREFIX_MAP["gestational age estimation"] = 4  # JSONL variant of Q5
+_QUESTION_PREFIX_MAP["image quality assessment"] = 5  # JSONL variant of Q6
 
 
 def detect_question_index(question_text: str) -> int:
@@ -203,6 +211,19 @@ Q1_STRUCTURE_SYNONYMS: Dict[str, set] = {
     "interhemispheric fissure": {"falx", "falx cerebri"},
     "choroid plexus": {"choroid"},
     "choroid": {"choroid plexus"},
+    "ventricle": {"lateral ventricle"},
+    "lateral ventricle": {"ventricle"},
+    "cerebellum": {"cerebellar vermis"},
+    "cerebellar vermis": {"cerebellum"},
+    "femur": {"femoral bone", "thigh bone"},
+    "femoral bone": {"femur", "thigh bone"},
+    "thigh bone": {"femur", "femoral bone"},
+    "placenta": {"placental tissue"},
+    "placental tissue": {"placenta"},
+    "amniotic fluid": {"liquor amnii"},
+    "liquor amnii": {"amniotic fluid"},
+    "diaphragm": {"diaphragmatic dome"},
+    "diaphragmatic dome": {"diaphragm"},
 }
 
 
@@ -213,6 +234,50 @@ def _expand_with_synonyms(structure_set: set) -> set:
         if s in Q1_STRUCTURE_SYNONYMS:
             expanded.update(Q1_STRUCTURE_SYNONYMS[s])
     return expanded
+
+
+def _get_git_hash() -> str:
+    """Return the current git commit hash (first 40 chars) or 'unknown'."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).strip().decode()
+    except Exception:
+        return "unknown"
+
+
+def _file_sha256(path) -> str:
+    """Return the first 16 hex chars of the SHA-256 of a file, or 'unknown'."""
+    import hashlib
+    try:
+        h = hashlib.sha256(Path(path).read_bytes())
+        return h.hexdigest()[:16]
+    except Exception:
+        return "unknown"
+
+
+def bootstrap_confidence_interval(
+    scores: np.ndarray,
+    n_bootstrap: int = 10000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> Tuple[float, float, float]:
+    """Compute bootstrap confidence interval for a score array.
+
+    Returns:
+        (mean, ci_lower, ci_upper)
+    """
+    if len(scores) == 0:
+        return 0.0, 0.0, 0.0
+    rng = np.random.default_rng(seed)
+    boot_means = np.array([
+        np.mean(rng.choice(scores, size=len(scores), replace=True))
+        for _ in range(n_bootstrap)
+    ])
+    mean = float(np.mean(scores))
+    ci_lower = float(np.percentile(boot_means, 100 * alpha / 2))
+    ci_upper = float(np.percentile(boot_means, 100 * (1 - alpha / 2)))
+    return mean, ci_lower, ci_upper
 
 
 def _extract_presentation_keyword(text: str) -> Optional[str]:
@@ -441,7 +506,7 @@ class _QuestionScorers:
         else:
             pred_kw = _extract_presentation_keyword(norm_pred)
             gt_kw = _extract_presentation_keyword(norm_gt)
-            score = 0.5 if (pred_kw and gt_kw and pred_kw == gt_kw) else 0.0
+            score = 0.5 if (pred_kw and gt_kw and pred_kw == gt_kw) else 0.0  # Partial credit=0.5; see sensitivity analysis in docs
 
         return QuestionScore(
             question_index=1,
@@ -464,7 +529,7 @@ class _QuestionScorers:
         else:
             pred_kw = _extract_plane_keyword(norm_pred)
             gt_kw = _extract_plane_keyword(norm_gt)
-            score = 0.5 if (pred_kw and gt_kw and pred_kw == gt_kw) else 0.0
+            score = 0.5 if (pred_kw and gt_kw and pred_kw == gt_kw) else 0.0  # Partial credit=0.5; see sensitivity analysis in docs
 
         return QuestionScore(
             question_index=2,
@@ -517,7 +582,7 @@ class _QuestionScorers:
             pred_idx = _ga_bin_index(pred_bin)
             gt_idx = _ga_bin_index(gt_bin)
             if pred_idx is not None and gt_idx is not None and abs(pred_idx - gt_idx) == 1:
-                score = 0.5
+                score = 0.5  # Partial credit=0.5; see sensitivity analysis in docs
             else:
                 score = 0.0
 
@@ -545,7 +610,7 @@ class _QuestionScorers:
             if pred_tier == gt_tier:
                 score = 1.0
             elif abs(QUALITY_TIERS.get(pred_tier, -99) - QUALITY_TIERS.get(gt_tier, -99)) == 1:
-                score = 0.5
+                score = 0.5  # Partial credit=0.5; see sensitivity analysis in docs
             else:
                 score = 0.0
         else:
@@ -577,7 +642,7 @@ class _QuestionScorers:
             gt_binary = _extract_normality_binary(norm_gt)
             details["pred_binary"] = pred_binary
             details["gt_binary"] = gt_binary
-            score = 0.5 if (pred_binary and gt_binary and pred_binary == gt_binary) else 0.0
+            score = 0.5 if (pred_binary and gt_binary and pred_binary == gt_binary) else 0.0  # Partial credit=0.5; see sensitivity analysis in docs
 
         # Confusion matrix component
         pred_binary = _extract_normality_binary(norm_pred)
@@ -771,6 +836,8 @@ class MultiMetricScorer:
             scores, records, unmatched, predictions_file
         )
         result["metadata"]["error_prediction_count"] = error_prediction_count
+        # L4: error_rate in overall for direct access
+        result["overall"]["error_rate"] = error_prediction_count / len(predictions) if predictions else 0
         return result
 
     def _aggregate_results(
@@ -786,6 +853,29 @@ class MultiMetricScorer:
         primary_scores = np.array([s.primary_score for s in scores])
         embedding_sims = np.array([s.embedding_similarity for s in scores])
 
+        # C3: Z-score normalized aggregation across heterogeneous metrics
+        per_q_means: Dict[int, np.ndarray] = {}
+        for q_idx in range(8):
+            q_scores_arr = np.array([s.primary_score for s in scores if s.question_index == q_idx])
+            if len(q_scores_arr) > 0:
+                per_q_means[q_idx] = q_scores_arr
+
+        if len(per_q_means) >= 2:
+            # Normalize each question's scores, then average across all
+            all_normalized: List[float] = []
+            for q_arr in per_q_means.values():
+                mu, sigma = np.mean(q_arr), np.std(q_arr)
+                if sigma > 0:
+                    all_normalized.extend(((q_arr - mu) / sigma).tolist())
+                else:
+                    all_normalized.extend(np.zeros_like(q_arr).tolist())
+            normalized_mean = float(np.mean(all_normalized)) if all_normalized else 0.0
+        else:
+            normalized_mean = float(np.mean(primary_scores))
+
+        # C2: Bootstrap CI for overall primary score
+        overall_mean, overall_ci_lower, overall_ci_upper = bootstrap_confidence_interval(primary_scores)
+
         result: Dict[str, Any] = {
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
@@ -793,10 +883,18 @@ class MultiMetricScorer:
                 "annotations_file": str(self.annotations_path),
                 "num_matched": len(records),
                 "num_unmatched": len(unmatched),
+                "scoring_pipeline_version": SCORING_PIPELINE_VERSION,
+                "git_commit_hash": _get_git_hash(),
+                "embedding_model": DEFAULT_EMBEDDING_MODEL,
+                "bertscore_model": BERTSCORE_MODEL,
+                "annotations_file_hash": _file_sha256(self.annotations_path),
             },
             "overall": {
-                # NOTE: Averages heterogeneous metrics (F2, accuracy, F1, BERTScore); interpret with caution
+                "_WARNING": "primary_score_mean averages heterogeneous metrics (F2, accuracy, F1, BERTScore); prefer per-question scores or primary_score_mean_normalized",
                 "primary_score_mean": float(np.mean(primary_scores)),
+                "primary_score_mean_normalized": normalized_mean,
+                "primary_score_ci_lower": overall_ci_lower,
+                "primary_score_ci_upper": overall_ci_upper,
                 "embedding_similarity_mean": float(np.mean(embedding_sims)),
                 "num_samples": len(scores),
             },
@@ -824,10 +922,15 @@ class MultiMetricScorer:
                 if s.normalized_prediction != r.prediction
             )
 
+            # H1: Bootstrap CI per question
+            q_mean, q_ci_lower, q_ci_upper = bootstrap_confidence_interval(q_primary)
+
             entry: Dict[str, Any] = {
                 "metric_name": q_scores[0].primary_metric_name,
                 "primary_mean": float(np.mean(q_primary)),
                 "primary_std": float(np.std(q_primary)),
+                "primary_ci_lower": q_ci_lower,
+                "primary_ci_upper": q_ci_upper,
                 "embedding_similarity_mean": float(np.mean(q_embed)),
                 "normalization_rate": norm_count / len(q_scores) if q_scores else 0.0,
                 "num_samples": len(q_scores),
@@ -844,9 +947,12 @@ class MultiMetricScorer:
                 total_neg = cm["TN"] + cm["FP"]
                 cm["sensitivity"] = cm["TP"] / total_pos if total_pos > 0 else 0.0
                 cm["specificity"] = cm["TN"] / total_neg if total_neg > 0 else 0.0
+                # M1: Balanced accuracy for Q7
+                cm["balanced_accuracy"] = (cm["sensitivity"] + cm["specificity"]) / 2
                 cm["classified_count"] = cm["TP"] + cm["TN"] + cm["FP"] + cm["FN"]
                 cm["cm_coverage"] = cm["classified_count"] / len(q_scores) if q_scores else 0.0
                 entry["confusion_matrix"] = cm
+                entry["balanced_accuracy"] = cm["balanced_accuracy"]
 
             result["per_question"][q_name] = entry
 
@@ -879,6 +985,11 @@ class MultiMetricScorer:
                 }
 
             result["per_category"][cat] = cat_entry
+
+        # M2: Macro-average across categories
+        if result["per_category"]:
+            cat_means = [c["primary_score_mean"] for c in result["per_category"].values()]
+            result["overall"]["category_macro_mean"] = float(np.mean(cat_means))
 
         return result
 

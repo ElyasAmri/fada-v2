@@ -14,6 +14,7 @@ from dotenv import load_dotenv, find_dotenv
 from src.utils.image_processing import to_base64_data_url
 from src.utils.api_client import call_with_retry
 from src.inference.vlm_interface import VLMInterface
+from experiments.evaluation.config import INTERACTIVE_TEMPERATURE
 
 load_dotenv(find_dotenv('.env.local'))
 
@@ -152,7 +153,7 @@ Provide clear, professional medical responses based on what you observe in the i
                         }
                     ],
                     "max_tokens": 1024,
-                    "temperature": 0.4
+                    "temperature": INTERACTIVE_TEMPERATURE
                 }
             ]
         }

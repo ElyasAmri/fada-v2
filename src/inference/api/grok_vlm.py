@@ -17,6 +17,7 @@ load_dotenv(find_dotenv('.env.local'))
 
 from openai import OpenAI
 from src.inference.vlm_interface import VLMInterface
+from experiments.evaluation.config import INTERACTIVE_TEMPERATURE
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class GrokVLM(VLMInterface):
                 model=self.model_name_id,
                 messages=messages,
                 max_tokens=1024,
-                temperature=0.4
+                temperature=INTERACTIVE_TEMPERATURE
             )
 
             # Extract text from response
