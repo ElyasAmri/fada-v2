@@ -89,16 +89,16 @@ These models have existing results. Keep for comparison but do NOT prioritize fo
 
 ## Medical VLMs
 
-| Model               | Focus             | Size | Availability   | Status     | Notes                                         |
-| ------------------- | ----------------- | ---- | -------------- | ---------- | --------------------------------------------- |
-| **MedGemma-27B**    | General medical   | 27B  | Google API     | **Tested** | 78.81% GT (709 samples)                       |
-| **MedGemma-4B**     | General medical   | 4B   | HuggingFace    | GT tested  | 0.3035 primary (1,894 samples)                |
-| **MedVLM-R1**       | Medical reasoning | 2B   | HuggingFace    | TODO       | Qwen2-VL-2B + GRPO RL; 78.22% on MRI/CT/X-ray |
-| **Medical-VLM-24B** | General medical   | 24B  | John Snow Labs | TODO       | 82.9% on OpenMedBench                         |
-| **MindGPT-Med**     | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                       |
-| **MedDr**           | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                       |
-| **LLaVA-Med**       | Radiology         | 7B   | HuggingFace    | TODO       | Medical adaptation of LLaVA                   |
-| **CheXagent-8B**    | Chest X-ray       | 8B   | HuggingFace    | Tested     | 0% -- complete domain mismatch                |
+| Model               | Focus             | Size | Availability   | Status     | Notes                                                                                                            |
+| ------------------- | ----------------- | ---- | -------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| **MedGemma-27B**    | General medical   | 27B  | Google API     | **Tested** | 78.81% proxy (709 samples -- Phase 1 proxy scoring against Gemini pseudo-labels, NOT GT sonographer annotations) |
+| **MedGemma-4B**     | General medical   | 4B   | HuggingFace    | GT tested  | 0.3035 primary (1,894 samples)                                                                                   |
+| **MedVLM-R1**       | Medical reasoning | 2B   | HuggingFace    | TODO       | Qwen2-VL-2B + GRPO RL; 78.22% on MRI/CT/X-ray                                                                    |
+| **Medical-VLM-24B** | General medical   | 24B  | John Snow Labs | TODO       | 82.9% on OpenMedBench                                                                                            |
+| **MindGPT-Med**     | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                                                                                          |
+| **MedDr**           | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                                                                                          |
+| **LLaVA-Med**       | Radiology         | 7B   | HuggingFace    | TODO       | Medical adaptation of LLaVA                                                                                      |
+| **CheXagent-8B**    | Chest X-ray       | 8B   | HuggingFace    | Tested     | 0% -- complete domain mismatch                                                                                   |
 
 ---
 

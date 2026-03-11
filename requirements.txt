@@ -1,3 +1,4 @@
+# Requires Python >= 3.10
 # FADA v3 - Core Dependencies
 # NOTE: PyTorch is installed separately with CUDA support:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
@@ -37,6 +38,13 @@ streamlit==1.50.0
 
 # Utilities
 backoff==2.2.1
+
+# Training/Fine-tuning (install alongside PyTorch)
+transformers>=4.51.0
+peft>=0.15.0
+trl>=0.18.0
+accelerate>=1.7.0
+datasets>=3.6.0
 
 # Optional: TFLite export for mobile deployment (heavy dependency, ~500MB)
 # tensorflow==2.20.0

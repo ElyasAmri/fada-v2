@@ -8,6 +8,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+MAX_UPLOAD_SIZE_MB = 10
+
 # Check VLM availability
 try:
     from src.inference.vlm_factory import create_top_vlms
@@ -55,6 +57,9 @@ def _render_upload_section():
     )
 
     if vlm_uploaded_file is not None:
+        if vlm_uploaded_file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+            st.error(f"File exceeds {MAX_UPLOAD_SIZE_MB} MB limit. Please upload a smaller image.")
+            return
         vlm_image = Image.open(vlm_uploaded_file).convert('RGB')
         st.session_state.vlm_comparison_image = vlm_image
         st.image(vlm_image, caption=vlm_uploaded_file.name, use_container_width=True)

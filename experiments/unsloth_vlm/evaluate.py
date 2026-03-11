@@ -6,6 +6,7 @@ comparing generated responses to ground truth annotations.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -55,8 +56,11 @@ def normalize_assessment(text: str) -> str:
 
     # Check for abnormal indicators first (they override normal)
     for keyword in abnormal_keywords:
-        if keyword in text and "no " + keyword not in text:
-            return "abnormal"
+        if keyword in text:
+            # Check for negation patterns before the keyword (no trailing \b to handle plural/suffix forms)
+            negation_pattern = rf'\bno\s+{re.escape(keyword)}|\bnot\s+{re.escape(keyword)}|\bwithout\s+{re.escape(keyword)}|\bno\s+evidence\s+of\s+{re.escape(keyword)}'
+            if not re.search(negation_pattern, text):
+                return "abnormal"
 
     # Check for normal indicators
     for keyword in normal_keywords:

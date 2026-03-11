@@ -6,7 +6,7 @@ This project is focused on developing a machine learning model to assist in the 
 
 ### Available Data
 
-We have a comprehensive dataset of 12 fetal organ types:
+We have a comprehensive dataset of 14 fetal organ types (CRL-View and NT-View added since initial writing):
 
 - Aorta
 - Cervical region
@@ -56,6 +56,8 @@ Each annotated image includes 8 standardized questions:
 | Phase 3 | Further Benchmarks | Pending     |
 | Phase 4 | Mobile Deployment  | Pending     |
 | Phase 5 | Web/App Demo       | Pending     |
+
+NOTE: Phase definitions and current status may differ from above. See docs/project/Tasks.md for current task tracking.
 
 ## Steps and Approach
 

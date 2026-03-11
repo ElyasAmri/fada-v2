@@ -53,6 +53,7 @@ if VQA_AVAILABLE and st.session_state.vqa_model is None:
 
 # Header
 st.markdown("# FADA - Fetal Anomaly Detection Algorithm")
+st.warning("RESEARCH PROTOTYPE ONLY -- Not for clinical use. All results require verification by qualified medical professionals.")
 
 # Top metrics row
 col1, col2, col3, col4 = st.columns(4)
@@ -85,11 +86,4 @@ with tab4:
 
 # Footer
 st.divider()
-footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
-with footer_col2:
-    st.markdown(
-        "<p style='text-align: center; color: gray; font-size: 12px;'>"
-        "FADA v3.1"
-        "</p>",
-        unsafe_allow_html=True
-    )
+st.caption("FADA v3.1")

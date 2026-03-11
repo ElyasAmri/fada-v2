@@ -10,10 +10,12 @@ Fine-tune top-performing VLMs on fetal ultrasound dataset using LoRA adapters fo
 
 ## Completed Results
 
-| Model                 | Score | Method               | Samples | Platform        |
-| --------------------- | ----- | -------------------- | ------- | --------------- |
-| Qwen2.5-VL-7B         | 81.1% | Embedding similarity | 600     | RunPod RTX 3090 |
-| Qwen3-VL-8B (Q7 only) | 82%   | Accuracy             | 50      | Local RTX 5090  |
+| Model                 | Score     | Method               | Samples | Platform        |
+| --------------------- | --------- | -------------------- | ------- | --------------- |
+| Qwen2.5-VL-7B         | 81.1% [1] | Embedding similarity | 600     | RunPod RTX 3090 |
+| Qwen3-VL-8B (Q7 only) | 82%       | Accuracy             | 50      | Local RTX 5090  |
+
+[1] NOTE: 600-sample subset. Full test set (1,894 images) v3 score is embed_sim=0.5058. The 81.1% figure should be reproduced on the full test set for verification.
 
 ## Target Models (Priority Order)
 

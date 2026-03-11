@@ -8,7 +8,7 @@ tags: [tasks]
 
 ### Completed (Phase 4: Full Test Set Evaluation)
 
-- [x] Ground-truth evaluation of 46 models on 1,894 test images
+- [x] Ground-truth evaluation of 54 models on 1,894 test images (see models-to-test.md for current count)
 - [x] Expand Qwen2.5-VL-7B evaluation from 600 to 1,894 images
 - [x] Score existing Gemini batch annotation results (62 batches)
 - [x] Score MedGemma-4B results (medgemma_4b_complete.json)
@@ -22,14 +22,14 @@ tags: [tasks]
 
 ### Completed (Phase 2: Fine-Tuning)
 
-- [x] Qwen2.5-VL-7B fine-tuned to 81.1% (600 samples, embedding similarity)
+- [x] Qwen2.5-VL-7B fine-tuned to 81.1% (600 samples, embedding similarity -- NOTE: 600-sample subset; full test set v3 score is embed_sim=0.5058)
 - [x] Qwen3-VL-8B Q7 baseline at 82% (50 samples)
 - [x] Unsloth fine-tuning verified for all 7 Qwen models (RTX 5090)
 - [x] Cloud infrastructure built (RCCG A100/H100)
 
 ### Completed (Phase 3: Cloud API Evaluation)
 
-- [x] MedGemma-27B evaluated at 78.81% (709 samples, embedding similarity)
+- [x] MedGemma-27B evaluated at 78.81% (709 samples, embedding similarity against Gemini pseudo-labels -- Phase 1 proxy scoring, NOT GT sonographer annotations)
 - [x] Gemini batch annotations (62 batches)
 
 ### Upcoming
@@ -46,7 +46,7 @@ tags: [tasks]
 | Phase 1: VLM Benchmarks | Complete | 50+ models              |
 | Phase 2: Fine-Tuning    | Complete | Qwen2.5-VL-7B at 81.1%  |
 | Phase 3: Cloud API      | Complete | MedGemma-27B at 78.81%  |
-| Phase 4: Full Test Set  | Complete | 1,894 images, 46 models |
+| Phase 4: Full Test Set  | Complete | 1,894 images, 54 models |
 | Phase 5: Web/App Demo   | Pending  | -                       |
 
 ## Blockers

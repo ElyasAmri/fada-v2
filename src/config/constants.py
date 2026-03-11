@@ -7,13 +7,15 @@ and mappings used throughout the FADA system.
 
 from typing import Dict, List
 
-# 12-class labels for fetal ultrasound classification
+# 14-class labels for fetal ultrasound classification
 CLASSES: List[str] = [
     'Abdomen',
     'Aorta',
+    'CRL-View',
     'Cervical',
     'Cervix',
     'Femur',
+    'NT-View',
     'Non_standard_NT',
     'Public_Symphysis_fetal_head',
     'Standard_NT',
@@ -29,8 +31,10 @@ DISPLAY_NAMES: Dict[str, str] = {
     'Aorta': 'Aortic Arch',
     'Cervical': 'Cervical View',
     'Cervix': 'Cervix',
+    'CRL-View': 'Crown-Rump Length View',
     'Femur': 'Femur',
     'Non_standard_NT': 'Non-standard NT',
+    'NT-View': 'Nuchal Translucency View',
     'Public_Symphysis_fetal_head': 'Fetal Head Position',
     'Standard_NT': 'Standard NT',
     'Thorax': 'Thorax',
@@ -45,8 +49,10 @@ CLASS_DESCRIPTIONS: Dict[str, str] = {
     'Aorta': 'Aortic arch view for cardiac output assessment',
     'Cervical': 'Cervical view for cervix evaluation',
     'Cervix': 'Direct cervix view for length measurement',
+    'CRL-View': 'Crown-rump length measurement view for first trimester dating',
     'Femur': 'Femur length measurement for growth assessment',
     'Non_standard_NT': 'Non-standard nuchal translucency view',
+    'NT-View': 'Nuchal translucency screening view',
     'Public_Symphysis_fetal_head': 'Fetal head position relative to pubic symphysis',
     'Standard_NT': 'Standard nuchal translucency measurement',
     'Thorax': 'Thoracic cross-section for lung and heart assessment',
@@ -70,6 +76,8 @@ VQA_MODEL_MAPPING: Dict[str, str] = {
     'Aorta': '1epoch',
     'Cervical': '1epoch',
     'Cervix': '1epoch',
+    'CRL-View': '1epoch',
+    'NT-View': '1epoch',
     'Public_Symphysis_fetal_head': '1epoch',
 }
 
@@ -77,9 +85,11 @@ VQA_MODEL_MAPPING: Dict[str, str] = {
 ORGAN_INFO: Dict[str, str] = {
     'Abdomen': 'The abdominal view shows stomach, liver, and cord insertion.',
     'Aortic Arch': 'The aortic arch view assesses cardiac output and vessel structure.',
+    'Crown-Rump Length View': 'The CRL view is used for crown-rump length measurement in first trimester dating.',
     'Cervical View': 'The cervical view evaluates the cervical region.',
     'Cervix': 'The cervical view measures cervical length.',
     'Femur': 'The femur view is used to measure femur length (FL).',
+    'Nuchal Translucency View': 'The NT view is used for nuchal translucency screening.',
     'Non-standard NT': 'Non-standard nuchal translucency measurement view.',
     'Fetal Head Position': 'Fetal head position relative to pubic symphysis.',
     'Standard NT': 'Standard nuchal translucency measurement for screening.',

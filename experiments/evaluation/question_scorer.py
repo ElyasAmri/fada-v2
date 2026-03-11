@@ -168,33 +168,41 @@ def _compute_set_f1(
 # ---------------------------------------------------------------------------
 
 Q1_STRUCTURE_SYNONYMS: Dict[str, set] = {
-    "abdomen": {"abdominal wall", "abdominal area"},
-    "abdominal wall": {"abdomen", "abdominal area"},
-    "belly": {"abdomen", "abdominal wall"},
-    "head": {"fetal head", "fetal skull", "calvarium"},
+    "abdomen": {"abdominal wall", "abdominal area", "belly"},
+    "abdominal wall": {"abdomen", "abdominal area", "belly"},
+    "abdominal area": {"abdomen", "abdominal wall", "belly"},
+    "belly": {"abdomen", "abdominal wall", "abdominal area"},
+    "head": {"fetal head", "fetal skull", "calvarium", "skull"},
     "fetal head": {"head", "calvarium", "skull"},
     "fetal skull": {"skull", "calvarium", "head"},
-    "skull": {"fetal skull", "calvarium"},
-    "calvarium": {"skull", "fetal skull", "calvarial bones"},
+    "skull": {"fetal skull", "calvarium", "head", "fetal head", "calvarial bones"},
+    "calvarium": {"skull", "fetal skull", "calvarial bones", "head", "fetal head"},
     "calvarial bones": {"calvarium", "skull"},
     "spine": {"vertebral column", "spinal column", "fetal spine", "vertebrae"},
-    "fetal spine": {"spine", "vertebral column"},
-    "vertebral column": {"spine", "fetal spine"},
-    "vertebrae": {"spine", "vertebral column"},
+    "spinal column": {"spine", "vertebral column", "fetal spine", "vertebrae"},
+    "fetal spine": {"spine", "vertebral column", "spinal column"},
+    "vertebral column": {"spine", "fetal spine", "vertebrae", "spinal column"},
+    "vertebrae": {"spine", "vertebral column", "spinal column"},
     "brain": {"cerebrum", "intracranial structures"},
-    "intracranial structures": {"brain"},
+    "intracranial structures": {"brain", "cerebrum"},
+    "cerebrum": {"brain", "intracranial structures"},
     "heart": {"cardiac structures", "fetal heart"},
     "fetal heart": {"heart", "cardiac structures"},
+    "cardiac structures": {"heart", "fetal heart"},
     "ivc": {"inferior vena cava"},
     "inferior vena cava": {"ivc"},
-    "stomach bubble": {"stomach"},
+    "stomach bubble": {"stomach", "gastric bubble"},
     "stomach": {"stomach bubble", "gastric bubble"},
+    "gastric bubble": {"stomach", "stomach bubble"},
     "umbilical cord": {"umbilical"},
+    "umbilical": {"umbilical cord"},
     "thalami": {"thalamus"},
     "thalamus": {"thalami"},
     "falx": {"falx cerebri", "interhemispheric fissure"},
     "falx cerebri": {"falx", "interhemispheric fissure"},
+    "interhemispheric fissure": {"falx", "falx cerebri"},
     "choroid plexus": {"choroid"},
+    "choroid": {"choroid plexus"},
 }
 
 
@@ -381,7 +389,7 @@ class _QuestionScorers:
         """Q1: Synonym-expanded set F2 (recall-weighted) on anatomical structures."""
         col = QUESTION_COLUMNS[0]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt  # Already normalized in the Excel
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         pred_set = {s.strip().lower() for s in norm_pred.split(",") if s.strip()}
         gt_set = {s.strip().lower() for s in norm_gt.split(",") if s.strip()}
@@ -426,7 +434,7 @@ class _QuestionScorers:
         """Q2: Relaxed accuracy on fetal orientation."""
         col = QUESTION_COLUMNS[1]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         if norm_pred.strip().lower() == norm_gt.strip().lower():
             score = 1.0
@@ -449,7 +457,7 @@ class _QuestionScorers:
         """Q3: Relaxed accuracy on imaging plane."""
         col = QUESTION_COLUMNS[2]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         if norm_pred.strip().lower() == norm_gt.strip().lower():
             score = 1.0
@@ -472,7 +480,7 @@ class _QuestionScorers:
         """Q4: Keyword F1 on measurement types."""
         col = QUESTION_COLUMNS[3]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         pred_kw = _extract_q4_keywords(norm_pred)
         gt_kw = _extract_q4_keywords(norm_gt)
@@ -498,7 +506,7 @@ class _QuestionScorers:
         """Q5: Exact bin match on gestational age."""
         col = QUESTION_COLUMNS[4]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         pred_bin = norm_pred.strip().lower()
         gt_bin = norm_gt.strip().lower()
@@ -528,7 +536,7 @@ class _QuestionScorers:
         """Q6: Exact tier match on image quality."""
         col = QUESTION_COLUMNS[5]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         pred_tier = _extract_quality_tier(norm_pred)
         gt_tier = _extract_quality_tier(norm_gt)
@@ -536,7 +544,7 @@ class _QuestionScorers:
         if pred_tier and gt_tier:
             if pred_tier == gt_tier:
                 score = 1.0
-            elif abs(QUALITY_TIERS.get(pred_tier, -1) - QUALITY_TIERS.get(gt_tier, -1)) == 1:
+            elif abs(QUALITY_TIERS.get(pred_tier, -99) - QUALITY_TIERS.get(gt_tier, -99)) == 1:
                 score = 0.5
             else:
                 score = 0.0
@@ -558,7 +566,7 @@ class _QuestionScorers:
         """Q7: Exact match with binary normal/abnormal fallback."""
         col = QUESTION_COLUMNS[6]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         details: Dict[str, Any] = {}
 
@@ -598,7 +606,7 @@ class _QuestionScorers:
         """Q8: Placeholder -- primary_score filled by batch BERTScore later."""
         col = QUESTION_COLUMNS[7]
         norm_pred = self.normalizer.normalize_single(col, pred)
-        norm_gt = gt
+        norm_gt = self.normalizer.normalize_single(col, gt)
 
         return QuestionScore(
             question_index=7,
@@ -748,9 +756,15 @@ class MultiMetricScorer:
         if q8_indices:
             q8_preds = [scores[i].normalized_prediction for i in q8_indices]
             q8_refs = [scores[i].normalized_gt for i in q8_indices]
-            bert_scores = _compute_bertscore_batch(q8_preds, q8_refs)
-            for j, idx in enumerate(q8_indices):
-                scores[idx].primary_score = bert_scores[j]
+            try:
+                bert_scores = _compute_bertscore_batch(q8_preds, q8_refs)
+                for j, idx in enumerate(q8_indices):
+                    scores[idx].primary_score = bert_scores[j]
+            except Exception as e:
+                logger.error("BERTScore computation failed, falling back to 0.0: %s", e)
+                for idx in q8_indices:
+                    scores[idx].primary_score = 0.0
+                    scores[idx].details["bertscore_error"] = str(e)
 
         # 5. Aggregate
         result = self._aggregate_results(
@@ -781,6 +795,7 @@ class MultiMetricScorer:
                 "num_unmatched": len(unmatched),
             },
             "overall": {
+                # NOTE: Averages heterogeneous metrics (F2, accuracy, F1, BERTScore); interpret with caution
                 "primary_score_mean": float(np.mean(primary_scores)),
                 "embedding_similarity_mean": float(np.mean(embedding_sims)),
                 "num_samples": len(scores),
@@ -829,6 +844,8 @@ class MultiMetricScorer:
                 total_neg = cm["TN"] + cm["FP"]
                 cm["sensitivity"] = cm["TP"] / total_pos if total_pos > 0 else 0.0
                 cm["specificity"] = cm["TN"] / total_neg if total_neg > 0 else 0.0
+                cm["classified_count"] = cm["TP"] + cm["TN"] + cm["FP"] + cm["FN"]
+                cm["cm_coverage"] = cm["classified_count"] / len(q_scores) if q_scores else 0.0
                 entry["confusion_matrix"] = cm
 
             result["per_question"][q_name] = entry

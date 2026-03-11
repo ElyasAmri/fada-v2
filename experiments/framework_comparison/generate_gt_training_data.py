@@ -17,17 +17,12 @@ from pathlib import Path
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-QUESTIONS = {
-    "Q1: Anatomical Structures": "Anatomical Structures Identification: Identify and describe all anatomical structures visible in the image.",
-    "Q2: Fetal Orientation": "Fetal Orientation: Describe the orientation of the fetus as seen in the ultrasound image.",
-    "Q3: Imaging Plane": "Imaging Plane Identification: What imaging plane is used in this ultrasound image?",
-    "Q4: Biometric Measurements": "Biometric Measurements: Identify any biometric measurements that can be taken from this image.",
-    "Q5: Gestational Age": "Gestational Age Estimation: Based on the visible features, estimate the gestational age of the fetus.",
-    "Q6: Image Quality": "Image Quality Assessment: Evaluate the technical quality of this ultrasound image.",
-    "Q7: Normality Assessment": "Normality/Abnormality Determination: Assess whether the visualized structures appear normal or abnormal.",
-    "Q8: Clinical Recommendations": "Clinical Recommendations: Based on the image findings, provide clinical recommendations.",
-}
+from src.config.questions import QUESTIONS, QUESTION_COLUMNS
+
+# Build column -> full question text mapping from canonical source
+QUESTIONS_MAP = dict(zip(QUESTION_COLUMNS, QUESTIONS))
 
 SYSTEM_PROMPT = "You are an expert in fetal ultrasound imaging analysis. Provide accurate and clinically relevant interpretations."
 
@@ -83,7 +78,7 @@ def main():
                 if isinstance(row, pd.DataFrame):
                     row = row.iloc[0]
 
-                for q_col, q_text in QUESTIONS.items():
+                for q_col, q_text in QUESTIONS_MAP.items():
                     answer = row.get(q_col)
                     if pd.isna(answer) or str(answer).strip() == "":
                         continue
@@ -93,7 +88,9 @@ def main():
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
 
-        print(f"{split_name}: {len(samples)} samples from {sum(len(v) for v in split_images.values())} images ({missing} missing)")
+        print(f"{split_name}: {len(samples)} samples from {sum(len(v) for v in split_images.values())} images ({missing} missing annotations)")
+        if missing > 0:
+            print(f"  NOTE: {missing} images have no annotations (unannotated by sonographer). This is expected.")
 
     print("Done!")
 

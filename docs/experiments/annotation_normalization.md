@@ -2,7 +2,7 @@
 
 ## Motivation
 
-Analysis of the master annotations file (`data/Fetal Ultrasound Annotations Final.xlsx`, 18,936 rows) revealed extreme answer fragmentation across the 8 clinical questions (Q1-Q8). The dataset contained 6,988 unique answer values where approximately 120 canonical forms should logically exist.
+Analysis of the master annotations file (`data/Fetal Ultrasound Annotations Normalized.xlsx`, 18,936 rows) revealed extreme answer fragmentation across the 8 clinical questions (Q1-Q8). The dataset contained 6,988 unique answer values where approximately 120 canonical forms should logically exist.
 
 This fragmentation directly harms VLM training quality: the model learns to associate the same clinical concept with hundreds of superficially different strings, diluting gradient signal and inflating the effective vocabulary.
 
@@ -182,7 +182,7 @@ Review of the unmapped tail confirmed no high-frequency patterns were missed.
 | --------------------------------------------------- | ---------------------------------------------- |
 | `src/data/normalize_annotations.py`                 | Core normalizer class and mapping dictionaries |
 | `experiments/normalization/run_normalize.py`        | CLI runner script                              |
-| `data/Fetal Ultrasound Annotations Final.xlsx`      | Original annotations (unchanged)               |
+| `data/Fetal Ultrasound Annotations Normalized.xlsx` | Original annotations (unchanged)               |
 | `data/Fetal Ultrasound Annotations Normalized.xlsx` | Normalized output                              |
 | `data/normalization_changelog.json`                 | Per-cell change log with layer/rule tracking   |
 

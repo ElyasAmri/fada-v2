@@ -63,8 +63,8 @@ BERTSCORE_MODEL = "roberta-large"
 
 # Gestational age bins (ordered for adjacency scoring)
 GA_BINS_ORDERED = [
-    "8-13 weeks", "15-20 weeks", "20-25 weeks",
-    "25-30 weeks", "30-35 weeks", "35-38 weeks",
+    "8-13 weeks", "13-15 weeks", "15-20 weeks", "20-25 weeks",
+    "25-30 weeks", "30-35 weeks", "35-38 weeks", "38+ weeks",
 ]
 
 # Image quality tiers (ordered for adjacency scoring)

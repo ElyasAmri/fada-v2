@@ -110,7 +110,7 @@ class ComprehensiveMetrics:
                             auc_scores[self.class_names[i]] = roc_auc_score(
                                 y_true_binarized[:, i], y_probs[:, i]
                             )
-                        except:
+                        except Exception:
                             auc_scores[self.class_names[i]] = None
             except Exception as e:
                 logger.warning(f"Could not compute AUC: {e}")

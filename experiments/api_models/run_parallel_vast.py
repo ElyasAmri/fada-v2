@@ -256,7 +256,7 @@ class VastManager:
             try:
                 proc.terminate()
                 proc.wait(timeout=5)
-            except:
+            except Exception:
                 proc.kill()
 
         # Kill inference processes
@@ -264,7 +264,7 @@ class VastManager:
             try:
                 proc.terminate()
                 proc.wait(timeout=5)
-            except:
+            except Exception:
                 proc.kill()
 
         # Destroy instances
@@ -516,7 +516,7 @@ def main():
                         with open(ckpt_file, 'r') as f:
                             ckpt = json.load(f)
                             progress = len(ckpt.get("completed_images", {}))
-                    except:
+                    except Exception:
                         pass
 
                 total = end_idx - start_idx

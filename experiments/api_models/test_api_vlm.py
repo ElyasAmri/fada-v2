@@ -324,8 +324,13 @@ Question: {question}"""
             lambda: self._client.generate_content([prompt, image])
         )
 
-        if response.text:
-            return response.text.strip()
+        # Guard against safety-blocked or empty responses
+        try:
+            text = response.text
+        except Exception:
+            text = None
+        if text:
+            return text.strip()
         return "No response generated."
 
 
@@ -664,7 +669,8 @@ async def process_single_image(
     rate_limiter: RateLimiter
 ) -> Dict[str, Any]:
     """Process all questions for a single image in parallel"""
-    image = Image.open(image_path).convert('RGB')
+    with Image.open(image_path) as img:
+        image = img.convert('RGB')
 
     # Create tasks for all questions
     tasks = [

@@ -77,7 +77,7 @@ cmd_play() {
     wsl_script=$(wslpath -u "$wsl_script" 2>/dev/null || echo "$wsl_script")
     wsl_inv=$(wslpath -u "$wsl_inv" 2>/dev/null || echo "$wsl_inv")
     wsl_pb=$(wslpath -u "$wsl_pb" 2>/dev/null || echo "$wsl_pb")
-    wsl -e bash -lc "cp '$wsl_script' /tmp/rccg_ansible.cfg && cp '$wsl_inv' /tmp/rccg_hosts.yml && chmod 644 /tmp/rccg_ansible.cfg /tmp/rccg_hosts.yml && ANSIBLE_CONFIG=/tmp/rccg_ansible.cfg ansible-playbook -i /tmp/rccg_hosts.yml '$wsl_pb' $*"
+    wsl -e bash -lc "cp '$wsl_script' /tmp/rccg_ansible.cfg && cp '$wsl_inv' /tmp/rccg_hosts.yml && chmod 644 /tmp/rccg_ansible.cfg /tmp/rccg_hosts.yml && ANSIBLE_CONFIG=/tmp/rccg_ansible.cfg ansible-playbook -i /tmp/rccg_hosts.yml '$wsl_pb' $(printf ' %q' "$@")"
   fi
 }
 

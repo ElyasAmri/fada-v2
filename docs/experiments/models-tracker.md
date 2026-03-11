@@ -17,19 +17,19 @@ project: fada-v3
 
 ## Phase 2: Fine-Tuned with Ground Truth (Jan 2026)
 
-| Model             | Task         | Score     | Samples | Method               |
-| ----------------- | ------------ | --------- | ------- | -------------------- |
-| **Qwen2.5-VL-7B** | VQA Q1-Q8    | **81.1%** | 600     | Embedding similarity |
-| Qwen3-VL-8B       | Q7 Normality | 82%       | 50      | Accuracy             |
-| EfficientNet-B0   | 12-class     | 88%       | 1,494   | Classification       |
+| Model             | Task         | Score     | Samples | Method                                                                                      |
+| ----------------- | ------------ | --------- | ------- | ------------------------------------------------------------------------------------------- |
+| **Qwen2.5-VL-7B** | VQA Q1-Q8    | **81.1%** | 600     | Embedding similarity -- NOTE: 600-sample subset; full test set v3 score is embed_sim=0.5058 |
+| Qwen3-VL-8B       | Q7 Normality | 82%       | 50      | Accuracy                                                                                    |
+| EfficientNet-B0   | 12-class     | 88%       | 1,494   | Classification                                                                              |
 
 ---
 
 ## Phase 3: Cloud API Evaluation (Dec 2025)
 
-| Model            | Provider  | Score      | Samples | Notes      |
-| ---------------- | --------- | ---------- | ------- | ---------- |
-| **MedGemma-27B** | Vertex AI | **78.81%** | 709     | Full Q1-Q8 |
+| Model            | Provider  | Score      | Samples | Notes                                                                                          |
+| ---------------- | --------- | ---------- | ------- | ---------------------------------------------------------------------------------------------- |
+| **MedGemma-27B** | Vertex AI | **78.81%** | 709     | Full Q1-Q8 -- NOTE: proxy scoring against Gemini pseudo-labels, NOT GT sonographer annotations |
 
 ---
 
@@ -51,14 +51,14 @@ All 7 Qwen models verified working with Unsloth:
 
 ## Phase 4: RCCG H100 Full Test Set Evaluation (Mar 2026)
 
-8x H100 PCIe machines running vLLM, evaluated on 1,894 test images (full test split). 46 models scored.
+8x H100 PCIe machines running vLLM, evaluated on 1,894 test images (full test split). 54 models scored (see models-to-test.md for current count).
 
 ### Scored Results (zero-shot, 1,894 test images)
 
 Metrics: primary_score = weighted multi-metric average, embed_sim = embedding similarity vs ground truth.
 
 Scoring pipeline v2 (Mar 5): Q5 regex fix, Q2/Q3 keyword expansion, Q1/Q4 abbreviation expansion.
-Scoring pipeline v3 (Mar 6): Q1 synonym matching + F2, Q3 transverse synonym, GT spelling fixes. All 46 models rescored.
+Scoring pipeline v3 (Mar 6): Q1 synonym matching + F2, Q3 transverse synonym, GT spelling fixes. All 46 models rescored (54 total including later additions).
 
 | Rank | Model                                   | Size | Primary | EmbedSim |
 | ---- | --------------------------------------- | ---- | ------- | -------- |

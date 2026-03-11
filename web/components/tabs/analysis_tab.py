@@ -11,6 +11,8 @@ from ..model_loader import load_category_vqa, VQA_AVAILABLE
 
 logger = logging.getLogger(__name__)
 
+MAX_UPLOAD_SIZE_MB = 10
+
 
 def render_analysis_tab():
     """Render the main analysis tab"""
@@ -56,7 +58,10 @@ def _render_chat_area():
 
     # Process image upload
     if uploaded_file is not None and not st.session_state.analyzing:
-        _handle_image_upload(uploaded_file)
+        if uploaded_file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+            st.error(f"File exceeds {MAX_UPLOAD_SIZE_MB} MB limit. Please upload a smaller image.")
+        else:
+            _handle_image_upload(uploaded_file)
 
 
 def _handle_text_input(prompt):

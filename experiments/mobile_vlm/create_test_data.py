@@ -40,7 +40,7 @@ def create_dummy_images(output_dir: Path, count: int = 10):
         # Add label
         try:
             draw.text((10, 10), f"Test Image {i+1}", fill=255)
-        except:
+        except Exception:
             pass  # Font not available, skip text
 
         # Save

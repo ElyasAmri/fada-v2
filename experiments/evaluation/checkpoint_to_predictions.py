@@ -10,6 +10,7 @@ Usage:
 import argparse
 import json
 import sys
+import logging
 from pathlib import Path
 
 _project_root = Path(__file__).resolve().parent.parent.parent
@@ -17,6 +18,8 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.config.questions import QUESTIONS
+
+logger = logging.getLogger(__name__)
 
 
 def convert(checkpoint_path: Path, output_path: Path) -> int:
@@ -35,8 +38,30 @@ def convert(checkpoint_path: Path, output_path: Path) -> int:
             image_path = f"{category}/{image_name}"
 
             for q in result.get("questions", []):
-                q_idx = q.get("question_idx", 0)
-                question_text = QUESTIONS[q_idx] if q_idx < len(QUESTIONS) else q.get("question", "")
+                raw_question_text = q.get("question", "")
+                if "question_idx" in q:
+                    q_idx = q["question_idx"]
+                    question_text = QUESTIONS[q_idx] if q_idx < len(QUESTIONS) else raw_question_text
+                else:
+                    # question_idx absent: detect from question text to avoid silently
+                    # miscategorizing all entries as Q1 (index 0)
+                    if raw_question_text:
+                        from experiments.evaluation.question_scorer import detect_question_index
+                        try:
+                            q_idx = detect_question_index(raw_question_text)
+                            question_text = QUESTIONS[q_idx]
+                        except ValueError:
+                            logger.warning(
+                                "Cannot detect question index for image %s, question text: %r -- skipping",
+                                image_key, raw_question_text[:80],
+                            )
+                            continue
+                    else:
+                        logger.warning(
+                            "Image %s has a question entry with no question_idx and no question text -- skipping",
+                            image_key,
+                        )
+                        continue
                 response = q.get("response", "")
 
                 pred = {

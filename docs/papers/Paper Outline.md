@@ -3,18 +3,20 @@ tags: [output, writing]
 closes: "#24"
 ---
 
+> NOTE: Performance figures in this outline should be verified against the latest results in docs/experiments/results-summary.md
+
 # Comparative Evaluation of Vision-Language Models for Fetal Ultrasound Visual Question Answering
 
 ## Abstract
 
-We present the largest benchmark of vision-language models (VLMs) for fetal ultrasound image analysis, evaluating 42 models across 14 anatomical categories using 8 standardized clinical questions per image. Using a multi-metric scoring pipeline combining per-question specialized metrics with embedding similarity against sonographer ground truth, we find that google/gemma-3-12b-it achieves the highest zero-shot score (0.3596), followed by Qwen3.5-35B-A3B (0.3566) and InternVL3_5-4B (0.3492). Our analysis reveals that model size does not predict performance, current-generation models consistently outperform predecessors, and medical-specialized models underperform general-purpose alternatives on this domain. All models plateau at ~36% primary score, suggesting a ceiling for zero-shot evaluation that fine-tuning may overcome. Research prototype -- not for clinical use.
+We present the largest benchmark of vision-language models (VLMs) for fetal ultrasound image analysis, evaluating 54 models across 14 anatomical categories using 8 standardized clinical questions per image. Using a multi-metric scoring pipeline combining per-question specialized metrics with embedding similarity against sonographer ground truth, we find that google/gemma-3-12b-it achieves the highest zero-shot score (0.3596), followed by Qwen3.5-35B-A3B (0.3566) and InternVL3_5-4B (0.3492). Our analysis reveals that model size does not predict performance, current-generation models consistently outperform predecessors, and medical-specialized models underperform general-purpose alternatives on this domain. All models plateau at ~36% primary score, suggesting a ceiling for zero-shot evaluation that fine-tuning may overcome. Research prototype -- not for clinical use.
 
 ## 1. Introduction
 
 - Motivation: AI-assisted prenatal screening via automated ultrasound interpretation
 - Gap: No large-scale VLM benchmark exists for fetal ultrasound VQA
 - Contribution:
-  - Largest fetal ultrasound VLM benchmark (42 models, 19K images, 14 categories)
+  - Largest fetal ultrasound VLM benchmark (54 models, 19K images, 14 categories)
   - Multi-metric scoring pipeline with per-question specialized evaluation
   - Analysis of model families, size scaling, and architectural choices (MoE, thinking modes)
   - Evidence that general-purpose VLMs outperform medical-specialized models on this task
@@ -51,7 +53,7 @@ We present the largest benchmark of vision-language models (VLMs) for fetal ultr
 
 ### 4.1 Model Selection
 
-- 42 models from 13 families spanning 256M to 35B parameters
+- 54 models from 13 families spanning 256M to 35B parameters (see models-to-test.md for current count)
 - Current-gen: Gemma 3, Qwen3.5, Qwen3-VL, InternVL3.5, MiniCPM-V-4.5, Kimi-VL
 - Previous-gen: Qwen2.5-VL, Qwen2-VL, InternVL2, Gemma 3n
 - Medical: MedGemma, MedVLM-R1
@@ -82,7 +84,7 @@ We present the largest benchmark of vision-language models (VLMs) for fetal ultr
 ### 5.1 Overall Rankings
 
 - Top 5: gemma-3-12b-it (0.3596), Qwen3.5-35B-A3B (0.3566), InternVL3_5-4B (0.3492), MiniCPM-V-4_5 (0.3403), Qwen3.5-4B (0.3397)
-- Score range: 0.12 to 0.36 across 42 models
+- Score range: 0.12 to 0.36 across 54 models (see results-summary.md for current rankings)
 - Strong clustering in 0.26-0.36 band (ranks 1-36)
 
 ### 5.2 Per-Question Analysis
@@ -133,7 +135,7 @@ We present the largest benchmark of vision-language models (VLMs) for fetal ultr
 
 - All models plateau at ~36% primary score
 - Contributing factors: metric strictness, task difficulty, zero-shot limitation
-- Fine-tuning expected to break this ceiling (prior work: Qwen2.5-VL-7B fine-tuned reached 81.1% embed sim on 600 samples)
+- Fine-tuning expected to break this ceiling (prior work: Qwen2.5-VL-7B fine-tuned reached 81.1% embed sim on 600 samples -- NOTE: this figure is from a 600-sample subset; the full test set v3 score is embed_sim=0.5058; the 81.1% figure should be reproduced on the full test set for verification)
 
 ### 6.6 Limitations
 
@@ -157,11 +159,11 @@ We present the largest benchmark of vision-language models (VLMs) for fetal ultr
 - Sentence-transformers
 - BERTScore
 - vLLM
-- Model citations for all 42 models evaluated
+- Model citations for all 54 models evaluated
 
 ## Status
 
-- [x] Phase 4 zero-shot benchmark complete (42 models)
+- [x] Phase 4 zero-shot benchmark complete (54 models, see models-to-test.md for current count)
 - [ ] Fine-tuning experiments
 - [ ] Human evaluation correlation study
 - [ ] Full paper draft

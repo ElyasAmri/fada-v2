@@ -47,7 +47,7 @@ TRAINING_CONFIG = {
 # LoRA configuration
 LORA_CONFIG = {
     "r": 16,
-    "lora_alpha": 16,
+    "lora_alpha": 32,
     "lora_dropout": 0,
     "target_modules": "all-linear",
     "use_rslora": False,

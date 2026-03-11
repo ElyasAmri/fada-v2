@@ -50,7 +50,7 @@ def extract_category_from_path(image_path: str) -> str:
     """Extract category name from image path."""
     parts = Path(image_path).parts
     for i, part in enumerate(parts):
-        if part == "Fetal Ultrasound":
+        if part == "Fetal Ultrasound" and i + 1 < len(parts):
             return parts[i + 1]
     return "Unknown"
 
@@ -149,7 +149,8 @@ class VLMEvaluator:
         import torch
         from PIL import Image
 
-        image = Image.open(image_path).convert('RGB')
+        with Image.open(image_path) as img:
+            image = img.convert('RGB')
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -445,6 +446,12 @@ def main():
         # Handle resume
         start_index = 0
         existing_results = None
+        if args.resume_from and args.start_index is not None:
+            print(
+                f"\nWARNING: --resume-from and --start-index are both set. "
+                f"--resume-from takes precedence; --start-index={args.start_index} is ignored. "
+                f"Using --resume-from to avoid duplicate sample_ids."
+            )
         if args.resume_from:
             resume_path = Path(args.resume_from)
             if not resume_path.exists():
@@ -452,6 +459,21 @@ def main():
                 return 1
             existing_results = load_predictions(resume_path)
             start_index = len(existing_results)
+            # Deduplicate by sample_id in case resume file already contains overlap
+            seen_ids = set()
+            deduped = []
+            for r in existing_results:
+                sid = r.get("sample_id")
+                if sid not in seen_ids:
+                    seen_ids.add(sid)
+                    deduped.append(r)
+            if len(deduped) < len(existing_results):
+                print(
+                    f"\nWARNING: Removed {len(existing_results) - len(deduped)} duplicate "
+                    f"sample_ids from resume file."
+                )
+                existing_results = deduped
+                start_index = len(existing_results)
             print(f"\nResuming from sample {start_index} ({len(existing_results)} already completed)")
         elif args.start_index is not None:
             start_index = args.start_index

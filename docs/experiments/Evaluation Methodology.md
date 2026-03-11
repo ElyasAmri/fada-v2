@@ -38,10 +38,13 @@ Uses embedding similarity scoring with sentence-transformers against expert anno
 
 ### Verified Results
 
-| Model                      | Score  | Samples | Method               |
-| -------------------------- | ------ | ------- | -------------------- |
-| Qwen2.5-VL-7B (fine-tuned) | 81.1%  | 600     | Embedding similarity |
-| MedGemma-27B (cloud API)   | 78.81% | 709     | Embedding similarity |
+| Model                      | Score  | Samples | Method                   |
+| -------------------------- | ------ | ------- | ------------------------ |
+| Qwen2.5-VL-7B (fine-tuned) | 81.1%  | 600     | Embedding similarity [1] |
+| MedGemma-27B (cloud API)   | 78.81% | 709     | Embedding similarity [2] |
+
+[1] NOTE: 600-sample subset. Full test set (1,894 images) v3 score is embed_sim=0.5058. The 81.1% figure should be reproduced on the full test set for verification.
+[2] NOTE: Phase 1 proxy scoring against Gemini pseudo-labels, NOT GT scoring against sonographer annotations.
 
 ### Known Issues
 

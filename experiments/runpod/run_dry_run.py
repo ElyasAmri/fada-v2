@@ -93,7 +93,7 @@ class RunPodDryRun:
         try:
             result = subprocess.run(scp_cmd, capture_output=True, timeout=timeout)
             return result.returncode == 0
-        except:
+        except Exception:
             return False
 
     def setup_remote_environment(self) -> bool:
@@ -271,7 +271,7 @@ class RunPodDryRun:
                     with open(local_path) as f:
                         results = json.load(f)
                         all_results.extend(results)
-                except:
+                except Exception:
                     print(f"  WARNING: Could not parse {remote_name}")
             else:
                 print(f"  WARNING: {remote_name} not found")

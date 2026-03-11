@@ -56,7 +56,7 @@ Options:
 
 - [x] Phase 1: 50+ models zero-shot
 - [x] Phase 2: Qwen2.5-VL-7B fine-tuned (81.1%, 600 samples)
-- [x] Phase 3: MedGemma-27B cloud (78.81%, 709 samples)
+- [x] Phase 3: MedGemma-27B cloud (78.81%, 709 samples -- proxy scoring against Gemini pseudo-labels, NOT GT sonographer annotations)
 - [x] Classification: EfficientNet-B0 (88%, 1,494 samples)
 - [x] Infrastructure: RCCG (A100/H100)
 - [x] Local testing: All 7 Qwen models with Unsloth
@@ -80,6 +80,9 @@ Options:
 | ---------------- | -------------- | ------- | ------ |
 | Qwen3.5-35B-A3B  | GT primary     | 1,894   | 36.5%  |
 | gemma-3-12b-it   | GT primary     | 1,894   | 36.3%  |
-| Qwen2.5-VL-7B FT | Embedding      | 600     | 81.1%  |
-| MedGemma-27B     | Embedding      | 709     | 78.81% |
+| Qwen2.5-VL-7B FT | Embedding [1]  | 600     | 81.1%  |
+| MedGemma-27B     | Embedding [2]  | 709     | 78.81% |
 | EfficientNet-B0  | Classification | 1,494   | 88%    |
+
+[1] NOTE: 600-sample subset. Full test set (1,894 images) v3 score is embed_sim=0.5058. The 81.1% figure should be reproduced on the full test set for verification.
+[2] NOTE: Phase 1 proxy scoring against Gemini pseudo-labels, NOT GT scoring against sonographer annotations.

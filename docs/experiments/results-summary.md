@@ -132,7 +132,7 @@ Qwen3.5 avg (0.3015) is dragged down by Qwen3.5-27B (0.1124, output issues). Exc
 
 ### 6. Score ceiling at ~36%
 
-All 46 models cluster between 0.10-0.37 primary score. The ceiling likely reflects:
+All 46 models cluster between 0.10-0.37 primary score (54 total including later additions; see models-to-test.md for current count). The ceiling likely reflects:
 
 - Scoring pipeline strictness (exact matching on Q1-Q3 penalizes semantically correct but differently worded answers)
 - Inherent task difficulty (biometric measurements, gestational age estimation from single images)
@@ -151,7 +151,7 @@ Applied March 2026. Changes from v2:
 - **Q1 synonym matching + F2**: Structure synonyms (e.g., "abdomen" matches "abdominal wall") with F-beta (beta=2) recall-weighted scoring. Q1 primary: 0.116 -> 0.142 (+22%)
 - **Q3 transverse synonym**: "transverse" now maps to "axial" (clinically equivalent for cross-sectional views)
 - **Q3 GT spelling fixes**: "sagital", "saggital", "dagital", "midsagital" corrected in normalization layer
-- All 46 models rescored. Top model changed: Qwen3.5-35B-A3B (0.3650) overtook gemma-3-12b-it (0.3629)
+- All 46 models rescored (54 total including later additions). Top model changed: Qwen3.5-35B-A3B (0.3650) overtook gemma-3-12b-it (0.3629)
 - Impact on gemma-3-12b-it: overall primary 0.3596 -> 0.3629 (+0.003)
 
 ## Scoring Pipeline v2
@@ -169,4 +169,4 @@ Applied March 2026. Changes from v1:
 - **Inference engine**: vLLM with OpenAI-compatible API
 - **Eval script**: `experiments/api_models/test_api_vlm.py` (8 questions per image, checkpoint/resume)
 - **Scoring**: `experiments/evaluation/score_against_gt.py` (per-question specialized metrics + embedding similarity)
-- **Ground truth**: Sonographer annotations from `data/Fetal Ultrasound Annotations Final.xlsx`
+- **Ground truth**: Sonographer annotations from `data/Fetal Ultrasound Annotations Normalized.xlsx`
