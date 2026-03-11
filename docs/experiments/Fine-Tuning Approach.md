@@ -18,11 +18,9 @@ Fine-tune top-performing VLMs on fetal ultrasound dataset using LoRA adapters fo
 ## Target Models (Priority Order)
 
 1. **Qwen2.5-VL-7B** - 81.1% fine-tuned, best verified GT score
-2. **MiniCPM-V-2.6** - 88.9% proxy (needs GT re-evaluation)
-3. **Qwen2-VL-2B** - 83.3% proxy, efficient 2B model
-4. **InternVL2-4B** - ~82% proxy, strong medical understanding
-
-Note: Proxy scores (keyword matching, ~250 samples) are NOT comparable to GT scores (embedding similarity).
+2. **Qwen3.5-35B-A3B** - 0.3650 primary (top zero-shot, 1,894 samples)
+3. **gemma-3-12b-it** - 0.3629 primary (#2 zero-shot)
+4. **InternVL3.5-4B** - 0.3491 primary (#3 zero-shot)
 
 ## Training Configuration
 

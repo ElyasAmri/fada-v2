@@ -17,6 +17,7 @@ load_dotenv(find_dotenv('.env.local'))
 
 from openai import OpenAI
 from src.inference.vlm_interface import VLMInterface
+from experiments.evaluation.config import API_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class OpenAIVLM(VLMInterface):
         messages = [
             {
                 "role": "system",
-                "content": "You are a medical imaging expert analyzing fetal ultrasound images. Provide clear, professional medical responses."
+                "content": API_SYSTEM_PROMPT
             },
             {
                 "role": "user",

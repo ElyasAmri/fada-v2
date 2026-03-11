@@ -17,6 +17,7 @@ load_dotenv(find_dotenv('.env.local'))
 
 import google.generativeai as genai
 from src.inference.vlm_interface import VLMInterface
+from experiments.evaluation.config import API_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ class GeminiVLM(VLMInterface):
         api_key: Optional[str] = None,
         thinking_level: str = "low",
         max_retries: int = 3,
-        retry_delay: float = 1.0
+        retry_delay: float = 1.0,
+        temperature: float = 0.4
     ):
         """
         Initialize Gemini VLM
@@ -51,6 +53,7 @@ class GeminiVLM(VLMInterface):
             thinking_level: Thinking level for reasoning models ("none", "low", "medium", "high")
             max_retries: Maximum number of retries on API errors
             retry_delay: Initial delay between retries (exponential backoff)
+            temperature: Sampling temperature for generation
         """
         self.model_name_id = model_name
         self.display_name = self.AVAILABLE_MODELS.get(model_name, model_name)
@@ -58,6 +61,7 @@ class GeminiVLM(VLMInterface):
         self.thinking_level = thinking_level
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.temperature = temperature
 
         self._loaded = False
         self._model = None
@@ -74,7 +78,7 @@ class GeminiVLM(VLMInterface):
 
         # Configure generation settings
         generation_config = {
-            "temperature": 0.4,
+            "temperature": self.temperature,
             "top_p": 0.95,
             "top_k": 40,
             "max_output_tokens": 1024,

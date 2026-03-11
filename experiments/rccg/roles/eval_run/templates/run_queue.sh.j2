@@ -73,7 +73,7 @@ run_eval() {
 
   if [ -f "$checkpoint" ]; then
     # Check if checkpoint is complete (1894 images)
-    local count=$(${PROJECT_DIR}/venv/bin/python -c "import json; d=json.load(open('$checkpoint')); print(len(d.get('results',{})))" 2>/dev/null || echo "0")
+    local count=$(${PROJECT_DIR}/venv/bin/python -c "import json; d=json.load(open('$checkpoint')); print(len(d.get('completed_images',{})))" 2>/dev/null || echo "0")
     if [ "$count" -ge 1894 ]; then
       log "SKIP: $model already complete ($count images in checkpoint)"
       return 0

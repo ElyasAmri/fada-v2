@@ -92,8 +92,10 @@ class EmbeddingScorer:
         Returns:
             numpy array of similarity scores (one per sample)
         """
-        assert len(predictions) == len(references), \
-            f"Length mismatch: {len(predictions)} predictions vs {len(references)} references"
+        if len(predictions) != len(references):
+            raise ValueError(
+                f"Length mismatch: {len(predictions)} predictions vs {len(references)} references"
+            )
 
         print("Encoding predictions...")
         pred_embeddings = self.encode_texts(predictions, show_progress)
@@ -146,8 +148,10 @@ class EmbeddingScorer:
         Returns:
             Dictionary mapping category name to its metrics
         """
-        assert len(similarities) == len(categories), \
-            f"Length mismatch: {len(similarities)} scores vs {len(categories)} categories"
+        if len(similarities) != len(categories):
+            raise ValueError(
+                f"Length mismatch: {len(similarities)} scores vs {len(categories)} categories"
+            )
 
         category_metrics = {}
         unique_categories = sorted(set(categories))

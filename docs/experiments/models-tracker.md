@@ -8,7 +8,7 @@ project: fada-v3
 
 | Phase   | Method               | Sample Size | Ground Truth | Status       |
 | ------- | -------------------- | ----------- | ------------ | ------------ |
-| Phase 1 | Proxy metrics        | ~250        | No           | Deprecated   |
+| Phase 1 | Zero-shot screening  | ~250        | No           | Archived     |
 | Phase 2 | Embedding similarity | 600         | Yes          | Complete     |
 | Phase 3 | Cloud API            | 709         | Yes          | Complete     |
 | Phase 4 | Full test set        | 1,894       | Yes          | **Complete** |

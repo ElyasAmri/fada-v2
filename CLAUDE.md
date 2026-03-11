@@ -132,7 +132,7 @@ data/archive/            # Gemini pseudo-labels, legacy training formats, old an
 
 - **Hardware**: RTX 5090 (24GB VRAM) local, cloud GPUs for benchmarking
 - **Accuracy**: Best verified GT score is 81.1% (Qwen2.5-VL-7B fine-tuned)
-- **Key caveat**: Phase 1 proxy scores (keyword matching) are NOT comparable to Phase 2/3 GT scores (embedding similarity)
+- **Key caveat**: All current scores are GT-based (embedding similarity + per-question metrics). Phase 1 proxy scores were archived.
 - **Documentation**: Every decision documented for research paper
 
 ## Common Issues and Solutions

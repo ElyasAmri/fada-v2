@@ -13,6 +13,7 @@ import torch
 from transformers import BitsAndBytesConfig
 
 from src.inference.local.base import LocalVLM
+from experiments.evaluation.config import VLM_SYSTEM_PROMPT
 
 
 class Qwen3VLVLM(LocalVLM):
@@ -25,7 +26,7 @@ class Qwen3VLVLM(LocalVLM):
     - 4-bit quantization for memory efficiency
     """
 
-    MODEL_ID = "Qwen/Qwen2-VL-2B-Instruct"  # Default fallback
+    MODEL_ID = ""  # Must be resolved from MODEL_VARIANTS via model_variant arg
     DISPLAY_NAME = "Qwen2-VL-2B"
     USE_CAUSAL_LM = False
 
@@ -71,6 +72,12 @@ class Qwen3VLVLM(LocalVLM):
             model_id=model_id,
             display_name=display_name or default_display,
             use_4bit=use_4bit
+        )
+
+        assert self.model_id, (
+            f"model_id is empty after resolution. "
+            f"Pass a valid model_variant key (one of {list(self.MODEL_VARIANTS)}) "
+            f"or a full HuggingFace model ID."
         )
 
         self.lora_adapter_path = lora_adapter_path
@@ -171,7 +178,7 @@ class Qwen3VLVLM(LocalVLM):
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert in fetal ultrasound imaging analysis. Provide accurate, detailed, and clinically relevant interpretations."
+                "content": VLM_SYSTEM_PROMPT
             },
             {
                 "role": "user",

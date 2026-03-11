@@ -6,7 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple
 
 _root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_root))
@@ -19,50 +19,9 @@ from src.data.normalize_annotations import AnnotationNormalizer
 from experiments.evaluation.question_scorer import (
     MultiMetricScorer, detect_question_index, _compute_set_f1,
     _extract_presentation_keyword, _extract_plane_keyword,
+    Q1_STRUCTURE_SYNONYMS, _expand_with_synonyms,
 )
 from experiments.evaluation.config import ANNOTATIONS_PATH
-
-# -----------------------------------------------------------------------
-# Q1 Fix: Structure synonyms
-# -----------------------------------------------------------------------
-Q1_SYNONYMS = {
-    "abdomen": {"abdominal wall", "abdominal area"},
-    "abdominal wall": {"abdomen", "abdominal area"},
-    "belly": {"abdomen", "abdominal wall"},
-    "head": {"fetal head", "fetal skull", "calvarium"},
-    "fetal head": {"head", "calvarium", "skull"},
-    "fetal skull": {"skull", "calvarium", "head"},
-    "skull": {"fetal skull", "calvarium"},
-    "calvarium": {"skull", "fetal skull", "calvarial bones"},
-    "calvarial bones": {"calvarium", "skull"},
-    "spine": {"vertebral column", "spinal column", "fetal spine", "vertebrae"},
-    "fetal spine": {"spine", "vertebral column"},
-    "vertebral column": {"spine", "fetal spine"},
-    "vertebrae": {"spine", "vertebral column"},
-    "brain": {"cerebrum", "intracranial structures"},
-    "intracranial structures": {"brain"},
-    "heart": {"cardiac structures", "fetal heart"},
-    "fetal heart": {"heart", "cardiac structures"},
-    "ivc": {"inferior vena cava"},
-    "inferior vena cava": {"ivc"},
-    "stomach bubble": {"stomach"},
-    "stomach": {"stomach bubble", "gastric bubble"},
-    "umbilical cord": {"umbilical"},
-    "thalami": {"thalamus"},
-    "thalamus": {"thalami"},
-    "falx": {"falx cerebri", "interhemispheric fissure"},
-    "falx cerebri": {"falx", "interhemispheric fissure"},
-    "choroid plexus": {"choroid"},
-}
-
-
-def _expand_synonyms(structure_set: Set[str]) -> Set[str]:
-    """Expand a set of structures with their synonyms."""
-    expanded = set(structure_set)
-    for s in structure_set:
-        if s in Q1_SYNONYMS:
-            expanded.update(Q1_SYNONYMS[s])
-    return expanded
 
 
 # -----------------------------------------------------------------------
@@ -201,8 +160,8 @@ def main():
             gt_set = {s.strip().lower() for s in gt_text.split(",") if s.strip()}
 
             if use_synonyms:
-                pred_expanded = _expand_synonyms(pred_set)
-                gt_expanded = _expand_synonyms(gt_set)
+                pred_expanded = _expand_with_synonyms(pred_set)
+                gt_expanded = _expand_with_synonyms(gt_set)
                 tp = len(pred_expanded & gt_expanded)
                 precision = tp / len(pred_set) if pred_set else 0
                 recall = tp / len(gt_set) if gt_set else 0

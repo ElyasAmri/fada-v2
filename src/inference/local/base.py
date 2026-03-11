@@ -86,17 +86,12 @@ class LocalVLM(VLMInterface):
 
     def unload(self) -> None:
         """Unload model from memory"""
-        if self.model is not None:
-            del self.model
-            self.model = None
-        if self.tokenizer is not None:
-            del self.tokenizer
-            self.tokenizer = None
+        self._loaded = False
+        self.model = None
+        self.tokenizer = None
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-        self._loaded = False
 
     def _check_loaded(self) -> None:
         """Check if model is loaded and raise if not"""

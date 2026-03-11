@@ -4,22 +4,14 @@ type: tracker
 project: fada-v3
 ---
 
-## Critical Gap
+## Priority 1: Fine-Tuning Top Models
 
-> **Phase 1 results (MiniCPM 88.9%, etc.) used proxy metrics on ~250 samples WITHOUT ground truth.** These are NOT comparable to Phase 2/3 results. Need to re-evaluate top models on full test set with ground truth.
+Fine-tune top-performing zero-shot models on full training set:
 
----
-
-## Priority 1: Ground Truth Evaluation
-
-Re-run top Phase 1 models with embedding similarity scoring:
-
-- [ ] MiniCPM-V-2.6 on 1,494 test images
-- [ ] Qwen2-VL-2B on 1,494 test images
-- [ ] InternVL2-4B on 1,494 test images
-- [ ] Expand Qwen2.5-VL-7B eval from 600 to 1,494
-
-**Why**: Can't compare 88.9% proxy score to 81.1% embedding similarity
+- [ ] Fine-tune Qwen3.5-35B-A3B (top zero-shot scorer)
+- [ ] Fine-tune gemma-3-12b-it (#2 zero-shot)
+- [ ] Fine-tune InternVL3.5-4B (#3 zero-shot)
+- [ ] Expand evaluation to 1,894 test images
 
 ---
 
@@ -62,7 +54,7 @@ Options:
 
 ## Completed
 
-- [x] Phase 1: 50+ models zero-shot (proxy metrics)
+- [x] Phase 1: 50+ models zero-shot
 - [x] Phase 2: Qwen2.5-VL-7B fine-tuned (81.1%, 600 samples)
 - [x] Phase 3: MedGemma-27B cloud (78.81%, 709 samples)
 - [x] Classification: EfficientNet-B0 (88%, 1,494 samples)
@@ -84,9 +76,10 @@ Options:
 
 ## Comparison Matrix (What We Know)
 
-| Model            | Method         | Samples | Score  | Comparable?    |
-| ---------------- | -------------- | ------- | ------ | -------------- |
-| MiniCPM-V-2.6    | Proxy          | ~250    | 88.9%  | No             |
-| Qwen2.5-VL-7B FT | Embedding      | 600     | 81.1%  | Yes            |
-| MedGemma-27B     | Embedding      | 709     | 78.81% | Yes            |
-| EfficientNet-B0  | Classification | 1,494   | 88%    | Different task |
+| Model            | Method         | Samples | Score  |
+| ---------------- | -------------- | ------- | ------ |
+| Qwen3.5-35B-A3B  | GT primary     | 1,894   | 36.5%  |
+| gemma-3-12b-it   | GT primary     | 1,894   | 36.3%  |
+| Qwen2.5-VL-7B FT | Embedding      | 600     | 81.1%  |
+| MedGemma-27B     | Embedding      | 709     | 78.81% |
+| EfficientNet-B0  | Classification | 1,494   | 88%    |

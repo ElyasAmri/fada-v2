@@ -6,17 +6,17 @@ tags: [tasks]
 
 ## Current Phase: 4 - Full Test Set Evaluation
 
-### In Progress
+### Completed (Phase 4: Full Test Set Evaluation)
 
-- [ ] Ground-truth evaluation of top Phase 1 models on 1,494 test images
-- [ ] Expand Qwen2.5-VL-7B evaluation from 600 to 1,494 images
-- [ ] Score existing Gemini batch annotation results (62 batches)
-- [ ] Score MedGemma-4B results (medgemma_4b_complete.json)
+- [x] Ground-truth evaluation of 46 models on 1,894 test images
+- [x] Expand Qwen2.5-VL-7B evaluation from 600 to 1,894 images
+- [x] Score existing Gemini batch annotation results (62 batches)
+- [x] Score MedGemma-4B results (medgemma_4b_complete.json)
 
 ### Completed (Phase 1: VLM Benchmarking)
 
 - [x] VLM benchmark framework
-- [x] Test 50+ models with proxy metrics
+- [x] Test 50+ models
 - [x] Identify top performers (MiniCPM-V-2.6, Qwen2-VL-2B, InternVL2-4B)
 - [x] Document results
 
@@ -41,17 +41,16 @@ tags: [tasks]
 
 ## Quick Links
 
-| Phase                   | Status      | Notes                     |
-| ----------------------- | ----------- | ------------------------- |
-| Phase 1: VLM Benchmarks | Complete    | 50+ models, proxy metrics |
-| Phase 2: Fine-Tuning    | Complete    | Qwen2.5-VL-7B at 81.1%    |
-| Phase 3: Cloud API      | Complete    | MedGemma-27B at 78.81%    |
-| Phase 4: Full Test Set  | In Progress | 1,494 images, GT eval     |
-| Phase 5: Web/App Demo   | Pending     | -                         |
+| Phase                   | Status   | Notes                   |
+| ----------------------- | -------- | ----------------------- |
+| Phase 1: VLM Benchmarks | Complete | 50+ models              |
+| Phase 2: Fine-Tuning    | Complete | Qwen2.5-VL-7B at 81.1%  |
+| Phase 3: Cloud API      | Complete | MedGemma-27B at 78.81%  |
+| Phase 4: Full Test Set  | Complete | 1,894 images, 46 models |
+| Phase 5: Web/App Demo   | Pending  | -                       |
 
 ## Blockers
 
-- Phase 1 proxy scores (keyword matching) not comparable to Phase 2/3 GT scores (embedding similarity)
 - Need standalone inference + GT-eval script for local open-weight models
 
 ## Notes

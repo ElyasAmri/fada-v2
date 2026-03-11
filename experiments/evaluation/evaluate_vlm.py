@@ -32,6 +32,8 @@ from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
+SCORING_MODE = "pseudo_label"
+
 from .config import (
     BASE_MODEL_ID,
     ADAPTER_PATH,
@@ -255,7 +257,7 @@ class VLMEvaluator:
                 "sample_id": actual_idx,
                 "image_path": image_path,
                 "category": category,
-                "question": question[:100] + "..." if len(question) > 100 else question,
+                "question": question,
                 "reference_response": reference_response,
                 "prediction": prediction
             })
@@ -280,7 +282,8 @@ def compute_scores(
     device: str = "cpu"
 ) -> Dict:
     """Compute embedding similarity scores."""
-    from embedding_scorer import EmbeddingScorer
+    print("WARNING: Scoring against pseudo-labels (not sonographer GT). Use score_against_gt.py for GT evaluation.")
+    from .embedding_scorer import EmbeddingScorer
 
     predictions = [r['prediction'] for r in results]
     # Backward-compatible: accept both 'reference_response' and legacy 'ground_truth'
@@ -425,6 +428,7 @@ def main():
     print(f"Mode:            {'inference-only' if args.inference_only else 'score-only' if args.score_only else 'full'}")
 
     results = None
+    predictions_path = None
 
     if not args.score_only:
         # Check test data exists
@@ -517,33 +521,44 @@ def main():
         print(f"\nLoaded {len(results)} predictions from {predictions_path}")
 
     # Compute scores
-    print("\nComputing embedding similarity scores...")
-    scores = compute_scores(results, embedding_model=args.embedding_model)
+    try:
+        print("\nComputing embedding similarity scores...")
+        scores = compute_scores(results, embedding_model=args.embedding_model)
 
-    # Build final output
-    final_results = {
-        "metadata": {
-            "timestamp": timestamp,
-            "test_data": args.test_data,
-            "embedding_model": args.embedding_model,
-            "model_id": args.model_id,
-            "adapter_path": str(adapter_path) if adapter_path else None,
-            "zero_shot": args.zero_shot,
-            "num_samples": len(results),
-        },
-        "scores": scores
-    }
+        # Build final output
+        final_results = {
+            "metadata": {
+                "timestamp": timestamp,
+                "test_data": args.test_data,
+                "embedding_model": args.embedding_model,
+                "model_id": args.model_id,
+                "adapter_path": str(adapter_path) if adapter_path else None,
+                "zero_shot": args.zero_shot,
+                "num_samples": len(results),
+            },
+            "scores": scores
+        }
 
-    # Save results
-    output_path = Path(args.output) if args.output else OUTPUTS_DIR / f"evaluation_results_{timestamp}.json"
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(final_results, f, indent=2, ensure_ascii=False)
+        # Save results
+        output_path = Path(args.output) if args.output else OUTPUTS_DIR / f"evaluation_results_{timestamp}.json"
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(final_results, f, indent=2, ensure_ascii=False)
 
-    # Print summary
-    print_results_summary(scores)
+        # Print summary
+        print_results_summary(scores)
 
-    print(f"\nResults saved to: {output_path}")
-    return 0
+        print(f"\nResults saved to: {output_path}")
+        return 0
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"\nScoring failed: {e}")
+        if predictions_path:
+            print(f"Predictions are safe at: {predictions_path}")
+            print(f"Re-run scoring with:")
+            print(f"  python -m experiments.evaluation.evaluate_vlm --score-only --predictions {predictions_path}")
+        return 1
 
 
 if __name__ == "__main__":

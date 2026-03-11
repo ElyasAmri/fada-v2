@@ -25,6 +25,7 @@ def convert(checkpoint_path: Path, output_path: Path) -> int:
 
     completed = data.get("completed_images", {})
     count = 0
+    sample_id = 0
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as out:
@@ -39,6 +40,7 @@ def convert(checkpoint_path: Path, output_path: Path) -> int:
                 response = q.get("response", "")
 
                 pred = {
+                    "sample_id": sample_id,
                     "image_path": image_path,
                     "category": category,
                     "question": question_text,
@@ -46,6 +48,7 @@ def convert(checkpoint_path: Path, output_path: Path) -> int:
                 }
                 out.write(json.dumps(pred) + "\n")
                 count += 1
+                sample_id += 1
 
     print(f"Converted {len(completed)} images -> {count} predictions to {output_path}")
     return count

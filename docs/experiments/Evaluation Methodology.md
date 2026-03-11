@@ -2,7 +2,7 @@
 tags: [phase1, methods]
 ---
 
-**Covers**: Phase 1 (proxy) and Phase 2/3 (ground truth) evaluation
+**Covers**: Ground truth evaluation methodology (Phase 2+)
 
 ## Hardware
 
@@ -17,29 +17,7 @@ tags: [phase1, methods]
 - **Local GPU**: NVIDIA RTX 5090 (24GB VRAM)
 - **Cloud**: RCCG (A100 at $1.35/h, H100 at $1.90/h)
 
-## Phase 1: Proxy Metrics (DEPRECATED for comparison)
-
-Used keyword matching on ~250 samples against BLIP-2 baseline. These scores are **not comparable** to Phase 2/3 ground-truth scores.
-
-### Quantization Strategy
-
-```
-Method: 4-bit NF4 with BitsAndBytes
-Applied to: Models >6GB
-Config:
-  - bnb_4bit_quant_type: "nf4"
-  - bnb_4bit_compute_dtype: torch.bfloat16
-  - bnb_4bit_use_double_quant: True
-```
-
-### Proxy Evaluation Metrics
-
-1. **Fetal Context Recognition** - keyword matching (fetal, fetus, ultrasound, etc.)
-2. **Anatomy Identification** - category-specific term matching
-3. **Medical Terminology Usage** - advanced term detection
-4. **Overall Score** - combined weighted average against BLIP-2 baseline
-
-## Phase 2/3: Ground Truth Evaluation (CURRENT)
+## Ground Truth Evaluation
 
 Uses embedding similarity scoring with sentence-transformers against expert annotations.
 

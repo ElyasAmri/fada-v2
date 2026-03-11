@@ -104,7 +104,6 @@ def generate_response(model, processor, image_path: str, question: str) -> str:
         output_ids = model.generate(
             **inputs,
             max_new_tokens=1024,
-            temperature=0.1,
             do_sample=False,
             pad_token_id=processor.tokenizer.pad_token_id,
         )

@@ -26,7 +26,13 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=ERROR"
 # Parse host IP from inventory YAML (simple grep, no yq needed)
 get_ip() {
   local host="$1"
-  grep -A1 "^        $host:" "$INVENTORY" | grep ansible_host | awk '{print $2}'
+  local ip
+  ip=$(grep -A5 "^\s*${host}:" "$INVENTORY" | grep ansible_host | awk '{print $NF}' | head -1)
+  if [ -z "$ip" ]; then
+    echo "Error: could not resolve IP for host '$host'" >&2
+    exit 1
+  fi
+  echo "$ip"
 }
 
 # Get all host names
@@ -37,7 +43,13 @@ get_hosts() {
 # Get model for a host
 get_model() {
   local host="$1"
-  grep -A2 "^        $host:" "$INVENTORY" | grep vllm_model | awk '{print $2}'
+  local model
+  model=$(grep -A5 "^\s*${host}:" "$INVENTORY" | grep vllm_model | awk '{print $NF}' | head -1)
+  if [ -z "$model" ]; then
+    echo "Error: could not resolve model for host '$host'" >&2
+    exit 1
+  fi
+  echo "$model"
 }
 
 cmd_play() {

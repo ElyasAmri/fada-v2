@@ -1,11 +1,13 @@
 {
-    "watch_patterns": [
-        "eval_hf_peft.py",
-        "launch_eval.sh",
-        "train_unsloth.py",
-        "run_queue.py"
-    ],
-    "poll_interval_seconds": 15,
-    "events_file": "/home/ubuntu/monitor/events.json",
-    "port": 9731
+  "watch_patterns": [
+    "eval_hf_peft.py",
+    "launch_eval.sh",
+    "train_unsloth.py",
+    "run_queue.py",
+    "test_api_vlm.py",
+    "run_queue.sh"
+  ],
+  "poll_interval_seconds": 15,
+  "events_file": "/home/ubuntu/monitor/events.json",
+  "port": 9731
 }

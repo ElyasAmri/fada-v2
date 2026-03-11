@@ -4,7 +4,6 @@ Configuration constants for VLM evaluation pipeline.
 
 from pathlib import Path
 
-from src.config.questions import QUESTIONS, QUESTION_SHORT_NAMES
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent

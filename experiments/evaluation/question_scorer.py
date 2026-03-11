@@ -63,6 +63,7 @@ def detect_question_index(question_text: str) -> int:
     # Fuzzy fallback: substring containment
     for key, idx in _QUESTION_PREFIX_MAP.items():
         if key in prefix or prefix in key:
+            print(f"WARNING: Fuzzy question match for '{question_text[:40]}' -> index {idx}")
             return idx
     raise ValueError(f"Cannot detect question index from: {question_text[:80]}")
 
@@ -667,6 +668,12 @@ class MultiMetricScorer:
         if len(self.gt_loader) == 0:
             self.gt_loader.load()
 
+        # Pre-pass: count error and empty predictions
+        error_prediction_count = sum(
+            1 for p in predictions
+            if not p.get("prediction") or p["prediction"].startswith("ERROR:")
+        )
+
         # 1. Build scoring records (join predictions to GT)
         records: List[ScoringRecord] = []
         unmatched: List[Dict] = []
@@ -746,9 +753,11 @@ class MultiMetricScorer:
                 scores[idx].primary_score = bert_scores[j]
 
         # 5. Aggregate
-        return self._aggregate_results(
+        result = self._aggregate_results(
             scores, records, unmatched, predictions_file
         )
+        result["metadata"]["error_prediction_count"] = error_prediction_count
+        return result
 
     def _aggregate_results(
         self,

@@ -75,33 +75,30 @@ Models from current generation (2025-2026). Priority for benchmarking.
 
 These models have existing results. Keep for comparison but do NOT prioritize for new benchmarking.
 
-| Model               | Family    | Size | Score        | Method                             | Notes                           |
-| ------------------- | --------- | ---- | ------------ | ---------------------------------- | ------------------------------- |
-| **Qwen2.5-VL-7B**   | Alibaba   | 7B   | **81.1% GT** | Embedding similarity (600 samples) | Fine-tuned, best verified score |
-| **MiniCPM-V-2.6**   | OpenBMB   | 8B   | 88.9% proxy  | Keyword matching (~250 samples)    | Needs GT re-eval                |
-| **Qwen2-VL-2B**     | Alibaba   | 2B   | 83.3% proxy  | Keyword matching                   | Needs GT re-eval                |
-| **InternVL2-4B**    | OpenGVLab | 4B   | ~82% proxy   | Keyword matching                   | Needs GT re-eval                |
-| **Qwen2-VL-7B**     | Alibaba   | 7B   | ~75% proxy   | Keyword matching                   | Superseded by Qwen3-VL-8B       |
-| **LLaVA-OneVision** | LLaVA     | 7B   | ~80% proxy   | Keyword matching                   | Superseded by v1.5              |
-| **Molmo-7B**        | AllenAI   | 7B   | ~70% proxy   | Keyword matching                   |                                 |
-| **PaliGemma2**      | Google    | 3B   | ~68% proxy   | Keyword matching                   |                                 |
-
-**IMPORTANT:** Proxy scores (keyword matching, ~250 samples) are NOT comparable to GT scores (embedding similarity, full test set).
+| Model               | Family    | Size | GT Primary | GT EmbedSim | Notes                           |
+| ------------------- | --------- | ---- | ---------- | ----------- | ------------------------------- |
+| **Qwen2.5-VL-7B**   | Alibaba   | 7B   | 0.2935     | 0.3828      | Fine-tuned: 81.1% (600 samples) |
+| **MiniCPM-V-2.6**   | OpenBMB   | 8B   | 0.2924     | 0.3941      |                                 |
+| **Qwen2-VL-2B**     | Alibaba   | 2B   | 0.3218     | 0.3720      |                                 |
+| **InternVL2-4B**    | OpenGVLab | 4B   | 0.2933     | 0.3523      |                                 |
+| **Qwen2-VL-7B**     | Alibaba   | 7B   | 0.2897     | 0.3897      | Superseded by Qwen3-VL-8B       |
+| **LLaVA-OneVision** | LLaVA     | 7B   | 0.1663     | 0.1606      | Superseded by v1.5              |
+| **Molmo-7B**        | AllenAI   | 7B   | 0.1260     | 0.0155      | Output issues                   |
 
 ---
 
 ## Medical VLMs
 
-| Model               | Focus             | Size | Availability   | Status       | Notes                                         |
-| ------------------- | ----------------- | ---- | -------------- | ------------ | --------------------------------------------- |
-| **MedGemma-27B**    | General medical   | 27B  | Google API     | **Tested**   | 78.81% GT (709 samples)                       |
-| **MedGemma-4B**     | General medical   | 4B   | HuggingFace    | Proxy tested | ~65% proxy                                    |
-| **MedVLM-R1**       | Medical reasoning | 2B   | HuggingFace    | TODO         | Qwen2-VL-2B + GRPO RL; 78.22% on MRI/CT/X-ray |
-| **Medical-VLM-24B** | General medical   | 24B  | John Snow Labs | TODO         | 82.9% on OpenMedBench                         |
-| **MindGPT-Med**     | Medical           | ?    | Unknown        | TODO         | On U2-BENCH leaderboard                       |
-| **MedDr**           | Medical           | ?    | Unknown        | TODO         | On U2-BENCH leaderboard                       |
-| **LLaVA-Med**       | Radiology         | 7B   | HuggingFace    | TODO         | Medical adaptation of LLaVA                   |
-| **CheXagent-8B**    | Chest X-ray       | 8B   | HuggingFace    | Tested       | 0% -- complete domain mismatch                |
+| Model               | Focus             | Size | Availability   | Status     | Notes                                         |
+| ------------------- | ----------------- | ---- | -------------- | ---------- | --------------------------------------------- |
+| **MedGemma-27B**    | General medical   | 27B  | Google API     | **Tested** | 78.81% GT (709 samples)                       |
+| **MedGemma-4B**     | General medical   | 4B   | HuggingFace    | GT tested  | 0.3035 primary (1,894 samples)                |
+| **MedVLM-R1**       | Medical reasoning | 2B   | HuggingFace    | TODO       | Qwen2-VL-2B + GRPO RL; 78.22% on MRI/CT/X-ray |
+| **Medical-VLM-24B** | General medical   | 24B  | John Snow Labs | TODO       | 82.9% on OpenMedBench                         |
+| **MindGPT-Med**     | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                       |
+| **MedDr**           | Medical           | ?    | Unknown        | TODO       | On U2-BENCH leaderboard                       |
+| **LLaVA-Med**       | Radiology         | 7B   | HuggingFace    | TODO       | Medical adaptation of LLaVA                   |
+| **CheXagent-8B**    | Chest X-ray       | 8B   | HuggingFace    | Tested     | 0% -- complete domain mismatch                |
 
 ---
 
@@ -140,7 +137,7 @@ These models have existing results. Keep for comparison but do NOT prioritize fo
 
 Priority: models most likely to beat our 81.1% baseline.
 
-1. [ ] Qwen3-VL-8B (already local tested, needs GT eval on 1,494 images)
+1. [ ] Qwen3-VL-8B (already local tested, needs GT eval on 1,894 images)
 2. [ ] Qwen3.5-35B-A3B (3B active -- efficient AND powerful)
 3. [ ] InternVL3.5-8B (latest gen, Cascade RL)
 4. [ ] LLaVA-OneVision-1.5-8B (beats Qwen2.5-VL-7B on 18/27 benchmarks)
@@ -156,9 +153,9 @@ Priority: models most likely to beat our 81.1% baseline.
 
 ### Phase 3: Re-eval Previous Best (Full Test Set GT)
 
-11. [ ] MiniCPM-V-2.6 (1,494 test images -- had 88.9% proxy)
-12. [ ] Qwen2.5-VL-7B (expand from 600 to 1,494 samples)
-13. [ ] InternVL2-4B (1,494 test images)
+11. [x] MiniCPM-V-2.6 (GT: 0.2924 primary)
+12. [ ] Qwen2.5-VL-7B (expand from 600 to 1,894 samples)
+13. [ ] InternVL2-4B (1,894 test images)
 
 ### Phase 4: Mobile Deployment Candidates
 
@@ -307,15 +304,15 @@ Fetal-specific evaluation -- higher relevance to our task than U2-BENCH.
 
 ## Summary Stats
 
-| Category                  | Count  | Tested       | TODO                |
-| ------------------------- | ------ | ------------ | ------------------- |
-| Fetal/US-specific         | 7      | 0            | 7                   |
-| Current-gen Tier 1        | 16     | 3 (local)    | 13 (GT)             |
-| Previous-gen (comparison) | 8      | 8 (proxy/GT) | 3 (need GT re-eval) |
-| Medical                   | 8      | 3            | 5                   |
-| Mobile                    | 8      | 1 (perf)     | 7                   |
-| API                       | 7      | 2            | 5                   |
-| **Total**                 | **54** | **17**       | **37**              |
+| Category                  | Count  | Tested    | TODO    |
+| ------------------------- | ------ | --------- | ------- |
+| Fetal/US-specific         | 7      | 0         | 7       |
+| Current-gen Tier 1        | 16     | 3 (local) | 13 (GT) |
+| Previous-gen (comparison) | 7      | 7 (GT)    | 0       |
+| Medical                   | 8      | 3         | 5       |
+| Mobile                    | 8      | 1 (perf)  | 7       |
+| API                       | 7      | 2         | 5       |
+| **Total**                 | **54** | **17**    | **37**  |
 
 ### By Fine-Tuning Method
 

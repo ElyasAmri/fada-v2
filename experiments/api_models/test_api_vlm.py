@@ -1310,6 +1310,24 @@ async def main():
             if checkpoint_data and checkpoint_data.get('model_name', '').startswith('vLLM'):
                 completed_images = checkpoint_data.get('completed_images', {})
 
+            # Health check: verify vLLM server is up and serving the expected model
+            import aiohttp
+            health_url = args.vllm_url.rstrip('/') + '/v1/models'
+            try:
+                async with aiohttp.ClientSession() as _hc_session:
+                    async with _hc_session.get(health_url, timeout=aiohttp.ClientTimeout(total=10)) as _hc_resp:
+                        _hc_data = await _hc_resp.json()
+                        _model_ids = [m.get('id', '') for m in _hc_data.get('data', [])]
+                        if not any(args.vllm_model in mid for mid in _model_ids):
+                            print(f"ERROR: vLLM server at {args.vllm_url} does not have model '{args.vllm_model}'. "
+                                  f"Found: {_model_ids}")
+                            import sys as _sys
+                            _sys.exit(1)
+            except Exception as _hc_err:
+                print(f"ERROR: vLLM health check failed for {health_url}: {_hc_err}")
+                import sys as _sys
+                _sys.exit(1)
+
             vllm = AsyncVLLM(base_url=args.vllm_url, model_name=args.vllm_model)
             result = await run_parallel_evaluation(
                 vllm, f"vLLM ({args.vllm_model})",
