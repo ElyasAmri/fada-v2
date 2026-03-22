@@ -127,3 +127,4 @@ webhooks/
 # Node/Bun (fada-channel plugin)
 node_modules/
 bun.lock
+experiments/rccg/results/
