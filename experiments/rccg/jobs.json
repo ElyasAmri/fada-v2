@@ -1,0 +1,50 @@
+{
+  "fada-1": {
+    "command": "(script) /tmp/fada1_mistral_fix.sh",
+    "launched_at": "2026-03-22T03:54:24Z",
+    "status": "running",
+    "pane_pid": "183740"
+  },
+  "fada-4": {
+    "command": "(script) /tmp/fada_axolotl_fada-4.sh",
+    "launched_at": "2026-03-22T08:36:08Z",
+    "status": "running",
+    "pane_pid": "175557"
+  },
+  "fada-6": {
+    "command": "set -a && source /etc/environment && set +a && export PATH=$HOME/.local/bin:$PATH && cd /home/ubuntu/fada-v3 && python3 experiments/framework_comparison/wrappers/train_llamafactory.py --model google/paligemma2-3b-pt-448 --train-data data/vlm_training/gt_train_sharegpt_abs.jsonl --val-data data/vlm_training/gt_val_sharegpt_abs.jsonl --data-root \"data/Fetal Ultrasound\" --output-dir /home/ubuntu/fada-results/llamafactory_paligemma2-3b --config experiments/framework_comparison/config_multimodal.json && if [ -d /home/ubuntu/fada-results/llamafactory_paligemma2-3b/adapter ]; then bash experiments/framework_comparison/eval_adapter.sh google/paligemma2-3b-pt-448 /home/ubuntu/fada-results/llamafactory_paligemma2-3b/adapter /home/ubuntu/fada-results/llamafactory_paligemma2-3b/eval; fi",
+    "launched_at": "2026-03-21T07:11:45Z",
+    "status": "running",
+    "pane_pid": "161706"
+  },
+  "fada-7": {
+    "command": "(script) /tmp/fada_axolotl_fada-7.sh",
+    "launched_at": "2026-03-22T08:36:52Z",
+    "status": "running",
+    "pane_pid": "192254"
+  },
+  "fada-2": {
+    "command": "(script) /tmp/fada2_axolotl.sh",
+    "launched_at": "2026-03-22T08:28:17Z",
+    "status": "running",
+    "pane_pid": "208394"
+  },
+  "fada-3": {
+    "command": "(script) /tmp/fada3_gemma27b.sh",
+    "launched_at": "2026-03-22T00:48:00Z",
+    "status": "running",
+    "pane_pid": "176208"
+  },
+  "fada-5": {
+    "command": "(script) /tmp/fada_axolotl_fada-5.sh",
+    "launched_at": "2026-03-22T08:36:30Z",
+    "status": "running",
+    "pane_pid": "177910"
+  },
+  "fada-8": {
+    "command": "set -a && source /etc/environment && set +a && export PATH=$HOME/.local/bin:$PATH && cd /home/ubuntu/fada-v3 && python3 experiments/framework_comparison/wrappers/train_llamafactory.py --model google/paligemma-3b-pt-448 --train-data data/vlm_training/gt_train_sharegpt_abs.jsonl --val-data data/vlm_training/gt_val_sharegpt_abs.jsonl --data-root \"data/Fetal Ultrasound\" --output-dir /home/ubuntu/fada-results/llamafactory_paligemma-3b --config experiments/framework_comparison/config_multimodal.json --keep-cache && if [ -d /home/ubuntu/fada-results/llamafactory_paligemma-3b/adapter ]; then bash experiments/framework_comparison/eval_adapter.sh google/paligemma-3b-pt-448 /home/ubuntu/fada-results/llamafactory_paligemma-3b/adapter /home/ubuntu/fada-results/llamafactory_paligemma-3b/eval; fi",
+    "launched_at": "2026-03-21T12:24:32Z",
+    "status": "running",
+    "pane_pid": "164937"
+  }
+}

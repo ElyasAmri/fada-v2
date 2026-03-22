@@ -1,0 +1,81 @@
+---
+- name: Setup attached data volume
+  hosts: rccg
+  become: true
+  vars:
+    mount_point: /mnt/data
+    volume_device_default: /dev/vdc
+  tasks:
+    - name: Detect volume device
+      shell: |
+        if [ -b /dev/vdc ]; then echo /dev/vdc
+        elif [ -b /dev/vdd ]; then echo /dev/vdd
+        elif [ -b /dev/vde ]; then echo /dev/vde
+        else echo "NONE"
+        fi
+      register: detected_device
+      changed_when: false
+
+    - name: Fail if no volume found
+      fail:
+        msg: "No attached volume found on {{ inventory_hostname }}"
+      when: detected_device.stdout == "NONE"
+
+    - name: Check if already formatted
+      command: blkid {{ detected_device.stdout }}
+      register: blkid_result
+      failed_when: false
+      changed_when: false
+
+    - name: Format volume as ext4
+      command: mkfs.ext4 -q {{ detected_device.stdout }}
+      when: blkid_result.rc != 0
+
+    - name: Create mount point
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Mount volume
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ detected_device.stdout }}"
+        fstype: ext4
+        opts: defaults,noatime
+        state: mounted
+
+    - name: Set ownership
+      file:
+        path: "{{ mount_point }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: false
+
+    - name: Create directories on volume
+      file:
+        path: "{{ mount_point }}/{{ item }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+      loop:
+        - huggingface
+        - fada-results
+
+    - name: Symlink HF cache to volume
+      become: false
+      shell: |
+        rm -rf /home/ubuntu/.cache/huggingface/hub
+        mkdir -p /home/ubuntu/.cache/huggingface
+        ln -sf {{ mount_point }}/huggingface /home/ubuntu/.cache/huggingface/hub
+
+    - name: Show volume status
+      command: df -h {{ mount_point }}
+      register: df_out
+      changed_when: false
+
+    - name: Report
+      debug:
+        msg: "{{ inventory_hostname }}: {{ detected_device.stdout }} mounted at {{ mount_point }} — {{ df_out.stdout_lines[-1] }}"

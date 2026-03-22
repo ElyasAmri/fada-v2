@@ -16,6 +16,8 @@ Usage:
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -48,6 +50,63 @@ def detect_model_type(model_id: str) -> str:
     return "auto"
 
 
+def _classify_error(stderr: str) -> str:
+    """Classify training error from stderr output."""
+    s = stderr.lower()
+    if "cuda out of memory" in s or "outofmemoryerror" in s:
+        return "oom"
+    if "no module named" in s or "modulenotfounderror" in s:
+        return "missing_package"
+    if "no space left on device" in s:
+        return "disk_full"
+    if "not a valid model identifier" in s or "repository not found" in s:
+        return "model_not_found"
+    if "datasetgenerationerror" in s or "trailing data" in s:
+        return "data_format"
+    if "failed to retrieve the dataset" in s:
+        return "data_too_long"
+    return "unknown"
+
+
+def _prepare_swift_data(input_path: str, data_root: str, output_path: str):
+    """Convert HF chat format JSONL to Swift-compatible format.
+
+    Fixes: mixed content types (list→string with <image>), relative→absolute
+    image paths, and Windows line endings.
+    """
+    data_root = str(Path(data_root).resolve())
+    count = 0
+    with open(input_path) as f_in, open(output_path, "w", newline="\n") as f_out:
+        for line in f_in:
+            line = line.rstrip("\r\n")
+            if not line:
+                continue
+            d = json.loads(line)
+            # Fix message content: list-of-dicts → string with <image> placeholders
+            new_messages = []
+            for m in d.get("messages", []):
+                if isinstance(m["content"], list):
+                    parts = []
+                    for item in m["content"]:
+                        if item.get("type") == "image":
+                            parts.append("<image>")
+                        elif item.get("type") == "text":
+                            parts.append(item["text"])
+                    new_messages.append({"role": m["role"], "content": "\n".join(parts)})
+                else:
+                    new_messages.append(m)
+            d["messages"] = new_messages
+            # Fix image paths: relative → absolute
+            if "images" in d:
+                d["images"] = [
+                    f"{data_root}/{p}" if not os.path.isabs(p) else p
+                    for p in d["images"]
+                ]
+            f_out.write(json.dumps(d, ensure_ascii=False) + "\n")
+            count += 1
+    print(f"Prepared {count} samples for Swift: {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="ms-swift LoRA fine-tuning wrapper")
     parser.add_argument("--model", required=True, help="HuggingFace model ID")
@@ -70,45 +129,61 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Defensive disk check
+    free_gb = shutil.disk_usage("/").free / 1e9
+    if free_gb < 5:
+        print(f"FATAL: Only {free_gb:.1f}GB free disk space. Aborting.", file=sys.stderr)
+        sys.exit(1)
+
     model_type = detect_model_type(args.model)
 
-    # Build swift sft command
+    # Preprocess data for Swift compatibility
+    train_data = str(Path(args.train_data).resolve())
+    val_data = str(Path(args.val_data).resolve()) if args.val_data and Path(args.val_data).exists() else None
+    swift_train = str(output_dir / "swift_train.jsonl")
+    swift_val = str(output_dir / "swift_val.jsonl") if val_data else None
+    _prepare_swift_data(train_data, args.data_root, swift_train)
+    if val_data:
+        _prepare_swift_data(val_data, args.data_root, swift_val)
+    print(f"Preprocessed Swift data: {swift_train}")
+
+    # Build swift sft command (ms-swift v4.x API)
     cmd = [
         "swift", "sft",
         "--model", args.model,
-        "--model_type", model_type,
-        "--sft_type", "lora",
-        "--dataset", str(Path(args.train_data).resolve()),
-        "--dataset_format", "messages",
-        "--images_dir", str(Path(args.data_root).resolve()),
+        "--train_type", "lora",
+        "--dataset", swift_train,
         "--output_dir", str(output_dir / "adapter"),
         "--lora_rank", str(lora_cfg["r"]),
         "--lora_alpha", str(lora_cfg["lora_alpha"]),
         "--lora_dropout", str(lora_cfg["lora_dropout"]),
-        "--lora_target_modules", lora_cfg["target_modules"],
+        "--target_modules", lora_cfg["target_modules"],
         "--num_train_epochs", str(train_cfg["num_train_epochs"]),
         "--per_device_train_batch_size", str(train_cfg["per_device_train_batch_size"]),
         "--gradient_accumulation_steps", str(train_cfg["gradient_accumulation_steps"]),
         "--learning_rate", str(train_cfg["learning_rate"]),
         "--warmup_ratio", str(train_cfg["warmup_ratio"]),
         "--lr_scheduler_type", train_cfg["lr_scheduler_type"],
-        "--bf16", str(train_cfg["bf16"]),
+        "--bf16", "True",
+        "--fp16", "False",
         "--optim", train_cfg["optim"],
         "--weight_decay", str(train_cfg["weight_decay"]),
         "--max_grad_norm", str(train_cfg["max_grad_norm"]),
         "--gradient_checkpointing", str(train_cfg["gradient_checkpointing"]),
         "--logging_steps", str(train_cfg["logging_steps"]),
         "--save_strategy", train_cfg["save_strategy"],
-        "--max_length", str(train_cfg["max_seq_length"]),
+        "--max_model_len", str(train_cfg["max_seq_length"]),
+        "--truncation_strategy", "delete",
         "--dataloader_num_workers", str(train_cfg["dataloader_num_workers"]),
         "--seed", str(config["data"]["seed"]),
     ]
 
     if quant_cfg["load_in_4bit"]:
-        cmd.extend(["--quantization_bit", "4", "--bnb_4bit_comp_dtype", "bfloat16"])
+        cmd.extend(["--quant_bits", "4", "--quant_method", "bnb",
+                     "--bnb_4bit_quant_type", quant_cfg.get("bnb_4bit_quant_type", "nf4")])
 
-    if args.val_data and Path(args.val_data).exists():
-        cmd.extend(["--val_dataset", str(Path(args.val_data).resolve())])
+    if swift_val:
+        cmd.extend(["--val_dataset", swift_val])
 
     if args.test_run:
         cmd.extend(["--max_samples", "100"])
@@ -121,21 +196,25 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    result = subprocess.run(cmd, text=True, stderr=subprocess.PIPE)
 
     training_time = time.time() - start_time
     gpu_mem_peak = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
 
     if result.returncode != 0:
+        stderr = result.stderr or ""
+        error_category = _classify_error(stderr)
         manifest = {
             "model": args.model,
             "framework": "swift",
             "status": "failed",
             "error": f"swift sft exited with code {result.returncode}",
+            "error_category": error_category,
             "training_time_seconds": round(training_time, 1),
         }
         with open(output_dir / "run_manifest.json", "w") as f:
             json.dump(manifest, f, indent=2)
+        print(f"FAILED [{error_category}]: {stderr[-500:]}", file=sys.stderr)
         sys.exit(1)
 
     # Find the actual output directory (swift creates timestamped subdirs)

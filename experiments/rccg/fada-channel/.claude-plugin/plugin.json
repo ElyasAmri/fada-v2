@@ -1,0 +1,11 @@
+{
+  "name": "fada-rccg",
+  "version": "1.0.0",
+  "description": "Receives webhook events from RCCG fada-monitor when training jobs complete",
+  "author": {
+    "name": "Elyas Amri"
+  },
+  "license": "MIT",
+  "keywords": ["rccg", "webhook", "fada", "monitor"],
+  "mcpServers": "../mcp-config.json"
+}

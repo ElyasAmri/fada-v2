@@ -20,7 +20,7 @@
 
     - name: Display machine info
       debug:
-        msg: "{{ inventory_hostname }}: GPU={{ gpu_info.stdout }} | Disk={{ disk_info.stdout }} | Model={{ vllm_model }}"
+        msg: "{{ inventory_hostname }}: GPU={{ gpu_info.stdout }} | Disk={{ disk_info.stdout }} | Model={{ vllm_model | default('not set') }}"
 
     # ==================== VOLUME ====================
     - name: Check if volume is already mounted

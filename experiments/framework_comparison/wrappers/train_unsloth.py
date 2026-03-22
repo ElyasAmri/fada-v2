@@ -20,6 +20,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -157,6 +158,15 @@ def collate_fn(batch):
     return collated
 
 
+def find_latest_checkpoint(output_dir):
+    """Find the latest checkpoint in output directory."""
+    checkpoints = list(Path(output_dir).glob("checkpoint-*"))
+    if not checkpoints:
+        return None
+    checkpoints.sort(key=lambda x: int(x.name.split("-")[1]))
+    return str(checkpoints[-1])
+
+
 def main():
     parser = argparse.ArgumentParser(description="Unsloth LoRA fine-tuning wrapper")
     parser.add_argument("--model", required=True, help="HuggingFace model ID")
@@ -166,6 +176,16 @@ def main():
     parser.add_argument("--output-dir", required=True, help="Output directory for adapter")
     parser.add_argument("--config", default=None, help="Path to config.json")
     parser.add_argument("--test-run", action="store_true", help="Quick test with 100 samples, 1 step")
+    parser.add_argument("--resume-from-checkpoint", type=str, default=None,
+                        help="Path to checkpoint directory to resume training from")
+    parser.add_argument("--auto-resume", action="store_true",
+                        help="Automatically resume from latest checkpoint in output directory")
+    parser.add_argument("--num-workers", type=int, default=None,
+                        help="Override dataloader_num_workers from config")
+    parser.add_argument("--learning-rate", type=float, default=None,
+                        help="Override learning rate from config")
+    parser.add_argument("--epochs", type=int, default=None,
+                        help="Override num_train_epochs from config")
     args = parser.parse_args()
 
     # Load config
@@ -177,12 +197,23 @@ def main():
     train_cfg = config["training"]
     quant_cfg = config["quantization"]
 
+    if args.learning_rate is not None:
+        train_cfg["learning_rate"] = args.learning_rate
+    if args.epochs is not None:
+        train_cfg["num_train_epochs"] = args.epochs
+
     if args.test_run:
         max_samples = 100
         train_cfg = {**train_cfg, "num_train_epochs": 1, "logging_steps": 1, "save_strategy": "no",
                      "eval_strategy": "no"}
     else:
         max_samples = train_cfg.get("max_samples", None)
+
+    # Defensive disk check
+    free_gb = shutil.disk_usage("/").free / 1e9
+    if free_gb < 5:
+        print(f"FATAL: Only {free_gb:.1f}GB free disk space. Aborting.", file=sys.stderr)
+        sys.exit(1)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -254,9 +285,9 @@ def main():
         eval_steps=train_cfg.get("eval_steps", 100),
         load_best_model_at_end=train_cfg["eval_strategy"] != "no",
         metric_for_best_model="eval_loss" if train_cfg["eval_strategy"] != "no" else None,
-        dataloader_num_workers=train_cfg["dataloader_num_workers"],
+        dataloader_num_workers=args.num_workers if args.num_workers is not None else train_cfg["dataloader_num_workers"],
         dataloader_pin_memory=True,
-        dataloader_prefetch_factor=2,
+        **({"dataloader_prefetch_factor": 2} if (args.num_workers if args.num_workers is not None else train_cfg["dataloader_num_workers"]) > 0 else {}),
         report_to="none",
         seed=config["data"]["seed"],
     )
@@ -270,12 +301,29 @@ def main():
         data_collator=collate_fn,
     )
 
+    # Handle resume
+    checkpoint = None
+    if args.resume_from_checkpoint:
+        checkpoint = args.resume_from_checkpoint
+        if not Path(checkpoint).exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint}")
+        print(f"Resuming from checkpoint: {checkpoint}")
+    elif args.auto_resume:
+        checkpoint = find_latest_checkpoint(output_dir)
+        if checkpoint:
+            print(f"Auto-resuming from {checkpoint}")
+        else:
+            print("Auto-resume: No checkpoints found, starting fresh")
+
     print("Starting training...")
     start_time = time.time()
     gpu_mem_before = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
     torch.cuda.reset_peak_memory_stats() if torch.cuda.is_available() else None
 
-    trainer.train()
+    if checkpoint:
+        trainer.train(resume_from_checkpoint=checkpoint)
+    else:
+        trainer.train()
 
     training_time = time.time() - start_time
     gpu_mem_peak = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fada-rccg": {
+      "command": "bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/server.ts"],
+      "env": {
+        "FADA_CHANNEL_PORT": "8789"
+      }
+    }
+  }
+}

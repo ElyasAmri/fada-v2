@@ -175,57 +175,62 @@ docs/
 
 ## RCCG Cloud Cluster
 
-8 H100 machines (fada-1 through fada-8) managed via Ansible through WSL.
+H100 machines managed via Ansible through WSL. Instance count varies.
 
-### CRITICAL: Always use rccg.sh -- NEVER raw SSH
+### CRITICAL: Always use ./r.sh -- NEVER raw SSH
 
-**NEVER use raw `ssh -i ~/.ssh/rccg_key ubuntu@<ip>` commands.** Always use `rccg.sh` via `r.sh`:
-
-```bash
-# r.sh is the entry point for ALL cluster operations
-bash experiments/rccg/r.sh <command> [args]
-```
-
-Available commands:
+**NEVER use raw `ssh -i ~/.ssh/rccg_key ubuntu@<ip>` commands.** Always use `./r.sh` from project root:
 
 ```bash
-# Check eval progress on all machines
-bash experiments/rccg/r.sh status
+# Simple commands (no quoting needed)
+./r.sh ssh fada-1 hostname
+./r.sh ssh fada-1 nvidia-smi
 
-# Run a playbook (setup, run_eval, run_queue, stop, exec)
-bash experiments/rccg/r.sh play setup --limit fada-3
-bash experiments/rccg/r.sh play run_eval --limit fada-3
-bash experiments/rccg/r.sh play run_queue --limit fada-1,fada-2
+# Complex commands with pipes/redirects (use heredoc, no quoting needed)
+./r.sh ssh fada-1 <<'CMD'
+nvidia-smi | grep MiB && echo done
+CMD
 
-# Pull checkpoints from a machine
-bash experiments/rccg/r.sh pull fada-3
+# Status / logs
+./r.sh status
+./r.sh logs fada-1
+./r.sh vllm-log fada-1
+./r.sh queue-log fada-1
 
-# SSH into a machine (or run a command on it)
-bash experiments/rccg/r.sh ssh fada-3
-bash experiments/rccg/r.sh ssh fada-3 "nvidia-smi"
+# Pull checkpoints
+./r.sh pull fada-1
 
-# Tail eval log / vLLM log / queue log
-bash experiments/rccg/r.sh logs fada-3
-bash experiments/rccg/r.sh vllm-log fada-3
-bash experiments/rccg/r.sh queue-log fada-3
+# Run Ansible playbooks
+./r.sh play setup --limit fada-1
+./r.sh play run_eval --limit fada-1
+./r.sh play run_queue --limit fada-1,fada-2
+
+# Launch long-running jobs (SCP-based, survives SSH drops)
+experiments/rccg/launch_job.sh fada-1 "training command"
+
+# Quick cluster status
+experiments/rccg/check_status.sh
 ```
 
-If you need to run a command on a remote machine, use `r.sh ssh <host> "<command>"` -- never construct raw SSH commands with IPs and key paths.
+A PreToolUse hook (`.claude/hooks/block-raw-ssh.sh`) enforces this -- raw SSH commands are blocked.
 
 ### Key Files
 
+- `r.sh` - Project root shortcut to `experiments/rccg/rccg.sh`
+- `experiments/rccg/rccg.sh` - Unified CLI wrapper (resolves host -> IP from inventory, supports stdin for complex commands)
 - `experiments/rccg/inventory/hosts.yml` - Machine IPs, models, volume devices
+- `experiments/rccg/check_status.sh` - Parallel SSH status check across all hosts
+- `experiments/rccg/launch_job.sh` - SCP-based job launcher (tmux, logs, jobs.json tracking)
+- `experiments/rccg/jobs.json` - Active job metadata
 - `experiments/rccg/playbooks/` - Ansible playbooks (setup, run_eval, run_queue, stop, exec, status, collect, deploy_monitor, deploy_tunnel)
-- `experiments/rccg/rccg.sh` - Unified CLI wrapper (resolves host -> IP from inventory)
-- `experiments/rccg/r.sh` - Thin WSL wrapper with clean PATH
 - `experiments/rccg/fada-monitor/` - Process monitor server (see below)
 
 ### Model Rotation Workflow
 
 1. Edit `vllm_model` and `vllm_models` list in `inventory/hosts.yml`
-2. `bash experiments/rccg/r.sh play run_queue --limit <host>` (queue system: stops old vLLM, downloads model, starts vLLM, runs eval for each model in list)
-3. `bash experiments/rccg/r.sh status` to monitor progress
-4. `bash experiments/rccg/r.sh pull <host>` to fetch checkpoints when done
+2. `./r.sh play run_queue --limit <host>` (queue system: stops old vLLM, downloads model, starts vLLM, runs eval for each model in list)
+3. `./r.sh status` to monitor progress
+4. `./r.sh pull <host>` to fetch checkpoints when done
 
 ### Process Monitor (fada-monitor)
 
@@ -277,6 +282,7 @@ After pulling checkpoints:
 
 ## Critical Instructions
 
+- **NEVER fine-tune a model that has already been fine-tuned** unless there is a specific, reasonable justification (e.g., fixing a known training issue, testing a hypothesis that could meaningfully improve scores). Hyperparameter variants are NOT acceptable as a lazy fallback when a different model fails. The priority is always to fine-tune NEW, UNIQUE base models. When a non-Qwen model fails, replace it with another non-Qwen model, not a Qwen variant.
 - Always be critical of the task you are told to do. Never assume the user is always right. This is a large project with many constraints
 - Always focus on comparative analysis (multiple models)
 - Always use MLflow for all experiments

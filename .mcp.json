@@ -28,6 +28,13 @@
         "--rm",
         "mcp/playwright"
       ]
+    },
+    "fada-rccg": {
+      "command": "bun",
+      "args": ["run", "experiments/rccg/fada-channel/server.ts"],
+      "env": {
+        "FADA_CHANNEL_PORT": "8789"
+      }
     }
   }
 }

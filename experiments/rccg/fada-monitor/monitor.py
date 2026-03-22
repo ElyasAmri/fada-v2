@@ -24,6 +24,8 @@ import socket
 import subprocess
 import threading
 import time
+import urllib.request
+import urllib.error
 import uuid
 from collections import OrderedDict
 from pathlib import Path
@@ -55,6 +57,12 @@ POLL_INTERVAL = CFG.get("poll_interval_seconds", 15)
 WATCH_PATTERNS = CFG["watch_patterns"]
 PORT = CFG.get("port", 9731)
 _EVENT_MAX_AGE_DAYS = 7
+
+# Webhook config
+WEBHOOK_URLS = CFG.get("webhook_urls", [])
+WEBHOOK_TIMEOUT = CFG.get("webhook_timeout_seconds", 10)
+WEBHOOK_RETRY_COUNT = CFG.get("webhook_retry_count", 2)
+IDLE_NOTIFY_INTERVAL = CFG.get("idle_notify_interval_seconds", 120)
 
 # ---------------------------------------------------------------------------
 # Authentication
@@ -129,6 +137,118 @@ def _load_events():
             shutil.copy2(EVENTS_FILE, bak)
 
 
+_RETRY_QUEUE_FILE = EVENTS_FILE.parent / "webhook_retry.json"
+_retry_queue: list[dict] = []
+_retry_lock = threading.Lock()
+_RETRY_MAX_AGE = 3600  # drop events older than 1 hour
+_RETRY_INTERVAL = 30
+_RETRY_MAX_BACKOFF = 300  # 5 minutes
+
+
+def _load_retry_queue():
+    if _RETRY_QUEUE_FILE.exists():
+        try:
+            with open(_RETRY_QUEUE_FILE) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+
+def _save_retry_queue():
+    try:
+        tmp = _RETRY_QUEUE_FILE.with_suffix(".tmp")
+        with open(tmp, "w") as f:
+            json.dump(_retry_queue, f)
+        tmp.rename(_RETRY_QUEUE_FILE)
+    except OSError as e:
+        log.warning("Failed to persist retry queue: %s", e)
+
+
+def _send_webhook(url: str, token: str, payload: dict) -> bool:
+    """POST webhook with retry. Returns True if delivered, False otherwise."""
+    body = json.dumps(payload).encode("utf-8")
+    for attempt in range(1, WEBHOOK_RETRY_COUNT + 1):
+        try:
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                    "User-Agent": "fada-monitor/1.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=WEBHOOK_TIMEOUT) as resp:
+                log.info("Webhook POST to %s: %d (attempt %d)", url, resp.status, attempt)
+                return True
+        except (urllib.error.URLError, OSError, TimeoutError) as e:
+            log.warning("Webhook POST to %s failed (attempt %d/%d): %s",
+                        url, attempt, WEBHOOK_RETRY_COUNT, e)
+            if attempt < WEBHOOK_RETRY_COUNT:
+                time.sleep(2 ** (attempt - 1))
+    return False
+
+
+def _resolve_wh_token(wh: dict) -> str:
+    if wh.get("token_env"):
+        return os.environ.get(wh["token_env"], "")
+    return wh.get("token", "")
+
+
+def _dispatch_webhooks(ev: dict):
+    """POST event to all webhook URLs. Queue for retry on failure."""
+    for wh in WEBHOOK_URLS:
+        url = wh.get("url", "")
+        if not url:
+            continue
+        token = _resolve_wh_token(wh)
+        delivered = _send_webhook(url, token, ev)
+        if not delivered:
+            with _retry_lock:
+                _retry_queue.append({
+                    "url": url, "token": token,
+                    "payload": ev, "queued_at": time.time(), "attempts": 0,
+                })
+                _save_retry_queue()
+            log.info("Queued event %s for retry", ev.get("id", "?"))
+
+
+def _retry_loop():
+    """Background thread: retry failed webhooks with exponential backoff."""
+    while True:
+        time.sleep(_RETRY_INTERVAL)
+        with _retry_lock:
+            if not _retry_queue:
+                continue
+            now = time.time()
+            # Drop expired entries
+            _retry_queue[:] = [
+                e for e in _retry_queue if now - e["queued_at"] < _RETRY_MAX_AGE
+            ]
+            if not _retry_queue:
+                _save_retry_queue()
+                continue
+            # Pop first item to retry
+            entry = _retry_queue[0]
+
+        # Retry outside lock
+        delivered = _send_webhook(entry["url"], entry["token"], entry["payload"])
+        with _retry_lock:
+            if delivered:
+                if entry in _retry_queue:
+                    _retry_queue.remove(entry)
+                log.info("Retry delivered event %s", entry["payload"].get("id", "?"))
+            else:
+                entry["attempts"] = entry.get("attempts", 0) + 1
+                # Move to back with backoff (will be skipped for backoff duration)
+                if entry in _retry_queue:
+                    _retry_queue.remove(entry)
+                    _retry_queue.append(entry)
+            _save_retry_queue()
+
+
 def push_event(kind: str, data: dict):
     ev = {
         "id": str(uuid.uuid4()),
@@ -140,7 +260,13 @@ def push_event(kind: str, data: dict):
     }
     with _events_lock:
         _events[ev["id"]] = ev
-        _save_events()
+        try:
+            _save_events()
+        except OSError as e:
+            log.warning("Failed to persist event %s: %s", ev["id"], e)
+    # Fire-and-forget webhook dispatch (outside lock, always attempt)
+    if WEBHOOK_URLS:
+        _dispatch_webhooks(ev)
 
 
 def get_pending_events() -> list[dict]:
@@ -246,7 +372,14 @@ def scan_processes(patterns: list[str]) -> dict[int, dict]:
                     stats["pattern"] = pat
                     result[pid] = stats
                 break
-    return result
+    # Deduplicate: keep only the lowest PID per (pattern, cmdline) to avoid
+    # tracking forked child processes that share the same command line.
+    seen: dict[tuple[str, str], int] = {}
+    for pid, info in sorted(result.items()):
+        key = (info["pattern"], info["cmdline"])
+        if key not in seen:
+            seen[key] = pid
+    return {pid: result[pid] for pid in seen.values()}
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +414,7 @@ def _load_tracked() -> dict[int, dict]:
 _tracked: dict[int, dict] = {}
 _poller_lock = threading.Lock()
 _hostname = socket.gethostname()
+_last_idle_notify: float = 0.0
 
 
 def _poll_loop():
@@ -297,8 +431,11 @@ def _poll_loop():
                 completed = [(pid, _tracked[pid]) for pid in prev_pids - curr_pids]
                 _tracked = current
 
-            # Persist tracked state (outside lock)
-            _save_tracked(current)
+            # Persist tracked state (outside lock, best-effort)
+            try:
+                _save_tracked(current)
+            except OSError as e:
+                log.warning("Failed to persist tracked state: %s", e)
 
             # Emit events outside the poller lock
             for pid, info in started:
@@ -318,6 +455,25 @@ def _poll_loop():
                     "runtime_s": prev["runtime_s"],
                     "runtime_human": prev.get("runtime_human", ""),
                 })
+
+            # Send idle notification via webhook every IDLE_NOTIFY_INTERVAL
+            global _last_idle_notify
+            if not current and WEBHOOK_URLS:
+                now = time.time()
+                if now - _last_idle_notify >= IDLE_NOTIFY_INTERVAL:
+                    _last_idle_notify = now
+                    idle_ev = {
+                        "id": str(uuid.uuid4()),
+                        "kind": "idle",
+                        "ts": now,
+                        "ts_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "data": {"hostname": _hostname},
+                        "acked": False,
+                    }
+                    _dispatch_webhooks(idle_ev)
+                    log.info("Sent idle notification for %s", _hostname)
+            else:
+                _last_idle_notify = 0.0
         except Exception as e:
             log.error("Poller error: %s", e)
         time.sleep(POLL_INTERVAL)
@@ -420,11 +576,16 @@ def gpu():
 # ---------------------------------------------------------------------------
 _load_events()
 _tracked = _load_tracked()
+_retry_queue[:] = _load_retry_queue()
 log.info("Watching patterns: %s", WATCH_PATTERNS)
 log.info("Poll interval: %ds", POLL_INTERVAL)
+log.info("Retry queue: %d pending", len(_retry_queue))
 
 _poller_thread = threading.Thread(target=_poll_loop, daemon=True)
 _poller_thread.start()
+
+_retry_thread = threading.Thread(target=_retry_loop, daemon=True)
+_retry_thread.start()
 
 # ---------------------------------------------------------------------------
 # Entrypoint

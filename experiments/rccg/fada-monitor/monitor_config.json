@@ -3,11 +3,23 @@
     "eval_hf_peft.py",
     "launch_eval.sh",
     "train_unsloth.py",
+    "train_llamafactory.py",
+    "train_swift.py",
+    "swift sft",
     "run_queue.py",
     "test_api_vlm.py",
     "run_queue.sh"
   ],
   "poll_interval_seconds": 15,
   "events_file": "/home/ubuntu/monitor/events.json",
-  "port": 9731
+  "port": 9731,
+  "webhook_urls": [
+    {
+      "url": "https://fada-channel.elyasamri.com/webhook",
+      "token_env": "MONITOR_API_TOKEN"
+    }
+  ],
+  "webhook_timeout_seconds": 10,
+  "webhook_retry_count": 2,
+  "idle_notify_interval_seconds": 300
 }

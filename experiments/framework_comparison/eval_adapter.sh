@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-export HF_HOME="${HF_HOME:-/mnt/models/huggingface}"
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
 BASE_MODEL="${1:?Usage: eval_adapter.sh <base_model> <adapter_path> <output_dir>}"
 ADAPTER_PATH="${2:?Usage: eval_adapter.sh <base_model> <adapter_path> <output_dir>}"
@@ -29,7 +29,7 @@ mkdir -p "${OUTPUT_DIR}"
 
 # Step 1: HF+PEFT inference
 echo "Running HF+PEFT inference..."
-python "${PROJECT_DIR}/experiments/framework_comparison/eval_hf_peft.py" \
+python3 "${PROJECT_DIR}/experiments/framework_comparison/eval_hf_peft.py" \
     --model "${BASE_MODEL}" \
     --adapter "${ADAPTER_PATH}" \
     --output-dir "${OUTPUT_DIR}" \
@@ -53,7 +53,7 @@ fi
 
 echo "Converting checkpoint: ${FOUND_CHECKPOINT}"
 cd "${PROJECT_DIR}"
-python -m experiments.evaluation.checkpoint_to_predictions \
+python3 -m experiments.evaluation.checkpoint_to_predictions \
     --checkpoint "${FOUND_CHECKPOINT}" \
     --output "${PREDICTIONS_FILE}"
 

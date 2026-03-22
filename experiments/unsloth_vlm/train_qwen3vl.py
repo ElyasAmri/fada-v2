@@ -40,7 +40,7 @@ TRAINING_CONFIG = {
     "num_train_epochs": 3,
     "logging_steps": 10,
     "save_steps": 500,
-    "save_total_limit": 2,
+    "save_total_limit": 3,
     "seed": 42,
 }
 
@@ -52,6 +52,15 @@ LORA_CONFIG = {
     "target_modules": "all-linear",
     "use_rslora": False,
 }
+
+
+def find_latest_checkpoint(output_dir):
+    """Find the latest checkpoint in output directory."""
+    checkpoints = list(Path(output_dir).glob("checkpoint-*"))
+    if not checkpoints:
+        return None
+    checkpoints.sort(key=lambda x: int(x.name.split("-")[1]))
+    return str(checkpoints[-1])
 
 
 def load_model():
@@ -196,6 +205,10 @@ def main():
                         help="Load model and data but don't train")
     parser.add_argument("--lazy-loading", action="store_true",
                         help="Use lazy loading to avoid OOM with large datasets")
+    parser.add_argument("--resume-from-checkpoint", type=str, default=None,
+                        help="Path to checkpoint directory to resume training from")
+    parser.add_argument("--auto-resume", action="store_true",
+                        help="Automatically resume from latest checkpoint in output directory")
 
     args = parser.parse_args()
 
@@ -268,12 +281,29 @@ def main():
         print("\nCreating trainer...")
         trainer = create_trainer(model, tokenizer, train_dataset, val_dataset, lazy_loading=use_lazy)
 
+        # Handle resume
+        checkpoint = None
+        if args.resume_from_checkpoint:
+            checkpoint = args.resume_from_checkpoint
+            if not Path(checkpoint).exists():
+                raise FileNotFoundError(f"Checkpoint not found: {checkpoint}")
+            print(f"\nResuming from checkpoint: {checkpoint}")
+        elif args.auto_resume:
+            checkpoint = find_latest_checkpoint(OUTPUT_DIR)
+            if checkpoint:
+                print(f"\nAuto-resuming from {checkpoint}")
+            else:
+                print("\nAuto-resume: No checkpoints found, starting fresh")
+
         # Train
         print("\nStarting training...")
         print("=" * 60)
 
         start_time = time.time()
-        trainer_stats = trainer.train()
+        if checkpoint:
+            trainer_stats = trainer.train(resume_from_checkpoint=checkpoint)
+        else:
+            trainer_stats = trainer.train()
         training_time = time.time() - start_time
 
         print("\n" + "=" * 60)

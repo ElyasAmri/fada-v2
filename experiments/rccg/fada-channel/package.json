@@ -1,0 +1,12 @@
+{
+  "name": "fada-channel",
+  "version": "1.0.0",
+  "description": "Claude Code channel plugin for RCCG webhook integration",
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

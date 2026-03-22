@@ -4,11 +4,6 @@
   gather_facts: no
 
   tasks:
-    - name: Validate target host
-      assert:
-        that: inventory_hostname == 'fada-1'
-        fail_msg: "Monitor only deploys to fada-1. Use: --limit fada-1"
-
     - name: Create monitor directory
       file:
         path: /home/ubuntu/monitor
@@ -57,8 +52,8 @@
         - { src: "../fada-monitor/monitor.py", dest: "/home/ubuntu/monitor/monitor.py", mode: "0755" }
         - { src: "../fada-monitor/monitor_config.json", dest: "/home/ubuntu/monitor/monitor_config.json" }
 
-    - name: Install flask in ft-unsloth env
-      shell: /home/ubuntu/miniconda3/envs/ft-unsloth/bin/pip install flask
+    - name: Install flask via pip3
+      shell: pip3 install flask
       register: pip_result
       changed_when: "'already satisfied' not in pip_result.stdout"
 

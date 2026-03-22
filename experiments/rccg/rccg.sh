@@ -18,7 +18,7 @@ if [ -f /proc/version ] && grep -q Microsoft /proc/version 2>/dev/null; then
   export PATH="$clean_path"
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${RCCG_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 INVENTORY="$SCRIPT_DIR/inventory/hosts.yml"
 SSH_KEY="$HOME/.ssh/rccg_key"
 SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=ERROR"
@@ -37,7 +37,7 @@ get_ip() {
 
 # Get all host names
 get_hosts() {
-  grep -oP '^\s{8}fada-\d+' "$INVENTORY" | awk '{print $1}'
+  grep -oE 'fada-[0-9]+' "$INVENTORY" | sort -u -t- -k2 -n
 }
 
 # Get model for a host
@@ -87,34 +87,20 @@ cmd_ssh() {
   if [ -z "$ip" ]; then
     echo "Unknown host: $host" >&2; exit 1
   fi
-  if [ $# -eq 0 ]; then
-    ssh -i "$SSH_KEY" $SSH_OPTS "ubuntu@$ip"
-  else
+  if [ $# -gt 0 ]; then
+    # Args provided: pass them to SSH
     ssh -i "$SSH_KEY" $SSH_OPTS "ubuntu@$ip" "$@"
+  elif [ ! -t 0 ]; then
+    # No args, stdin is piped: read command from stdin
+    ssh -i "$SSH_KEY" $SSH_OPTS "ubuntu@$ip" "$(cat)"
+  else
+    # Interactive session
+    ssh -i "$SSH_KEY" $SSH_OPTS "ubuntu@$ip"
   fi
 }
 
 cmd_status() {
-  printf "%-8s %-45s %s\n" "HOST" "MODEL" "STATUS"
-  printf "%-8s %-45s %s\n" "--------" "---------------------------------------------" "----------"
-  for host in $(get_hosts); do
-    local ip=$(get_ip "$host")
-    local model=$(get_model "$host")
-    local short_model=$(basename "$model")
-    local result
-    result=$(ssh -i "$SSH_KEY" $SSH_OPTS "ubuntu@$ip" '
-      if [ -f /home/ubuntu/fada-results/eval_done.marker ]; then
-        code=$(grep exit_code /home/ubuntu/fada-results/eval_done.marker | cut -d= -f2)
-        if [ "$code" = "0" ]; then echo "DONE"; else echo "FAILED(rc=$code)"; fi
-      elif pgrep -f "[t]est_api_vlm" > /dev/null; then
-        prog=$(tail -1 /home/ubuntu/fada-results/eval_run.log 2>/dev/null | grep -oP "\d+/\d+" | tail -1)
-        echo "RUNNING ${prog:-?/?}"
-      else
-        echo "IDLE"
-      fi
-    ' 2>/dev/null || echo "UNREACHABLE")
-    printf "%-8s %-45s %s\n" "$host" "$short_model" "$result"
-  done
+  exec "$SCRIPT_DIR/check_status.sh"
 }
 
 cmd_logs() {
@@ -153,6 +139,7 @@ case "${1:-help}" in
   play)      shift; cmd_play "$@" ;;
   ssh)       shift; cmd_ssh "$@" ;;
   status)    cmd_status ;;
+  launch)    shift; exec "$SCRIPT_DIR/launch_job.sh" "$@" ;;
   logs)      shift; cmd_logs "$@" ;;
   pull)      shift; cmd_pull "$@" ;;
   vllm-log)  shift; cmd_vllm_log "$@" ;;
@@ -161,7 +148,8 @@ case "${1:-help}" in
     echo "Usage: rccg.sh <command> [args]"
     echo "  play <playbook> [--limit hosts]  Run ansible-playbook"
     echo "  ssh <host> [cmd]                 SSH into host or run command"
-    echo "  status                           Check eval progress"
+    echo "  launch <host> \"<cmd>\"             Launch job in tmux (survives disconnects)"
+    echo "  status                           Check cluster status"
     echo "  logs <host>                      Tail eval log"
     echo "  pull <host>                      Pull checkpoint files"
     echo "  vllm-log <host>                  Tail vLLM server log"
