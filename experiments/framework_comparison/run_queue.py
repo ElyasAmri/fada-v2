@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -22,9 +23,6 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
-
-# Conda executable (may not be on PATH when run from venv)
-CONDA = os.environ.get("CONDA_EXE", "/home/ubuntu/miniconda3/bin/conda")
 
 # Framework -> conda env mapping
 CONDA_ENVS = {
@@ -44,6 +42,28 @@ WRAPPER_SCRIPTS = {
 
 # Frameworks that use ShareGPT format
 SHAREGPT_FRAMEWORKS = {"llamafactory", "axolotl"}
+
+
+def resolve_conda_executable() -> str:
+    """Resolve conda executable across RCCG/Linux and local Windows setups."""
+    conda_from_env = os.environ.get("CONDA_EXE")
+    if conda_from_env:
+        return conda_from_env
+
+    linux_default = "/home/ubuntu/miniconda3/bin/conda"
+    if Path(linux_default).exists():
+        return linux_default
+
+    conda_on_path = shutil.which("conda")
+    if conda_on_path:
+        return conda_on_path
+
+    # Keep dry-run and matrix operations usable even if conda isn't installed.
+    # Actual training/eval will fail with a clear subprocess error if unresolved.
+    return "conda"
+
+
+CONDA = resolve_conda_executable()
 
 
 def load_config(config_path: Path) -> dict:

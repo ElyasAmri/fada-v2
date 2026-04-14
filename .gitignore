@@ -41,6 +41,7 @@ tmpclaude-*/
 
 # Documents
 *.pdf
+*.zip
 
 # Keep these files
 !README.md

@@ -1,5 +1,5 @@
 """
-Qwen3-VL LoRA Fine-tuning Script for Fetal Ultrasound VQA
+VLM LoRA Fine-tuning Script for Fetal Ultrasound VQA
 
 Supports both Unsloth (optimized) and standard HuggingFace + PEFT training.
 Designed for RTX 4070 (12GB) with 4-bit quantization.
@@ -91,6 +91,9 @@ MODEL_CONFIGS = {
     # MiniCPM-V family
     "minicpm-v-2.6": "openbmb/MiniCPM-V-2_6",
     "minicpm-v-4": "openbmb/MiniCPM-V-4",
+    # Gemma 4 family
+    "gemma-4-e2b-it": "google/gemma-4-E2B-it",
+    "gemma-4-e4b-it": "google/gemma-4-E4B-it",
 }
 
 # LoRA target modules (identical across qwen/internvl/minicpm architectures)
@@ -140,22 +143,28 @@ class VLMDataset(Dataset):
         self,
         jsonl_path: str,
         processor: AutoProcessor,
+        architecture: str = "qwen",
         max_samples: Optional[int] = None,
         max_length: int = 4096,
         data_root: Optional[str] = None,
     ):
         self.processor = processor
+        self.architecture = architecture
         self.max_length = max_length
         self.data_root = Path(data_root) if data_root else None
         self._missing_count = 0
         self.samples = []
 
-        # Precompute Qwen chat template markers for label masking.
-        # This script targets Qwen models only (<|im_start|>/<|im_end|> format).
-        self._response_template_ids = self.processor.tokenizer.encode(
-            "<|im_start|>assistant\n", add_special_tokens=False
-        )
-        self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        # Qwen uses explicit assistant boundary tokens.
+        # Non-Qwen architectures fall back to padding-only masking.
+        if self.architecture == "qwen":
+            self._response_template_ids = self.processor.tokenizer.encode(
+                "<|im_start|>assistant\n", add_special_tokens=False
+            )
+            self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        else:
+            self._response_template_ids = []
+            self._end_token_id = None
 
         with open(jsonl_path, 'r') as f:
             for i, line in enumerate(f):
@@ -231,10 +240,12 @@ class VLMDataset(Dataset):
             # Find all assistant response boundaries and unmask them
             template_len = len(self._response_template_ids)
             ids_list = input_ids.tolist()
+            found_any_response = False
             i = 0
             while i <= len(ids_list) - template_len:
                 # Check for <|im_start|>assistant\n marker
                 if ids_list[i:i + template_len] == self._response_template_ids:
+                    found_any_response = True
                     # Unmask from after the marker until <|im_end|>
                     response_start = i + template_len
                     j = response_start
@@ -248,6 +259,10 @@ class VLMDataset(Dataset):
                     i = j + 1
                 else:
                     i += 1
+            if not found_any_response:
+                # Fallback in case template markers are not present in the tokenized sample.
+                labels = input_ids.clone()
+                labels[labels == self.processor.tokenizer.pad_token_id] = -100
         else:
             # Fallback: mask padding only (original behavior)
             labels = input_ids.clone()
@@ -266,15 +281,19 @@ def get_model_architecture(model_id: str) -> str:
         model_id: HuggingFace model ID or model name
 
     Returns:
-        Architecture type: "internvl", "minicpm", or "qwen" (default)
+        Architecture type: "qwen", "internvl", "minicpm", "gemma", or "generic"
     """
     model_lower = model_id.lower()
-    if "internvl" in model_lower:
+    if "qwen" in model_lower:
+        return "qwen"
+    elif "internvl" in model_lower:
         return "internvl"
     elif "minicpm" in model_lower:
         return "minicpm"
+    elif "gemma" in model_lower:
+        return "gemma"
     else:
-        return "qwen"  # Default
+        return "generic"
 
 
 def create_model_and_processor(
@@ -452,14 +471,13 @@ def create_trainer(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Fine-tune Qwen3-VL for fetal ultrasound VQA"
+        description="Fine-tune VLMs for fetal ultrasound VQA"
     )
 
     # Model arguments
     parser.add_argument(
         '--model', type=str, default='qwen2-vl-2b',
-        choices=list(MODEL_CONFIGS.keys()),
-        help='Model to fine-tune (default: qwen2-vl-2b)'
+        help='Model key from MODEL_CONFIGS or full HuggingFace model ID (default: qwen2-vl-2b)'
     )
     parser.add_argument(
         '--use-unsloth', action='store_true',
@@ -614,6 +632,7 @@ def main():
     train_dataset = VLMDataset(
         args.train_data,
         processor,
+        architecture=get_model_architecture(model_id),
         max_samples=args.max_train_samples,
         data_root=args.data_root,
     )
@@ -623,6 +642,7 @@ def main():
         eval_dataset = VLMDataset(
             args.val_data,
             processor,
+            architecture=get_model_architecture(model_id),
             max_samples=args.max_val_samples,
             data_root=args.data_root,
         )

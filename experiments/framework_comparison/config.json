@@ -49,6 +49,11 @@
       "id": "microsoft/Phi-4-multimodal-instruct",
       "short_name": "phi-4-multimodal",
       "frameworks": ["unsloth", "llamafactory"]
+    },
+    {
+      "id": "google/gemma-4-E4B-it",
+      "short_name": "gemma-4-e4b",
+      "frameworks": ["unsloth", "llamafactory", "swift", "axolotl"]
     }
   ],
   "lora": {

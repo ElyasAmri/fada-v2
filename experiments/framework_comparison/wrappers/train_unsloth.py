@@ -36,17 +36,37 @@ class VLMDataset(Dataset):
     """Dataset for VLM fine-tuning from HF chat format JSONL."""
 
     def __init__(self, jsonl_path, processor, max_samples=None, max_length=4096,
-                 data_root=None):
+                 data_root=None, architecture="qwen"):
         self.processor = processor
         self.max_length = max_length
         self.data_root = Path(data_root) if data_root else None
+        self.architecture = architecture
         self._missing_count = 0
         self.samples = []
 
-        self._response_template_ids = self.processor.tokenizer.encode(
-            "<|im_start|>assistant\n", add_special_tokens=False
-        )
-        self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        if self.architecture == "qwen":
+            self._response_template_ids = self.processor.tokenizer.encode(
+                "<|im_start|>assistant\n", add_special_tokens=False
+            )
+            self._end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+            self._gemma_model_turn_ids = []
+            self._gemma_turn_end_id = None
+        elif self.architecture == "gemma":
+            self._response_template_ids = []
+            self._end_token_id = None
+            probe_ids = self.processor.tokenizer.apply_chat_template(
+                [{"role": "assistant", "content": "x"}],
+                tokenize=True,
+                add_generation_prompt=False,
+            )
+            # Typical shape: <bos> <|turn> model \n x <turn|> \n
+            self._gemma_model_turn_ids = probe_ids[1:4] if len(probe_ids) >= 6 else []
+            self._gemma_turn_end_id = probe_ids[-2] if len(probe_ids) >= 2 else None
+        else:
+            self._response_template_ids = []
+            self._end_token_id = None
+            self._gemma_model_turn_ids = []
+            self._gemma_turn_end_id = None
 
         with open(jsonl_path) as f:
             for i, line in enumerate(f):
@@ -102,9 +122,11 @@ class VLMDataset(Dataset):
         if self._response_template_ids:
             template_len = len(self._response_template_ids)
             ids_list = input_ids.tolist()
+            found_any_response = False
             i = 0
             while i <= len(ids_list) - template_len:
                 if ids_list[i:i + template_len] == self._response_template_ids:
+                    found_any_response = True
                     j = i + template_len
                     while j < len(ids_list):
                         labels[j] = input_ids[j]
@@ -114,23 +136,77 @@ class VLMDataset(Dataset):
                     i = j + 1
                 else:
                     i += 1
+            if not found_any_response:
+                labels = input_ids.clone()
+                labels[labels == self.processor.tokenizer.pad_token_id] = -100
         else:
-            labels = input_ids.clone()
-            labels[labels == self.processor.tokenizer.pad_token_id] = -100
+            labels = self._build_assistant_only_labels(input_ids)
+            if labels is None:
+                labels = input_ids.clone()
+                labels[labels == self.processor.tokenizer.pad_token_id] = -100
 
         inputs["labels"] = labels
         return inputs
 
+    def _build_assistant_only_labels(self, input_ids):
+        if self.architecture == "gemma":
+            return self._build_gemma_turn_labels(input_ids)
+        return None
 
-def collate_fn(batch):
-    """Custom collator for variable-sized image tensors and dynamic padding.
+    def _build_gemma_turn_labels(self, input_ids):
+        if not self._gemma_model_turn_ids or self._gemma_turn_end_id is None:
+            return None
 
-    For Qwen VL models, pixel_values and image_grid_thw are variable-length
-    and must be concatenated along dim 0 rather than stacked.
-    Sequence tensors (input_ids, attention_mask, labels) are padded to the
-    longest in the batch for efficiency.
-    """
-    concat_keys = {"pixel_values", "image_grid_thw", "pixel_values_videos", "video_grid_thw"}
+        ids_list = input_ids.tolist()
+        labels = torch.full_like(input_ids, -100)
+        found_assistant_span = False
+
+        marker_len = len(self._gemma_model_turn_ids)
+        i = 0
+        while i <= len(ids_list) - marker_len:
+            if ids_list[i:i + marker_len] == self._gemma_model_turn_ids:
+                start = i + marker_len
+                end = start
+                while end < len(ids_list) and ids_list[end] != self._gemma_turn_end_id:
+                    end += 1
+                if end > start:
+                    labels[start:end] = input_ids[start:end]
+                    found_assistant_span = True
+                i = end + 1
+            else:
+                i += 1
+
+        return labels if found_assistant_span else None
+
+    def _build_assistant_only_labels_template_mask(self, messages, input_ids):
+        tokenizer = self.processor.tokenizer
+        try:
+            tokenized = tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=False,
+                return_dict=True,
+                return_assistant_tokens_mask=True,
+            )
+            assistant_mask = tokenized.get("assistant_masks")
+            if assistant_mask and len(assistant_mask) == len(input_ids):
+                if sum(assistant_mask) > 0:
+                    mask_tensor = torch.tensor(assistant_mask, dtype=torch.bool)
+                    labels = torch.full_like(input_ids, -100)
+                    labels[mask_tensor] = input_ids[mask_tensor]
+                    return labels
+        except Exception:
+            pass
+        return None
+
+
+def collate_fn(batch, architecture: str = "qwen"):
+    """Custom collator for variable-sized image tensors and dynamic padding."""
+    # Qwen VL packs visual tokens per sample; those fields need concat behavior.
+    # Gemma and other models use standard batched tensors for pixel values.
+    concat_keys = {"image_grid_thw", "pixel_values_videos", "video_grid_thw"}
+    if architecture == "qwen":
+        concat_keys.add("pixel_values")
     # Pad sequence tensors to longest in batch
     pad_keys = {"input_ids", "attention_mask", "labels"}
     collated = {}
@@ -165,6 +241,19 @@ def find_latest_checkpoint(output_dir):
         return None
     checkpoints.sort(key=lambda x: int(x.name.split("-")[1]))
     return str(checkpoints[-1])
+
+
+def detect_architecture(model_id: str) -> str:
+    model_lower = model_id.lower()
+    if "qwen" in model_lower:
+        return "qwen"
+    if "internvl" in model_lower:
+        return "internvl"
+    if "minicpm" in model_lower:
+        return "minicpm"
+    if "gemma" in model_lower:
+        return "gemma"
+    return "generic"
 
 
 def main():
@@ -243,9 +332,11 @@ def main():
     print(f"Trainable: {trainable:,} / {total:,} ({100 * trainable / total:.2f}%)")
 
     # Load datasets
+    architecture = detect_architecture(args.model)
     train_dataset = VLMDataset(
         args.train_data, processor, max_samples=max_samples,
         max_length=train_cfg["max_seq_length"], data_root=args.data_root,
+        architecture=architecture,
     )
     eval_dataset = None
     if args.val_data and Path(args.val_data).exists():
@@ -253,6 +344,7 @@ def main():
             args.val_data, processor,
             max_samples=min(1000, max_samples) if max_samples else 1000,
             max_length=train_cfg["max_seq_length"], data_root=args.data_root,
+            architecture=architecture,
         )
 
     # Enable TF32 for H100 (faster matmuls with minimal precision loss)
@@ -298,7 +390,7 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=processor,
-        data_collator=collate_fn,
+        data_collator=lambda batch: collate_fn(batch, architecture=architecture),
     )
 
     # Handle resume

@@ -41,6 +41,22 @@ SYSTEM_PROMPT = (
 )
 
 
+def _is_gemma_processor(processor) -> bool:
+    name = getattr(getattr(processor, "tokenizer", None), "name_or_path", "") or ""
+    return "gemma" in name.lower()
+
+
+def _decode_generated_text(processor, output_ids, input_len: int, is_gemma: bool) -> str:
+    if not is_gemma:
+        return processor.tokenizer.decode(output_ids[0][input_len:], skip_special_tokens=True).strip()
+
+    raw = processor.decode(output_ids[0][input_len:], skip_special_tokens=False)
+    # Gemma 4 with thinking enabled emits a thought channel followed by <channel|>.
+    if "<channel|>" in raw:
+        raw = raw.split("<channel|>", 1)[1]
+    return raw.strip()
+
+
 def load_model(model_id: str, adapter_path: str, use_4bit: bool = True):
     """Load base model + LoRA adapter with HF+PEFT."""
     from transformers import AutoProcessor, AutoModelForImageTextToText, BitsAndBytesConfig
@@ -94,9 +110,12 @@ def generate_response(model, processor, image_path: str, question: str) -> str:
         },
     ]
 
-    text = processor.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
+    is_gemma = _is_gemma_processor(processor)
+    chat_kwargs = {"tokenize": False, "add_generation_prompt": True}
+    if is_gemma:
+        # Gemma 4 often gives "please provide image" on medical prompts when thinking is disabled.
+        chat_kwargs["enable_thinking"] = True
+    text = processor.apply_chat_template(messages, **chat_kwargs)
 
     inputs = processor(text=text, images=[image], return_tensors="pt").to(model.device)
 
@@ -109,10 +128,7 @@ def generate_response(model, processor, image_path: str, question: str) -> str:
         )
 
     input_len = inputs["input_ids"].shape[1]
-    response = processor.tokenizer.decode(
-        output_ids[0][input_len:], skip_special_tokens=True
-    )
-    return response.strip()
+    return _decode_generated_text(processor, output_ids, input_len, is_gemma)
 
 
 def load_test_images(data_root: str, splits_path: str) -> list:
