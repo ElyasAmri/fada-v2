@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.fada.ultrasound.llm.LlmChatTurn
 import com.fada.ultrasound.llm.LlmModelOption
 import com.fada.ultrasound.llm.LlmResponseClient
 import org.junit.Assert.assertEquals
@@ -18,16 +19,31 @@ class InferenceViewModelInstrumentedTest {
     fun generateResponseForSampleImage_returnsResponseReady() {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val fakeClient = object : LlmResponseClient {
+            override suspend fun prepare(
+                context: android.content.Context,
+                model: LlmModelOption,
+                onStatus: (String) -> Unit
+            ) = Unit
+
             override suspend fun generate(
                 context: android.content.Context,
                 model: LlmModelOption,
-                image: Bitmap,
+                conversationId: String,
+                history: List<LlmChatTurn>,
+                image: Bitmap?,
+                imageFileName: String?,
                 prompt: String,
-                onStatus: (String) -> Unit
+                onStatus: (String) -> Unit,
+                onPartialResponse: (String) -> Unit
             ): String {
                 onStatus("Fake model running...")
-                return "mock-response:${model.id}:${image.width}x${image.height}"
+                requireNotNull(image)
+                val response = "mock-response:${model.id}:${image.width}x${image.height}"
+                onPartialResponse(response)
+                return response
             }
+
+            override fun release() = Unit
         }
         val viewModel = InferenceViewModel(application, fakeClient)
         val sampleImage = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
@@ -46,24 +62,39 @@ class InferenceViewModelInstrumentedTest {
     }
 
     @Test
-    fun generateResponseWithoutImage_returnsError() {
+    fun generateResponseWithoutImage_returnsResponseReady() {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val fakeClient = object : LlmResponseClient {
+            override suspend fun prepare(
+                context: android.content.Context,
+                model: LlmModelOption,
+                onStatus: (String) -> Unit
+            ) = Unit
+
             override suspend fun generate(
                 context: android.content.Context,
                 model: LlmModelOption,
-                image: Bitmap,
+                conversationId: String,
+                history: List<LlmChatTurn>,
+                image: Bitmap?,
+                imageFileName: String?,
                 prompt: String,
-                onStatus: (String) -> Unit
-            ): String = "unused"
+                onStatus: (String) -> Unit,
+                onPartialResponse: (String) -> Unit
+            ): String {
+                val response = "text-only:$prompt"
+                onPartialResponse(response)
+                return response
+            }
+
+            override fun release() = Unit
         }
         val viewModel = InferenceViewModel(application, fakeClient)
 
         viewModel.generateResponseForCurrentImage()
 
-        val state = viewModel.uiState.value
-        assertTrue(state is InferenceUiState.Error)
-        assertEquals("No image selected", (state as InferenceUiState.Error).message)
+        val state = waitForTerminalState(viewModel)
+        assertTrue(state is InferenceUiState.ResponseReady)
     }
 
     private fun waitForTerminalState(

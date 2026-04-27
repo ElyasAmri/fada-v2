@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,9 +38,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -155,7 +156,7 @@ fun ChatScreen(
             draft = draft,
             onDraftChange = { draft = it },
             selectedModel = selectedModel,
-            isSendEnabled = draft.isNotBlank() && selectedImage != null && !isGenerating,
+            isSendEnabled = draft.isNotBlank() && !isGenerating,
             isAttachMenuExpanded = isAttachMenuExpanded,
             onAttachMenuExpandedChange = { isAttachMenuExpanded = it },
             onAddImage = {
@@ -238,64 +239,83 @@ private fun MessageComposer(
     onChangeModel: () -> Unit,
     onSend: () -> Unit
 ) {
-    Row(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box {
+                IconButton(
+                    onClick = { onAttachMenuExpandedChange(true) },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add attachment"
+                    )
+                }
+                DropdownMenu(
+                    expanded = isAttachMenuExpanded,
+                    onDismissRequest = { onAttachMenuExpandedChange(false) }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add image") },
+                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                        onClick = onAddImage
+                    )
+                    DropdownMenuItem(
+                    text = { Text("Take a photo") },
+                        leadingIcon = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
+                        onClick = onTakePhoto
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Current model: ${selectedModel.displayName}") },
+                        leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                        onClick = onChangeModel
+                    )
+                }
+            }
+
+            TextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Message") },
+                minLines = 1,
+                maxLines = 5,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                )
+            )
+
             IconButton(
-                onClick = { onAttachMenuExpandedChange(true) },
-                modifier = Modifier.size(48.dp)
+                onClick = onSend,
+                enabled = isSendEnabled,
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add attachment"
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send",
+                    tint = if (isSendEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    }
                 )
             }
-            DropdownMenu(
-                expanded = isAttachMenuExpanded,
-                onDismissRequest = { onAttachMenuExpandedChange(false) }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Add image") },
-                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                    onClick = onAddImage
-                )
-                DropdownMenuItem(
-                    text = { Text("Take one") },
-                    leadingIcon = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
-                    onClick = onTakePhoto
-                )
-                DropdownMenuItem(
-                    text = { Text("Current model: ${selectedModel.displayName}") },
-                    leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                    onClick = onChangeModel
-                )
-            }
-        }
-
-        OutlinedTextField(
-            value = draft,
-            onValueChange = onDraftChange,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text("Message") },
-            shape = RoundedCornerShape(24.dp),
-            minLines = 1,
-            maxLines = 5
-        )
-
-        Button(
-            onClick = onSend,
-            enabled = isSendEnabled,
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "Send"
-            )
         }
     }
 }
@@ -430,7 +450,7 @@ private fun ChatMessageBubble(message: ChatMessage) {
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (isUser) {
+                if (isUser || message.isStreaming) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyMedium

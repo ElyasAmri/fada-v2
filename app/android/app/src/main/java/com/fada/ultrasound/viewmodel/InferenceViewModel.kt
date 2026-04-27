@@ -7,6 +7,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fada.ultrasound.llm.LlmChatRole
+import com.fada.ultrasound.llm.LlmChatTurn
 import com.fada.ultrasound.llm.LlmModelOption
 import com.fada.ultrasound.llm.LlmModels
 import com.fada.ultrasound.llm.ModelDownloadManager
@@ -26,6 +28,13 @@ class InferenceViewModel(
     private val responseClient: LlmResponseClient = LlmResponseGenerator
 ) : AndroidViewModel(application) {
 
+    private val conversationStore = ConversationStore(application)
+    private val storedState = conversationStore.load()
+    private val initialConversations = storedState
+        ?.conversations
+        ?.takeIf { it.isNotEmpty() }
+        ?: listOf(createConversation())
+
     constructor(application: Application) : this(
         application = application,
         responseClient = LlmResponseGenerator
@@ -42,7 +51,9 @@ class InferenceViewModel(
     private val _selectedImageFileName = MutableStateFlow<String?>(null)
     val selectedImageFileName: StateFlow<String?> = _selectedImageFileName.asStateFlow()
 
-    private val _selectedModel = MutableStateFlow(LlmModels.default)
+    private val _selectedModel = MutableStateFlow(
+        LlmModels.options.firstOrNull { it.id == storedState?.selectedModelId } ?: LlmModels.default
+    )
     val selectedModel: StateFlow<LlmModelOption> = _selectedModel.asStateFlow()
 
     private val _modelOptions = MutableStateFlow(LlmModels.options)
@@ -51,20 +62,26 @@ class InferenceViewModel(
     private val _llmResponse = MutableStateFlow<LlmResponse?>(null)
     val llmResponse: StateFlow<LlmResponse?> = _llmResponse.asStateFlow()
 
-    private val _conversations = MutableStateFlow(listOf(createConversation()))
+    private val _conversations = MutableStateFlow(initialConversations)
     val conversations: StateFlow<List<ChatConversation>> = _conversations.asStateFlow()
 
-    private val _currentConversationId = MutableStateFlow(_conversations.value.first().id)
+    private val _currentConversationId = MutableStateFlow(
+        storedState?.currentConversationId
+            ?.takeIf { storedId -> initialConversations.any { it.id == storedId } }
+            ?: initialConversations.first().id
+    )
     val currentConversationId: StateFlow<String> = _currentConversationId.asStateFlow()
 
     private val _modelStorage = MutableStateFlow<List<ModelStorageInfo>>(emptyList())
     val modelStorage: StateFlow<List<ModelStorageInfo>> = _modelStorage.asStateFlow()
 
-    private val _settings = MutableStateFlow(AppSettings())
+    private val _settings = MutableStateFlow(storedState?.settings ?: AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     init {
         refreshModelStorage()
+        persistState()
+        prepareSelectedModel()
     }
 
     /**
@@ -112,17 +129,21 @@ class InferenceViewModel(
     fun selectModel(modelId: String) {
         val model = _modelOptions.value.firstOrNull { it.id == modelId } ?: return
         _selectedModel.value = model
+        persistState()
+        prepareSelectedModel()
     }
 
     fun createNewConversation() {
         val conversation = createConversation()
         _conversations.value = listOf(conversation) + _conversations.value
         _currentConversationId.value = conversation.id
+        persistState()
     }
 
     fun selectConversation(conversationId: String) {
         if (_conversations.value.any { it.id == conversationId }) {
             _currentConversationId.value = conversationId
+            persistState()
         }
     }
 
@@ -132,6 +153,7 @@ class InferenceViewModel(
         if (_currentConversationId.value == conversationId) {
             _currentConversationId.value = _conversations.value.first().id
         }
+        persistState()
     }
 
     fun clearCurrentConversation() {
@@ -149,6 +171,7 @@ class InferenceViewModel(
         }
         _llmResponse.value = null
         _uiState.value = InferenceUiState.Idle
+        persistState()
     }
 
     fun clearAllConversations() {
@@ -157,10 +180,12 @@ class InferenceViewModel(
         _currentConversationId.value = conversation.id
         _llmResponse.value = null
         _uiState.value = InferenceUiState.Idle
+        persistState()
     }
 
     fun updateKeepImageAfterSend(keepImageAfterSend: Boolean) {
         _settings.value = _settings.value.copy(keepImageAfterSend = keepImageAfterSend)
+        persistState()
     }
 
     /**
@@ -181,20 +206,29 @@ class InferenceViewModel(
         }
 
         val bitmap = _selectedImage.value
-        if (bitmap == null) {
-            _uiState.value = InferenceUiState.Error("No image selected")
-            return
-        }
 
         val currentId = _currentConversationId.value
+        val imageFileName = _selectedImageFileName.value
+        val history = currentConversationHistory(currentId)
         appendMessage(
             conversationId = currentId,
             message = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 role = ChatRole.User,
                 content = normalizedPrompt,
-                hasImage = true,
-                imageFileName = _selectedImageFileName.value ?: "Attached image"
+                hasImage = bitmap != null,
+                imageFileName = if (bitmap != null) imageFileName ?: "Attached image" else null
+            )
+        )
+
+        val assistantMessageId = UUID.randomUUID().toString()
+        appendMessage(
+            conversationId = currentId,
+            message = ChatMessage(
+                id = assistantMessageId,
+                role = ChatRole.Assistant,
+                content = "",
+                modelName = _selectedModel.value.displayName
             )
         )
 
@@ -206,10 +240,21 @@ class InferenceViewModel(
                 val output = responseClient.generate(
                     context = getApplication(),
                     model = selected,
+                    conversationId = currentId,
+                    history = history,
                     image = bitmap,
+                    imageFileName = imageFileName,
                     prompt = normalizedPrompt,
                     onStatus = { status ->
                         _uiState.value = InferenceUiState.Loading(status)
+                    },
+                    onPartialResponse = { partial ->
+                        updateMessageContent(
+                            conversationId = currentId,
+                            messageId = assistantMessageId,
+                            content = partial,
+                            isStreaming = true
+                        )
                     }
                 )
                 val elapsed = System.currentTimeMillis() - startTime
@@ -222,15 +267,12 @@ class InferenceViewModel(
                         latencyMs = elapsed
                     )
                     _llmResponse.value = response
-                    appendMessage(
+                    updateMessageContent(
                         conversationId = currentId,
-                        message = ChatMessage(
-                            id = UUID.randomUUID().toString(),
-                            role = ChatRole.Assistant,
-                            content = output,
-                            modelName = selected.displayName,
-                            latencyMs = elapsed
-                        )
+                        messageId = assistantMessageId,
+                        content = output,
+                        latencyMs = elapsed,
+                        isStreaming = false
                     )
                     if (!_settings.value.keepImageAfterSend) {
                         replaceSelectedImage(null, null)
@@ -238,9 +280,13 @@ class InferenceViewModel(
                     _uiState.value = InferenceUiState.ResponseReady(response)
                 }
             } catch (e: IllegalStateException) {
-                _uiState.value = InferenceUiState.Error(e.message ?: "Model runtime failed")
+                val message = e.message ?: "Model runtime failed"
+                updateMessageContent(currentId, assistantMessageId, "Generation failed: $message", isStreaming = false)
+                _uiState.value = InferenceUiState.Error(message)
             } catch (e: RuntimeException) {
-                _uiState.value = InferenceUiState.Error(e.message ?: "Inference failed")
+                val message = e.message ?: "Inference failed"
+                updateMessageContent(currentId, assistantMessageId, "Generation failed: $message", isStreaming = false)
+                _uiState.value = InferenceUiState.Error(message)
             }
         }
     }
@@ -295,6 +341,7 @@ class InferenceViewModel(
     override fun onCleared() {
         super.onCleared()
         replaceSelectedImage(null, null)
+        responseClient.release()
     }
 
     private fun replaceSelectedImage(bitmap: Bitmap?, fileName: String?) {
@@ -333,6 +380,37 @@ class InferenceViewModel(
                 conversation
             }
         }.sortedByDescending { it.updatedAt }
+        persistState()
+    }
+
+    private fun updateMessageContent(
+        conversationId: String,
+        messageId: String,
+        content: String,
+        latencyMs: Long? = null,
+        isStreaming: Boolean? = null
+    ) {
+        _conversations.value = _conversations.value.map { conversation ->
+            if (conversation.id == conversationId) {
+                conversation.copy(
+                    messages = conversation.messages.map { message ->
+                        if (message.id == messageId) {
+                            message.copy(
+                                content = content,
+                                latencyMs = latencyMs ?: message.latencyMs,
+                                isStreaming = isStreaming ?: message.isStreaming
+                            )
+                        } else {
+                            message
+                        }
+                    },
+                    updatedAt = System.currentTimeMillis()
+                )
+            } else {
+                conversation
+            }
+        }.sortedByDescending { it.updatedAt }
+        persistState()
     }
 
     private fun markModelBusy(modelId: String, status: String) {
@@ -374,6 +452,51 @@ class InferenceViewModel(
         )
     }
 
+    private fun prepareSelectedModel() {
+        val selected = _selectedModel.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                responseClient.prepare(
+                    context = getApplication(),
+                    model = selected,
+                    onStatus = { status ->
+                        _uiState.value = InferenceUiState.Loading(status)
+                    }
+                )
+                _uiState.value = InferenceUiState.Idle
+            } catch (e: RuntimeException) {
+                _uiState.value = InferenceUiState.Error(e.message ?: "Model initialization failed")
+            }
+        }
+    }
+
+    private fun currentConversationHistory(conversationId: String): List<LlmChatTurn> {
+        return _conversations.value
+            .firstOrNull { it.id == conversationId }
+            ?.messages
+            .orEmpty()
+            .filter { it.content.isNotBlank() && !it.isStreaming }
+            .map { message ->
+                LlmChatTurn(
+                    role = when (message.role) {
+                        ChatRole.User -> LlmChatRole.User
+                        ChatRole.Assistant -> LlmChatRole.Assistant
+                    },
+                    content = message.content,
+                    imageFileName = message.imageFileName
+                )
+            }
+    }
+
+    private fun persistState() {
+        conversationStore.save(
+            conversations = _conversations.value,
+            currentConversationId = _currentConversationId.value,
+            selectedModelId = _selectedModel.value.id,
+            settings = _settings.value
+        )
+    }
+
     companion object {
         private const val DEFAULT_IMAGE_PROMPT =
             "Describe the visible anatomy, likely image view, and important uncertainty."
@@ -412,6 +535,7 @@ data class ChatMessage(
     val latencyMs: Long? = null,
     val hasImage: Boolean = false,
     val imageFileName: String? = null,
+    val isStreaming: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
 

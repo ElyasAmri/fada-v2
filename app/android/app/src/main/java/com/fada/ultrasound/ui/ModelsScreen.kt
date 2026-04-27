@@ -1,26 +1,27 @@
 package com.fada.ultrasound.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fada.ultrasound.viewmodel.InferenceViewModel
 import com.fada.ultrasound.viewmodel.ModelStorageInfo
@@ -42,13 +44,12 @@ fun ModelsScreen(viewModel: InferenceViewModel) {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 12.dp, top = 20.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -58,7 +59,7 @@ fun ModelsScreen(viewModel: InferenceViewModel) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Download, delete, and choose on-device models",
+                    text = "Choose and manage on-device model files",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -69,14 +70,13 @@ fun ModelsScreen(viewModel: InferenceViewModel) {
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             items(
                 items = modelStorage,
                 key = { it.model.id }
             ) { info ->
-                ModelCard(
+                ModelRow(
                     info = info,
                     isSelected = info.model.id == selectedModel.id,
                     onSelect = { viewModel.selectModel(info.model.id) },
@@ -89,91 +89,97 @@ fun ModelsScreen(viewModel: InferenceViewModel) {
 }
 
 @Composable
-private fun ModelCard(
+private fun ModelRow(
     info: ModelStorageInfo,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            }
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !isSelected, onClick = onSelect)
+                .padding(horizontal = 24.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = if (info.isStored) Icons.Default.CheckCircle else Icons.Default.Storage,
-                    contentDescription = null,
-                    tint = if (info.isStored) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = info.model.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Version ${info.model.version} - ${if (info.isStored) formatBytes(info.sizeBytes) else "Not downloaded"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Icon(
+                imageVector = when {
+                    isSelected -> Icons.Default.CheckCircle
+                    info.isStored -> Icons.Default.Storage
+                    else -> Icons.Default.Download
+                },
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                if (info.isBusy) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            Text(
-                text = info.status ?: shortModelPath(info.filePath),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onSelect,
-                    enabled = !isSelected,
-                    modifier = Modifier.weight(1f)
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(if (isSelected) "Selected" else "Select")
+                    Text(
+                        text = info.model.displayName,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (info.isBusy) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    } else if (isSelected) {
+                        Text(
+                            text = "Selected",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
-                OutlinedButton(
-                    onClick = onDownload,
-                    enabled = !info.isBusy,
-                    modifier = Modifier.weight(1f)
+
+                Text(
+                    text = "Version ${info.model.version} - ${if (info.isStored) formatBytes(info.sizeBytes) else "Not downloaded"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = info.status ?: shortModelPath(info.filePath),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(if (info.isStored) "Update" else "Get")
-                }
-                OutlinedButton(
-                    onClick = onDelete,
-                    enabled = info.isStored && !info.isBusy,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Remove")
+                    TextButton(
+                        onClick = onDownload,
+                        enabled = !info.isBusy
+                    ) {
+                        Text(if (info.isStored) "Update" else "Download")
+                    }
+                    TextButton(
+                        onClick = onDelete,
+                        enabled = info.isStored && !info.isBusy
+                    ) {
+                        Text("Remove")
+                    }
                 }
             }
         }
+        HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
     }
 }
 

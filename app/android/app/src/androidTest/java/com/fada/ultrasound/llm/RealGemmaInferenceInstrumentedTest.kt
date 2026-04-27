@@ -22,7 +22,10 @@ class RealGemmaInferenceInstrumentedTest {
         val response = LlmResponseGenerator.generate(
             context = context,
             model = LlmModels.default,
+            conversationId = "test-1",
+            history = emptyList(),
             image = sampleImage,
+            imageFileName = "sample.png",
             prompt = "Describe this image."
         )
 
@@ -39,7 +42,10 @@ class RealGemmaInferenceInstrumentedTest {
         LlmResponseGenerator.generate(
             context = context,
             model = LlmModels.default,
+            conversationId = "test-2",
+            history = emptyList(),
             image = sampleImage,
+            imageFileName = "sample.png",
             prompt = "Describe this image."
         )
 
@@ -47,7 +53,10 @@ class RealGemmaInferenceInstrumentedTest {
         val secondResponse = LlmResponseGenerator.generate(
             context = context,
             model = LlmModels.default,
+            conversationId = "test-3",
+            history = emptyList(),
             image = sampleImage,
+            imageFileName = "sample.png",
             prompt = "Describe this image.",
             onStatus = { statuses.add(it) }
         )

@@ -51,7 +51,7 @@ fun FADANavHost() {
         topBar = {
             if (showGlobalTopBar) {
                 TopAppBar(
-                    title = { Text("TSLM") },
+                    title = { Text("FADA") },
                     navigationIcon = {
                         if (currentRoute != null && currentRoute != Screen.Chat.route) {
                             IconButton(onClick = { navController.popBackStack() }) {

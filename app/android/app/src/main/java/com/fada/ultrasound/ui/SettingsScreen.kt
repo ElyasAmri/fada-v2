@@ -64,14 +64,8 @@ fun SettingsScreen(
         SectionHeader("Models")
         SettingsRow(
             icon = { Icon(Icons.Default.Storage, contentDescription = null) },
-            title = "Current model",
-            subtitle = selectedModel.displayName,
-            onClick = onNavigateToModels
-        )
-        SettingsRow(
-            icon = { Icon(Icons.Default.Storage, contentDescription = null) },
-            title = "Manage downloaded models",
-            subtitle = "$storedModels stored model${if (storedModels == 1) "" else "s"}",
+            title = "Models",
+            subtitle = "${selectedModel.displayName} - $storedModels stored",
             onClick = onNavigateToModels
         )
 
