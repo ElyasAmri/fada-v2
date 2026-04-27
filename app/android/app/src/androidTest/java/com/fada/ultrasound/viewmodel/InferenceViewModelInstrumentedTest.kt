@@ -22,6 +22,7 @@ class InferenceViewModelInstrumentedTest {
                 context: android.content.Context,
                 model: LlmModelOption,
                 image: Bitmap,
+                prompt: String,
                 onStatus: (String) -> Unit
             ): String {
                 onStatus("Fake model running...")
@@ -52,6 +53,7 @@ class InferenceViewModelInstrumentedTest {
                 context: android.content.Context,
                 model: LlmModelOption,
                 image: Bitmap,
+                prompt: String,
                 onStatus: (String) -> Unit
             ): String = "unused"
         }

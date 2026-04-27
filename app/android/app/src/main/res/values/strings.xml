@@ -26,10 +26,6 @@
     <string name="camera_permission_message">To capture ultrasound images, please grant camera access.</string>
     <string name="go_back">Go Back</string>
 
-    <!-- Disclaimers -->
-    <string name="disclaimer_short">Research prototype only. NOT for clinical use.</string>
-    <string name="disclaimer_full">This is a research prototype for educational purposes only. NOT intended for clinical use or medical diagnosis.</string>
-
     <!-- Confidence levels -->
     <string name="confidence_high">High confidence</string>
     <string name="confidence_good">Good confidence</string>

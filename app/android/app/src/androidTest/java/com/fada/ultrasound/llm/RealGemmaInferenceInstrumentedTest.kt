@@ -22,7 +22,8 @@ class RealGemmaInferenceInstrumentedTest {
         val response = LlmResponseGenerator.generate(
             context = context,
             model = LlmModels.default,
-            image = sampleImage
+            image = sampleImage,
+            prompt = "Describe this image."
         )
 
         assertTrue(response.isNotBlank())
@@ -38,7 +39,8 @@ class RealGemmaInferenceInstrumentedTest {
         LlmResponseGenerator.generate(
             context = context,
             model = LlmModels.default,
-            image = sampleImage
+            image = sampleImage,
+            prompt = "Describe this image."
         )
 
         val statuses = mutableListOf<String>()
@@ -46,6 +48,7 @@ class RealGemmaInferenceInstrumentedTest {
             context = context,
             model = LlmModels.default,
             image = sampleImage,
+            prompt = "Describe this image.",
             onStatus = { statuses.add(it) }
         )
 

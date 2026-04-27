@@ -1,17 +1,16 @@
 # FADA Android App
 
-Native Android app scaffold for image-to-LLM workflows in fetal ultrasound research.
-
-**DISCLAIMER: This is a research prototype for educational purposes only. NOT intended for clinical use or medical diagnosis.**
+Native Android app for image-to-LLM workflows in fetal ultrasound research.
 
 ## Features
 
-- Camera capture and gallery image picker
-- On-device Gemma model selector (Gemma 4 E2B/E4B)
-- Runtime model download to app-private storage (`files/models/...`)
+- Chat-first image analysis workflow with camera capture and gallery picker
+- Conversation selector for switching, creating, and deleting local chat threads
+- On-device Gemma model selector and model management screen (Gemma 4 E2B/E4B)
+- Runtime model download and deletion from app-private storage (`FADA/models/...`)
+- Settings screen for chat behavior, model management access, and local data management
 - Optional SHA-256 verification support in model metadata
-- LLM response view for selected model output
-- Material 3 Compose UI
+- Material 3 Compose UI with a single top app bar
 
 ## Project Structure
 
@@ -25,6 +24,10 @@ app/android/
 |   |-- viewmodel/
 |   |   +-- InferenceViewModel.kt
 |   +-- ui/
+|       |-- ChatScreen.kt
+|       |-- ConversationsScreen.kt
+|       |-- ModelsScreen.kt
+|       |-- SettingsScreen.kt
 |       |-- MainScreen.kt
 |       |-- CameraScreen.kt
 |       |-- ResultsScreen.kt

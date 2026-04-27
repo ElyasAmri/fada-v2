@@ -21,6 +21,7 @@ interface LlmResponseClient {
         context: Context,
         model: LlmModelOption,
         image: Bitmap,
+        prompt: String,
         onStatus: (String) -> Unit = {}
     ): String
 }
@@ -34,6 +35,7 @@ object LlmResponseGenerator : LlmResponseClient {
         context: Context,
         model: LlmModelOption,
         image: Bitmap,
+        prompt: String,
         onStatus: (String) -> Unit
     ): String {
         enforceSupportedRuntime()
@@ -45,7 +47,7 @@ object LlmResponseGenerator : LlmResponseClient {
 
         return try {
             onStatus("Initializing ${model.displayName}...")
-            runInference(context, modelFile, image)
+            runInference(context, modelFile, image, prompt)
         } catch (e: RuntimeException) {
             if (!isPrefillDecodeMissingError(e)) {
                 throw e
@@ -58,14 +60,15 @@ object LlmResponseGenerator : LlmResponseClient {
                 onStatus = onStatus
             )
             onStatus("Retrying ${model.displayName}...")
-            runInference(context, modelFile, image)
+            runInference(context, modelFile, image, prompt)
         }
     }
 
     private fun runInference(
         context: Context,
         modelFile: File,
-        image: Bitmap
+        image: Bitmap,
+        prompt: String
     ): String {
         val tempImageFile = File.createTempFile("ultrasound_input_", ".jpg", context.cacheDir)
         FileOutputStream(tempImageFile).use { out ->
@@ -78,7 +81,8 @@ object LlmResponseGenerator : LlmResponseClient {
                 imageFile = tempImageFile,
                 backend = Backend.GPU(),
                 visionBackend = Backend.GPU(),
-                cacheDir = context.cacheDir.absolutePath
+                cacheDir = context.cacheDir.absolutePath,
+                prompt = prompt.ifBlank { DEFAULT_PROMPT }
             )
         } catch (_: RuntimeException) {
             runWithBackend(
@@ -86,7 +90,8 @@ object LlmResponseGenerator : LlmResponseClient {
                 imageFile = tempImageFile,
                 backend = Backend.CPU(),
                 visionBackend = Backend.CPU(),
-                cacheDir = context.cacheDir.absolutePath
+                cacheDir = context.cacheDir.absolutePath,
+                prompt = prompt.ifBlank { DEFAULT_PROMPT }
             )
         }
 
@@ -99,7 +104,8 @@ object LlmResponseGenerator : LlmResponseClient {
         imageFile: File,
         backend: Backend,
         visionBackend: Backend,
-        cacheDir: String
+        cacheDir: String,
+        prompt: String
     ): String {
         val engineConfig = EngineConfig(
             modelPath = modelFile.absolutePath,
@@ -113,7 +119,7 @@ object LlmResponseGenerator : LlmResponseClient {
                 val message = conversation.sendMessage(
                     Contents.of(
                         Content.ImageFile(imageFile.absolutePath),
-                        Content.Text(DEFAULT_PROMPT)
+                        Content.Text(prompt)
                     )
                 )
                 message.toString()

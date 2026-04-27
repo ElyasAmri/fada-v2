@@ -7,6 +7,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
+data class StoredModelInfo(
+    val file: File,
+    val isStored: Boolean,
+    val sizeBytes: Long
+)
+
 /**
  * Downloads and versions LiteRT-LM model files in phone storage under FADA/models.
  */
@@ -53,7 +59,16 @@ class ModelDownloadManager(private val context: Context) {
         getModelFile(option).delete()
     }
 
-    private fun getModelFile(option: LlmModelOption): File {
+    fun getStoredModelInfo(option: LlmModelOption): StoredModelInfo {
+        val file = getModelFile(option)
+        return StoredModelInfo(
+            file = file,
+            isStored = file.exists(),
+            sizeBytes = if (file.exists()) file.length() else 0L
+        )
+    }
+
+    fun getModelFile(option: LlmModelOption): File {
         val externalBase = context.getExternalFilesDir(null)
         val modelRoot = if (externalBase != null) {
             File(externalBase, "FADA/models")
