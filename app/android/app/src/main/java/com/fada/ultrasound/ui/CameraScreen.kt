@@ -52,12 +52,6 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/**
- * Camera screen for capturing ultrasound images.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
 @Composable
 fun CameraScreen(
     onImageCaptured: (Bitmap) -> Unit,
@@ -123,7 +117,7 @@ fun CameraScreen(
                             val preview = Preview.Builder()
                                 .build()
                                 .also {
-                                    it.surfaceProvider = previewView.surfaceProvider
+                                    it.setSurfaceProvider(previewView.surfaceProvider)
                                 }
 
                             imageCapture = ImageCapture.Builder()

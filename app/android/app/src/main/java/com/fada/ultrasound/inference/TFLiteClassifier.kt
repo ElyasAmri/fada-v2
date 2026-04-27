@@ -12,13 +12,6 @@ import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-/**
- * TensorFlow Lite classifier for fetal ultrasound images.
- * Runs the model entirely on-device with optional GPU acceleration.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
 class TFLiteClassifier(
     private val context: Context,
     private val modelFileName: String = "fada_classifier.tflite",

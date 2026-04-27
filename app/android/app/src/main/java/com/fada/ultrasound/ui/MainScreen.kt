@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,31 +27,37 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fada.ultrasound.viewmodel.InferenceUiState
 import com.fada.ultrasound.viewmodel.InferenceViewModel
 
 /**
- * Main screen with image selection and classification controls.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
+ * Main screen with image selection and multimodal response controls.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: InferenceViewModel,
@@ -61,9 +66,11 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedImage by viewModel.selectedImage.collectAsState()
-    val isModelReady by viewModel.isModelReady.collectAsState()
+    val selectedModel by viewModel.selectedModel.collectAsState()
+    val modelOptions by viewModel.modelOptions.collectAsState()
 
-    // Gallery picker launcher
+    var isModelMenuExpanded by remember { mutableStateOf(false) }
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -79,7 +86,6 @@ fun MainScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header
             Text(
                 text = "FADA",
                 style = MaterialTheme.typography.headlineLarge,
@@ -87,65 +93,47 @@ fun MainScreen(
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "Fetal Ultrasound Classifier",
+                text = "Vision LLM Image Assistant",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Disclaimer
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                )
+            ExposedDropdownMenuBox(
+                expanded = isModelMenuExpanded,
+                onExpandedChange = { isModelMenuExpanded = it },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                OutlinedTextField(
+                    value = selectedModel.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Model") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isModelMenuExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+
+                DropdownMenu(
+                    expanded = isModelMenuExpanded,
+                    onDismissRequest = { isModelMenuExpanded = false }
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Research prototype only. NOT for clinical use.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    modelOptions.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model.displayName) },
+                            onClick = {
+                                viewModel.selectModel(model.id)
+                                isModelMenuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Model status
-            if (!isModelReady) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Initializing model...")
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Image preview
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -166,17 +154,17 @@ fun MainScreen(
                                 Text((uiState as InferenceUiState.Loading).message)
                             }
                         }
-                        uiState is InferenceUiState.Classifying -> {
+                        uiState is InferenceUiState.GeneratingResponse -> {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 CircularProgressIndicator()
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("Analyzing image...")
+                                Text("Generating response...")
                             }
                         }
                         selectedImage != null -> {
                             Image(
                                 bitmap = selectedImage!!.asImageBitmap(),
-                                contentDescription = "Selected ultrasound image",
+                                contentDescription = "Selected input image",
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(12.dp)),
@@ -196,7 +184,7 @@ fun MainScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Select an ultrasound image",
+                                    text = "Select an image to analyze",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
@@ -208,7 +196,6 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Error message
             if (uiState is InferenceUiState.Error) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -225,15 +212,13 @@ fun MainScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
                     onClick = onNavigateToCamera,
-                    modifier = Modifier.weight(1f),
-                    enabled = isModelReady
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
@@ -246,8 +231,7 @@ fun MainScreen(
 
                 OutlinedButton(
                     onClick = { galleryLauncher.launch("image/*") },
-                    modifier = Modifier.weight(1f),
-                    enabled = isModelReady
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Image,
@@ -261,17 +245,12 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Classify button
             Button(
-                onClick = {
-                    viewModel.classifyCurrentImage()
-                },
+                onClick = { viewModel.generateResponseForCurrentImage() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = selectedImage != null &&
-                         isModelReady &&
-                         uiState !is InferenceUiState.Classifying
+                enabled = selectedImage != null && uiState !is InferenceUiState.GeneratingResponse
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
@@ -280,13 +259,12 @@ fun MainScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Classify Image",
+                    text = "Generate LLM Response",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
 
-            // Navigate to results when classification is complete
-            if (uiState is InferenceUiState.ClassificationComplete) {
+            if (uiState is InferenceUiState.ResponseReady) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onNavigateToResults,
@@ -295,22 +273,7 @@ fun MainScreen(
                     Text("View Results")
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Info section
-            Text(
-                text = "12-Class Fetal Ultrasound Classification",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Identifies: Abdomen, Aortic Arch, Cervical View, Cervix, Femur, NT views, Fetal Head Position, Thorax, and Brain planes",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
+

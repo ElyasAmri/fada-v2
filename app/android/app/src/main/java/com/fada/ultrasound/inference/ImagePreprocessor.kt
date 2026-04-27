@@ -5,13 +5,6 @@ import android.graphics.Color
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * Image preprocessor for TFLite inference.
- * Handles resizing, normalization with ImageNet statistics, and format conversion.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
 object ImagePreprocessor {
 
     // Model input dimensions

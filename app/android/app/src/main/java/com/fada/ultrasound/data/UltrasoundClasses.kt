@@ -1,12 +1,5 @@
 package com.fada.ultrasound.data
 
-/**
- * 12-class ultrasound classification labels.
- * Order must match the model output exactly.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
 object UltrasoundClasses {
 
     /**

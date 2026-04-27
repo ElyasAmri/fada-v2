@@ -11,6 +11,7 @@
 
     <!-- Media permissions for Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".FADAApplication"
@@ -21,6 +22,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FADA"
         android:hardwareAccelerated="true">
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
 
         <activity
             android:name=".MainActivity"

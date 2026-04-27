@@ -13,12 +13,6 @@ data class Prediction(
     val description: String
 )
 
-/**
- * Complete classification result with all predictions and metadata.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
 data class ClassificationResult(
     val predictions: List<Prediction>,
     val inferenceTimeMs: Long,

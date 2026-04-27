@@ -6,8 +6,10 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.fada.ultrasound.inference.ClassificationResult
-import com.fada.ultrasound.inference.TFLiteClassifier
+import com.fada.ultrasound.llm.LlmModelOption
+import com.fada.ultrasound.llm.LlmModels
+import com.fada.ultrasound.llm.LlmResponseClient
+import com.fada.ultrasound.llm.LlmResponseGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,15 +18,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 
-/**
- * ViewModel for managing model inference state.
- *
- * DISCLAIMER: This is a research prototype for educational purposes only.
- * NOT intended for clinical use or medical diagnosis.
- */
-class InferenceViewModel(application: Application) : AndroidViewModel(application) {
+class InferenceViewModel(
+    application: Application,
+    private val responseClient: LlmResponseClient = LlmResponseGenerator
+) : AndroidViewModel(application) {
 
-    private val classifier = TFLiteClassifier(application.applicationContext)
+    constructor(application: Application) : this(
+        application = application,
+        responseClient = LlmResponseGenerator
+    )
 
     // UI state
     private val _uiState = MutableStateFlow<InferenceUiState>(InferenceUiState.Idle)
@@ -34,34 +36,14 @@ class InferenceViewModel(application: Application) : AndroidViewModel(applicatio
     private val _selectedImage = MutableStateFlow<Bitmap?>(null)
     val selectedImage: StateFlow<Bitmap?> = _selectedImage.asStateFlow()
 
-    // Classification result
-    private val _classificationResult = MutableStateFlow<ClassificationResult?>(null)
-    val classificationResult: StateFlow<ClassificationResult?> = _classificationResult.asStateFlow()
+    private val _selectedModel = MutableStateFlow(LlmModels.default)
+    val selectedModel: StateFlow<LlmModelOption> = _selectedModel.asStateFlow()
 
-    // Model initialization state
-    private val _isModelReady = MutableStateFlow(false)
-    val isModelReady: StateFlow<Boolean> = _isModelReady.asStateFlow()
+    private val _modelOptions = MutableStateFlow(LlmModels.options)
+    val modelOptions: StateFlow<List<LlmModelOption>> = _modelOptions.asStateFlow()
 
-    init {
-        initializeModel()
-    }
-
-    /**
-     * Initialize the TFLite model in the background.
-     */
-    private fun initializeModel() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = InferenceUiState.Loading("Initializing model...")
-            val success = classifier.initialize()
-            _isModelReady.value = success
-
-            _uiState.value = if (success) {
-                InferenceUiState.Idle
-            } else {
-                InferenceUiState.Error("Failed to initialize model")
-            }
-        }
-    }
+    private val _llmResponse = MutableStateFlow<LlmResponse?>(null)
+    val llmResponse: StateFlow<LlmResponse?> = _llmResponse.asStateFlow()
 
     /**
      * Load an image from URI (gallery picker).
@@ -81,7 +63,7 @@ class InferenceViewModel(application: Application) : AndroidViewModel(applicatio
                 if (bitmap != null) {
                     withContext(Dispatchers.Main) {
                         _selectedImage.value = bitmap
-                        _classificationResult.value = null
+                        _llmResponse.value = null
                         _uiState.value = InferenceUiState.ImageLoaded
                     }
                 } else {
@@ -98,64 +80,57 @@ class InferenceViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun setCapturedImage(bitmap: Bitmap) {
         _selectedImage.value = bitmap
-        _classificationResult.value = null
+        _llmResponse.value = null
         _uiState.value = InferenceUiState.ImageLoaded
     }
 
     /**
-     * Run classification on the currently selected image.
+     * Select the current multimodal model.
      */
-    fun classifyCurrentImage() {
+    fun selectModel(modelId: String) {
+        val model = _modelOptions.value.firstOrNull { it.id == modelId } ?: return
+        _selectedModel.value = model
+    }
+
+    /**
+     * Generate a multimodal response on the selected image.
+     */
+    fun generateResponseForCurrentImage() {
         val bitmap = _selectedImage.value
         if (bitmap == null) {
             _uiState.value = InferenceUiState.Error("No image selected")
             return
         }
 
-        if (!_isModelReady.value) {
-            _uiState.value = InferenceUiState.Error("Model not ready")
-            return
-        }
-
         viewModelScope.launch(Dispatchers.Default) {
-            _uiState.value = InferenceUiState.Classifying
+            _uiState.value = InferenceUiState.GeneratingResponse
+            val startTime = System.currentTimeMillis()
+            val selected = _selectedModel.value
+            try {
+                val output = responseClient.generate(
+                    context = getApplication(),
+                    model = selected,
+                    image = bitmap,
+                    onStatus = { status ->
+                        _uiState.value = InferenceUiState.Loading(status)
+                    }
+                )
+                val elapsed = System.currentTimeMillis() - startTime
 
-            val result = classifier.classify(bitmap)
-
-            withContext(Dispatchers.Main) {
-                if (result != null) {
-                    _classificationResult.value = result
-                    _uiState.value = InferenceUiState.ClassificationComplete(result)
-                } else {
-                    _uiState.value = InferenceUiState.Error("Classification failed")
+                withContext(Dispatchers.Main) {
+                    val response = LlmResponse(
+                        modelId = selected.id,
+                        modelName = selected.displayName,
+                        content = output,
+                        latencyMs = elapsed
+                    )
+                    _llmResponse.value = response
+                    _uiState.value = InferenceUiState.ResponseReady(response)
                 }
-            }
-        }
-    }
-
-    /**
-     * Classify an image directly from a bitmap.
-     */
-    fun classifyBitmap(bitmap: Bitmap) {
-        _selectedImage.value = bitmap
-
-        if (!_isModelReady.value) {
-            _uiState.value = InferenceUiState.Error("Model not ready")
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.Default) {
-            _uiState.value = InferenceUiState.Classifying
-
-            val result = classifier.classify(bitmap)
-
-            withContext(Dispatchers.Main) {
-                if (result != null) {
-                    _classificationResult.value = result
-                    _uiState.value = InferenceUiState.ClassificationComplete(result)
-                } else {
-                    _uiState.value = InferenceUiState.Error("Classification failed")
-                }
+            } catch (e: IllegalStateException) {
+                _uiState.value = InferenceUiState.Error(e.message ?: "Model runtime failed")
+            } catch (e: RuntimeException) {
+                _uiState.value = InferenceUiState.Error(e.message ?: "Inference failed")
             }
         }
     }
@@ -166,20 +141,12 @@ class InferenceViewModel(application: Application) : AndroidViewModel(applicatio
     fun clearSelection() {
         _selectedImage.value?.recycle()
         _selectedImage.value = null
-        _classificationResult.value = null
+        _llmResponse.value = null
         _uiState.value = InferenceUiState.Idle
-    }
-
-    /**
-     * Get model information for debugging.
-     */
-    fun getModelInfo(): String {
-        return classifier.getModelInfo()
     }
 
     override fun onCleared() {
         super.onCleared()
-        classifier.close()
         _selectedImage.value?.recycle()
     }
 }
@@ -191,7 +158,14 @@ sealed class InferenceUiState {
     data object Idle : InferenceUiState()
     data class Loading(val message: String) : InferenceUiState()
     data object ImageLoaded : InferenceUiState()
-    data object Classifying : InferenceUiState()
-    data class ClassificationComplete(val result: ClassificationResult) : InferenceUiState()
+    data object GeneratingResponse : InferenceUiState()
+    data class ResponseReady(val response: LlmResponse) : InferenceUiState()
     data class Error(val message: String) : InferenceUiState()
 }
+
+data class LlmResponse(
+    val modelId: String,
+    val modelName: String,
+    val content: String,
+    val latencyMs: Long
+)

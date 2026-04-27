@@ -1,27 +1,27 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.fada.ultrasound"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.fada.ultrasound"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         vectorDrawables {
             useSupportLibrary = true
         }
 
-        // Disable PNG crunching for assets (TFLite model)
+        // Restrict to ARM ABIs to avoid x86_64 16KB page-size incompatibility in dependencies.
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 
@@ -42,10 +42,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -84,7 +80,6 @@ dependencies {
 
     // TensorFlow Lite
     implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
     implementation(libs.tensorflow.lite.gpu)
 
     // CameraX
@@ -95,4 +90,11 @@ dependencies {
 
     // Image loading
     implementation(libs.coil.compose)
+
+    // On-device Gemma runtime
+    implementation(libs.litertlm.android)
+
+    testImplementation(libs.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
 }

@@ -1,11 +1,6 @@
 package com.fada.ultrasound.ui
 
-import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,9 +24,6 @@ fun FADANavHost() {
     val navController = rememberNavController()
     val viewModel: InferenceViewModel = viewModel()
 
-    // Shared captured image state
-    var capturedBitmap: Bitmap? by remember { mutableStateOf(null) }
-
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route
@@ -51,7 +43,6 @@ fun FADANavHost() {
         composable(Screen.Camera.route) {
             CameraScreen(
                 onImageCaptured = { bitmap ->
-                    capturedBitmap = bitmap
                     viewModel.setCapturedImage(bitmap)
                     navController.popBackStack()
                 },
