@@ -23,11 +23,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -54,8 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -119,7 +118,7 @@ fun ChatScreen(
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
                     items(
-                        items = currentConversation?.messages.orEmpty(),
+                        items = currentConversation.messages,
                         key = { it.id }
                     ) { message ->
                         ChatMessageBubble(message = message)
@@ -307,7 +306,7 @@ private fun MessageComposer(
                 modifier = Modifier.size(44.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
                     tint = if (isSendEnabled) {
                         MaterialTheme.colorScheme.primary
@@ -450,13 +449,16 @@ private fun ChatMessageBubble(message: ChatMessage) {
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (isUser || message.isStreaming) {
+                if (isUser) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
-                    MarkdownMessageText(markdown = message.content)
+                    MarkdownMessageText(
+                        markdown = message.content,
+                        isStreaming = message.isStreaming
+                    )
                 }
                 if (message.hasImage || message.latencyMs != null) {
                     Text(
@@ -480,42 +482,95 @@ private fun ChatMessageBubble(message: ChatMessage) {
 }
 
 @Composable
-private fun MarkdownMessageText(markdown: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        markdown.lines().forEach { rawLine ->
-            val line = rawLine.trimEnd()
-            when {
-                line.startsWith("### ") -> MarkdownLine(line.removePrefix("### "), FontWeight.SemiBold)
-                line.startsWith("## ") -> MarkdownLine(line.removePrefix("## "), FontWeight.Bold)
-                line.startsWith("# ") -> MarkdownLine(line.removePrefix("# "), FontWeight.Bold)
-                line.startsWith("- ") || line.startsWith("* ") -> {
-                    MarkdownLine("- ${line.drop(2)}", FontWeight.Normal)
-                }
-                line.isBlank() -> Spacer(modifier = Modifier.height(2.dp))
-                else -> MarkdownLine(line, FontWeight.Normal)
+private fun MarkdownMessageText(markdown: String, isStreaming: Boolean) {
+    val blocks = remember(markdown, isStreaming) {
+        MarkdownTextFormatter.parseBlocks(markdown)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        blocks.forEach { block ->
+            when (block) {
+                is MarkdownBlock.Blank -> Spacer(modifier = Modifier.height(2.dp))
+                is MarkdownBlock.CodeBlock -> MarkdownCodeBlock(block.text)
+                is MarkdownBlock.Heading -> MarkdownLine(
+                    text = block.text,
+                    weight = if (block.level <= 2) FontWeight.Bold else FontWeight.SemiBold,
+                    isStreaming = isStreaming
+                )
+                is MarkdownBlock.ListItem -> MarkdownListItem(
+                    marker = block.marker,
+                    text = block.text,
+                    isStreaming = isStreaming
+                )
+                is MarkdownBlock.Paragraph -> MarkdownLine(
+                    text = block.text,
+                    weight = FontWeight.Normal,
+                    isStreaming = isStreaming
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MarkdownLine(text: String, weight: FontWeight) {
+private fun MarkdownLine(
+    text: String,
+    weight: FontWeight,
+    isStreaming: Boolean,
+    modifier: Modifier = Modifier
+) {
     Text(
-        text = buildAnnotatedString {
-            var index = 0
-            val regex = Regex("\\*\\*(.+?)\\*\\*")
-            regex.findAll(text).forEach { match ->
-                append(text.substring(index, match.range.first))
-                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                append(match.groupValues[1])
-                pop()
-                index = match.range.last + 1
-            }
-            append(text.substring(index))
-        },
+        text = MarkdownTextFormatter.buildAnnotatedText(
+            text = text,
+            streaming = isStreaming,
+            baseWeight = weight
+        ),
+        modifier = modifier,
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = weight
     )
+}
+
+@Composable
+private fun MarkdownListItem(
+    marker: String,
+    text: String,
+    isStreaming: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = marker,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        MarkdownLine(
+            text = text,
+            weight = FontWeight.Normal,
+            isStreaming = isStreaming,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun MarkdownCodeBlock(text: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace
+        )
+    }
 }
 
 @Composable

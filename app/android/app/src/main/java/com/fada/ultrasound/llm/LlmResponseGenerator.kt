@@ -109,7 +109,7 @@ object LlmResponseGenerator : LlmResponseClient {
             val contents = buildCurrentContents(normalizedPrompt, imageFile)
             var accumulated = ""
             conversation.sendMessageAsync(contents).collect { message ->
-                accumulated = mergeStreamText(accumulated, message.toString())
+                accumulated = StreamingTextAccumulator.append(accumulated, message.toString())
                 onPartialResponse(accumulated)
             }
             accumulated
@@ -196,15 +196,6 @@ object LlmResponseGenerator : LlmResponseClient {
                     LlmChatRole.Assistant -> Message.model(text)
                 }
             }
-    }
-
-    private fun mergeStreamText(current: String, next: String): String {
-        return when {
-            next.isBlank() -> current
-            next.startsWith(current) -> next
-            current.endsWith(next) -> current
-            else -> current + next
-        }
     }
 
     private fun enforceSupportedRuntime() {
