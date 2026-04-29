@@ -29,6 +29,14 @@ object LlmModels {
             version = "1",
             downloadUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
             localFileName = "gemma-4-E4B-it.litertlm"
+        ),
+        LlmModelOption(
+            id = "gemma-4-e2b-fada",
+            displayName = "Gemma 4 E2B FADA",
+            version = "20260428-target1h",
+            downloadUrl = "https://huggingface.co/elyasamri/gemma-4-e2b-fada-litertlm/resolve/main/gemma-4-E2B-fada-ft.litertlm",
+            expectedSha256 = "76a9aea3e0a0baeaf2e19f5cfdf7ec05d4fe8679eca345c919caee737795fd38",
+            localFileName = "gemma-4-E2B-fada-ft.litertlm"
         )
     )
 }

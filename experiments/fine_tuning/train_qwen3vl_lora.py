@@ -98,6 +98,15 @@ MODEL_CONFIGS = {
 
 # LoRA target modules (identical across qwen/internvl/minicpm architectures)
 LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+GEMMA4_LORA_TARGET_MODULES = [
+    "q_proj.linear",
+    "k_proj.linear",
+    "v_proj.linear",
+    "o_proj.linear",
+    "gate_proj.linear",
+    "up_proj.linear",
+    "down_proj.linear",
+]
 
 # Default LoRA configuration for RTX 4070
 DEFAULT_LORA_CONFIG = {
@@ -366,7 +375,11 @@ def apply_lora(
     # All supported architectures use the same target modules
     architecture = get_model_architecture(model_id)
     config = config.copy()
-    config['target_modules'] = LORA_TARGET_MODULES
+    config['target_modules'] = (
+        GEMMA4_LORA_TARGET_MODULES
+        if architecture == "gemma"
+        else LORA_TARGET_MODULES
+    )
     print(f"Using {architecture} target modules: {config['target_modules']}")
 
     if use_unsloth and UNSLOTH_AVAILABLE:
