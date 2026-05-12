@@ -26,7 +26,8 @@ class RealGemmaInferenceInstrumentedTest {
             history = emptyList(),
             image = sampleImage,
             imageFileName = "sample.png",
-            prompt = "Describe this image."
+            prompt = "Describe this image.",
+            systemPrompt = "Answer briefly."
         )
 
         assertTrue(response.isNotBlank())
@@ -46,7 +47,8 @@ class RealGemmaInferenceInstrumentedTest {
             history = emptyList(),
             image = sampleImage,
             imageFileName = "sample.png",
-            prompt = "Describe this image."
+            prompt = "Describe this image.",
+            systemPrompt = "Answer briefly."
         )
 
         val statuses = mutableListOf<String>()
@@ -58,6 +60,7 @@ class RealGemmaInferenceInstrumentedTest {
             image = sampleImage,
             imageFileName = "sample.png",
             prompt = "Describe this image.",
+            systemPrompt = "Answer briefly.",
             onStatus = { statuses.add(it) }
         )
 

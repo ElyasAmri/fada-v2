@@ -87,6 +87,7 @@ fun CameraScreen(
     // Camera components
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+    val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -163,9 +164,16 @@ fun CameraScreen(
                                 cameraExecutor,
                                 object : ImageCapture.OnImageCapturedCallback() {
                                     override fun onCaptureSuccess(image: ImageProxy) {
-                                        val bitmap = imageProxyToBitmap(image)
-                                        image.close()
-                                        bitmap?.let { onImageCaptured(it) }
+                                        val bitmap = try {
+                                            imageProxyToBitmap(image)
+                                        } finally {
+                                            image.close()
+                                        }
+                                        bitmap?.let {
+                                            mainExecutor.execute {
+                                                onImageCaptured(it)
+                                            }
+                                        }
                                     }
 
                                     override fun onError(exception: ImageCaptureException) {

@@ -1,5 +1,6 @@
 package com.fada.ultrasound.ui
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,14 +11,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,24 +61,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.fada.ultrasound.core.model.ChatMessage
+import com.fada.ultrasound.core.model.ChatRole
 import com.fada.ultrasound.llm.LlmModelOption
-import com.fada.ultrasound.viewmodel.ChatConversation
-import com.fada.ultrasound.viewmodel.ChatMessage
-import com.fada.ultrasound.viewmodel.ChatRole
 import com.fada.ultrasound.viewmodel.InferenceUiState
 import com.fada.ultrasound.viewmodel.InferenceViewModel
-import java.text.DateFormat
-import java.util.Date
+import java.io.File
 
 @Composable
 fun ChatScreen(
     viewModel: InferenceViewModel,
     onNavigateToCamera: () -> Unit,
-    onNavigateToConversations: () -> Unit
+    onNavigateToModels: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedImage by viewModel.selectedImage.collectAsState()
@@ -82,6 +89,12 @@ fun ChatScreen(
     val currentConversationId by viewModel.currentConversationId.collectAsState()
     val currentConversation = conversations.firstOrNull { it.id == currentConversationId }
     val isGenerating = uiState is InferenceUiState.GeneratingResponse || uiState is InferenceUiState.Loading
+    val listState = rememberLazyListState()
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val messageCount = currentConversation?.messages?.size ?: 0
+    val latestMessage = currentConversation?.messages?.lastOrNull()
+    val latestMessageId = latestMessage?.id
+    val latestMessageContentLength = latestMessage?.content?.length ?: 0
 
     var draft by remember(currentConversationId) { mutableStateOf("") }
     var isAttachMenuExpanded by remember { mutableStateOf(false) }
@@ -93,17 +106,19 @@ fun ChatScreen(
         uri?.let { viewModel.loadImageFromUri(it) }
     }
 
+    LaunchedEffect(currentConversationId, latestMessageId, latestMessageContentLength, isGenerating, imeBottom) {
+        if (messageCount > 0) {
+            val targetIndex = messageCount + (if (isGenerating) 1 else 0) - 1
+            listState.scrollToItem(targetIndex)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        ConversationStrip(
-            currentConversation = currentConversation,
-            onNavigateToConversations = onNavigateToConversations
-        )
-
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -113,7 +128,10 @@ fun ChatScreen(
                 EmptyChatState()
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(FadaTestTags.CHAT_MESSAGE_LIST),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
@@ -123,58 +141,74 @@ fun ChatScreen(
                     ) { message ->
                         ChatMessageBubble(message = message)
                     }
+                    if (isGenerating) {
+                        item(key = "generation-indicator") {
+                            GenerationListIndicator(
+                                message = when (val state = uiState) {
+                                    is InferenceUiState.Loading -> state.message
+                                    else -> "Generating response..."
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        if (uiState is InferenceUiState.Error) {
-            ErrorCard(message = (uiState as InferenceUiState.Error).message)
-        }
+        Column(
+            modifier = Modifier.imePadding(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (uiState is InferenceUiState.Error) {
+                val message = (uiState as InferenceUiState.Error).message
+                ErrorCard(
+                    message = message,
+                    actionLabel = if (message.startsWith("Download ")) "Open Models" else null,
+                    onAction = onNavigateToModels
+                )
+            }
 
-        if (isGenerating) {
-            LoadingCard(uiState = uiState)
-        }
+            selectedImage?.let { bitmap ->
+                AttachmentPreview(
+                    fileName = selectedImageFileName ?: "Attached image",
+                    thumbnail = {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Selected image",
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                )
+            }
 
-        selectedImage?.let { bitmap ->
-            AttachmentPreview(
-                fileName = selectedImageFileName ?: "Attached image",
-                thumbnail = {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Selected image",
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(10.dp)),
-                        contentScale = ContentScale.Crop
-                    )
+            MessageComposer(
+                draft = draft,
+                onDraftChange = { draft = it },
+                selectedModel = selectedModel,
+                isSendEnabled = draft.isNotBlank() && !isGenerating,
+                isAttachMenuExpanded = isAttachMenuExpanded,
+                onAttachMenuExpandedChange = { isAttachMenuExpanded = it },
+                onAddImage = {
+                    isAttachMenuExpanded = false
+                    galleryLauncher.launch("image/*")
+                },
+                onTakePhoto = {
+                    isAttachMenuExpanded = false
+                    onNavigateToCamera()
+                },
+                onChangeModel = {
+                    isAttachMenuExpanded = false
+                    isModelPickerOpen = true
+                },
+                onSend = {
+                    viewModel.sendChatMessage(draft)
+                    draft = ""
                 }
             )
         }
-
-        MessageComposer(
-            draft = draft,
-            onDraftChange = { draft = it },
-            selectedModel = selectedModel,
-            isSendEnabled = draft.isNotBlank() && !isGenerating,
-            isAttachMenuExpanded = isAttachMenuExpanded,
-            onAttachMenuExpandedChange = { isAttachMenuExpanded = it },
-            onAddImage = {
-                isAttachMenuExpanded = false
-                galleryLauncher.launch("image/*")
-            },
-            onTakePhoto = {
-                isAttachMenuExpanded = false
-                onNavigateToCamera()
-            },
-            onChangeModel = {
-                isAttachMenuExpanded = false
-                isModelPickerOpen = true
-            },
-            onSend = {
-                viewModel.sendChatMessage(draft)
-                draft = ""
-            }
-        )
     }
 
     if (isModelPickerOpen) {
@@ -187,41 +221,6 @@ fun ChatScreen(
             },
             onDismiss = { isModelPickerOpen = false }
         )
-    }
-}
-
-@Composable
-private fun ConversationStrip(
-    currentConversation: ChatConversation?,
-    onNavigateToConversations: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        IconButton(onClick = onNavigateToConversations) {
-            Icon(
-                imageVector = Icons.Default.Forum,
-                contentDescription = "Threads"
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = currentConversation?.title ?: "New conversation",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = conversationSubtitle(currentConversation),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }
 
@@ -286,7 +285,9 @@ private fun MessageComposer(
             TextField(
                 value = draft,
                 onValueChange = onDraftChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(FadaTestTags.CHAT_INPUT),
                 placeholder = { Text("Message") },
                 minLines = 1,
                 maxLines = 5,
@@ -303,7 +304,9 @@ private fun MessageComposer(
             IconButton(
                 onClick = onSend,
                 enabled = isSendEnabled,
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag(FadaTestTags.CHAT_SEND)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
@@ -450,15 +453,20 @@ private fun ChatMessageBubble(message: ChatMessage) {
                     fontWeight = FontWeight.SemiBold
                 )
                 if (isUser) {
+                    if (message.hasImage) {
+                        ChatImageAttachment(message = message)
+                    }
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
-                    MarkdownMessageText(
-                        markdown = message.content,
-                        isStreaming = message.isStreaming
-                    )
+                    if (message.content.isNotBlank()) {
+                        MarkdownMessageText(
+                            markdown = message.content,
+                            isStreaming = message.isStreaming
+                        )
+                    }
                 }
                 if (message.hasImage || message.latencyMs != null) {
                     Text(
@@ -574,57 +582,92 @@ private fun MarkdownCodeBlock(text: String) {
 }
 
 @Composable
-private fun ErrorCard(message: String) {
+private fun ErrorCard(
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer
         )
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            if (actionLabel != null && onAction != null) {
+                TextButton(onClick = onAction) {
+                    Text(actionLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatImageAttachment(message: ChatMessage) {
+    val bitmap = remember(message.imagePath) {
+        message.imagePath
+            ?.let(::File)
+            ?.takeIf { it.exists() }
+            ?.absolutePath
+            ?.let(BitmapFactory::decodeFile)
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = message.imageFileName ?: "Attached image",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(14.dp)),
+            contentScale = ContentScale.Crop
+        )
+    } else {
         Text(
-            text = message,
-            modifier = Modifier.padding(12.dp),
-            color = MaterialTheme.colorScheme.onErrorContainer
+            text = message.imageFileName ?: "Image attached",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-private fun LoadingCard(uiState: InferenceUiState) {
-    Card(
+private fun GenerationListIndicator(message: String) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        horizontalArrangement = Arrangement.Center
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            Text(
-                text = when (uiState) {
-                    is InferenceUiState.Loading -> uiState.message
-                    InferenceUiState.GeneratingResponse -> "Generating response..."
-                    else -> "Working..."
-                },
-                style = MaterialTheme.typography.bodyMedium
+        Card(
+            modifier = Modifier.wrapContentSize(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                Text(
+                    text = message.ifBlank { "Generating response..." },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-    }
-}
-
-private fun conversationSubtitle(conversation: ChatConversation?): String {
-    if (conversation == null) return "New thread"
-    val createdAt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-        .format(Date(conversation.createdAt))
-    val attachment = conversation.messages
-        .lastOrNull { !it.imageFileName.isNullOrBlank() }
-        ?.imageFileName
-    return if (attachment.isNullOrBlank()) {
-        "Created $createdAt"
-    } else {
-        "Created $createdAt - $attachment"
     }
 }

@@ -7,11 +7,20 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fada.ultrasound.core.data.ConversationStore
+import com.fada.ultrasound.core.model.AppSettings
+import com.fada.ultrasound.core.model.ChatConversation
+import com.fada.ultrasound.core.model.ChatMessage
+import com.fada.ultrasound.core.model.ChatRole
+import com.fada.ultrasound.core.model.LlmResponse
+import com.fada.ultrasound.core.model.ModelStorageInfo
 import com.fada.ultrasound.llm.LlmChatRole
 import com.fada.ultrasound.llm.LlmChatTurn
 import com.fada.ultrasound.llm.LlmModelOption
 import com.fada.ultrasound.llm.LlmModels
+import com.fada.ultrasound.llm.ModelDownloadCoordinator
 import com.fada.ultrasound.llm.ModelDownloadManager
+import com.fada.ultrasound.llm.ModelDownloadState
 import com.fada.ultrasound.llm.LlmResponseClient
 import com.fada.ultrasound.llm.LlmResponseGenerator
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.UUID
 
@@ -78,10 +89,17 @@ class InferenceViewModel(
     private val _settings = MutableStateFlow(storedState?.settings ?: AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    private var downloadStates: Map<String, ModelDownloadState> = ModelDownloadCoordinator.states.value
+
     init {
         refreshModelStorage()
+        viewModelScope.launch {
+            ModelDownloadCoordinator.states.collect { states ->
+                downloadStates = states
+                refreshModelStorage()
+            }
+        }
         persistState()
-        prepareSelectedModel()
     }
 
     /**
@@ -128,9 +146,15 @@ class InferenceViewModel(
      */
     fun selectModel(modelId: String) {
         val model = _modelOptions.value.firstOrNull { it.id == modelId } ?: return
+        val previousModelId = _selectedModel.value.id
         _selectedModel.value = model
+        if (previousModelId != model.id) {
+            viewModelScope.launch(Dispatchers.IO) {
+                responseClient.releaseModel(previousModelId)
+            }
+            _uiState.value = InferenceUiState.Idle
+        }
         persistState()
-        prepareSelectedModel()
     }
 
     fun createNewConversation() {
@@ -148,9 +172,14 @@ class InferenceViewModel(
     }
 
     fun deleteConversation(conversationId: String) {
-        val remaining = _conversations.value.filterNot { it.id == conversationId }
+        deleteConversations(setOf(conversationId))
+    }
+
+    fun deleteConversations(conversationIds: Set<String>) {
+        if (conversationIds.isEmpty()) return
+        val remaining = _conversations.value.filterNot { it.id in conversationIds }
         _conversations.value = remaining.ifEmpty { listOf(createConversation()) }
-        if (_currentConversationId.value == conversationId) {
+        if (_currentConversationId.value in conversationIds) {
             _currentConversationId.value = _conversations.value.first().id
         }
         persistState()
@@ -188,6 +217,16 @@ class InferenceViewModel(
         persistState()
     }
 
+    fun updateUseDefaultSystemPrompt(enabled: Boolean) {
+        _settings.value = _settings.value.copy(useDefaultSystemPrompt = enabled)
+        persistState()
+    }
+
+    fun updateCustomSystemPrompt(systemPrompt: String) {
+        _settings.value = _settings.value.copy(customSystemPrompt = systemPrompt)
+        persistState()
+    }
+
     /**
      * Generate a multimodal response on the selected image.
      */
@@ -210,32 +249,37 @@ class InferenceViewModel(
         val currentId = _currentConversationId.value
         val imageFileName = _selectedImageFileName.value
         val history = currentConversationHistory(currentId)
+        val selected = _selectedModel.value
+        if (!ModelDownloadManager(getApplication()).getStoredModelInfo(selected).isStored) {
+            _uiState.value = InferenceUiState.Error(
+                "Download ${selected.displayName} from Models before chatting."
+            )
+            return
+        }
+
+        val userMessageId = UUID.randomUUID().toString()
+        val chatImagePath = bitmap?.let { saveChatImage(it, userMessageId) }
         appendMessage(
             conversationId = currentId,
             message = ChatMessage(
-                id = UUID.randomUUID().toString(),
+                id = userMessageId,
                 role = ChatRole.User,
                 content = normalizedPrompt,
                 hasImage = bitmap != null,
-                imageFileName = if (bitmap != null) imageFileName ?: "Attached image" else null
+                imageFileName = if (bitmap != null) imageFileName ?: "Attached image" else null,
+                imagePath = chatImagePath
             )
         )
+        if (bitmap != null) {
+            clearSelectedImageReference()
+        }
 
         val assistantMessageId = UUID.randomUUID().toString()
-        appendMessage(
-            conversationId = currentId,
-            message = ChatMessage(
-                id = assistantMessageId,
-                role = ChatRole.Assistant,
-                content = "",
-                modelName = _selectedModel.value.displayName
-            )
-        )
 
         viewModelScope.launch(Dispatchers.Default) {
             _uiState.value = InferenceUiState.GeneratingResponse
             val startTime = System.currentTimeMillis()
-            val selected = _selectedModel.value
+            var assistantMessageCreated = false
             try {
                 val output = responseClient.generate(
                     context = getApplication(),
@@ -245,16 +289,31 @@ class InferenceViewModel(
                     image = bitmap,
                     imageFileName = imageFileName,
                     prompt = normalizedPrompt,
+                    systemPrompt = _settings.value.effectiveSystemPrompt,
                     onStatus = { status ->
                         _uiState.value = InferenceUiState.Loading(status)
                     },
                     onPartialResponse = { partial ->
-                        updateMessageContent(
-                            conversationId = currentId,
-                            messageId = assistantMessageId,
-                            content = partial,
-                            isStreaming = true
-                        )
+                        if (!assistantMessageCreated) {
+                            appendMessage(
+                                conversationId = currentId,
+                                message = ChatMessage(
+                                    id = assistantMessageId,
+                                    role = ChatRole.Assistant,
+                                    content = partial,
+                                    modelName = selected.displayName,
+                                    isStreaming = true
+                                )
+                            )
+                            assistantMessageCreated = true
+                        } else {
+                            updateMessageContent(
+                                conversationId = currentId,
+                                messageId = assistantMessageId,
+                                content = partial,
+                                isStreaming = true
+                            )
+                        }
                     }
                 )
                 val elapsed = System.currentTimeMillis() - startTime
@@ -267,25 +326,36 @@ class InferenceViewModel(
                         latencyMs = elapsed
                     )
                     _llmResponse.value = response
-                    updateMessageContent(
-                        conversationId = currentId,
-                        messageId = assistantMessageId,
-                        content = output,
-                        latencyMs = elapsed,
-                        isStreaming = false
-                    )
-                    if (!_settings.value.keepImageAfterSend) {
-                        replaceSelectedImage(null, null)
+                    if (assistantMessageCreated) {
+                        updateMessageContent(
+                            conversationId = currentId,
+                            messageId = assistantMessageId,
+                            content = output,
+                            latencyMs = elapsed,
+                            isStreaming = false
+                        )
+                    } else {
+                        appendMessage(
+                            conversationId = currentId,
+                            message = ChatMessage(
+                                id = assistantMessageId,
+                                role = ChatRole.Assistant,
+                                content = output,
+                                modelName = selected.displayName,
+                                latencyMs = elapsed,
+                                isStreaming = false
+                            )
+                        )
                     }
                     _uiState.value = InferenceUiState.ResponseReady(response)
                 }
             } catch (e: IllegalStateException) {
                 val message = e.message ?: "Model runtime failed"
-                updateMessageContent(currentId, assistantMessageId, "Generation failed: $message", isStreaming = false)
+                removeMessages(currentId, setOf(userMessageId, assistantMessageId))
                 _uiState.value = InferenceUiState.Error(message)
             } catch (e: RuntimeException) {
                 val message = e.message ?: "Inference failed"
-                updateMessageContent(currentId, assistantMessageId, "Generation failed: $message", isStreaming = false)
+                removeMessages(currentId, setOf(userMessageId, assistantMessageId))
                 _uiState.value = InferenceUiState.Error(message)
             }
         }
@@ -295,38 +365,52 @@ class InferenceViewModel(
         val manager = ModelDownloadManager(getApplication())
         _modelStorage.value = _modelOptions.value.map { option ->
             val info = manager.getStoredModelInfo(option)
+            val downloadState = downloadStates[option.id]
             ModelStorageInfo(
                 model = option,
                 isStored = info.isStored,
                 sizeBytes = info.sizeBytes,
-                filePath = info.file.absolutePath
+                filePath = info.file.absolutePath,
+                status = downloadState?.status,
+                isBusy = downloadState?.isBusy == true
             )
         }
     }
 
     fun downloadModel(modelId: String) {
         val model = _modelOptions.value.firstOrNull { it.id == modelId } ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            markModelBusy(modelId, "Queued")
-            try {
-                ModelDownloadManager(getApplication()).getOrDownloadModel(model) { status ->
-                    markModelBusy(modelId, status)
-                }
-                withContext(Dispatchers.Main) {
-                    refreshModelStorage()
-                }
-            } catch (e: IllegalStateException) {
-                markModelIdleWithError(modelId, e.message ?: "Model download failed")
-            } catch (e: RuntimeException) {
-                markModelIdleWithError(modelId, e.message ?: "Model download failed")
-            }
-        }
+        ModelDownloadCoordinator.startDownload(getApplication(), model)
     }
 
     fun deleteStoredModel(modelId: String) {
         val model = _modelOptions.value.firstOrNull { it.id == modelId } ?: return
-        ModelDownloadManager(getApplication()).invalidateModel(model)
-        refreshModelStorage()
+        viewModelScope.launch(Dispatchers.IO) {
+            responseClient.releaseModel(modelId)
+            ModelDownloadManager(getApplication()).invalidateModel(model)
+            withContext(Dispatchers.Main) {
+                refreshModelStorage()
+            }
+        }
+    }
+
+    fun deleteStoredModels(modelIds: Set<String>) {
+        modelIds.forEach { deleteStoredModel(it) }
+    }
+
+    fun clearUnusedModelFiles() {
+        if (downloadStates.values.any { it.isBusy }) {
+            _uiState.value = InferenceUiState.Error("Wait for model downloads to finish before clearing old files")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = ModelDownloadManager(getApplication()).clearUnusedModelFiles(_modelOptions.value)
+            withContext(Dispatchers.Main) {
+                refreshModelStorage()
+                _uiState.value = InferenceUiState.Loading(
+                    "Cleared ${result.deletedFiles} old model file${if (result.deletedFiles == 1) "" else "s"}"
+                )
+            }
+        }
     }
 
     /**
@@ -351,6 +435,24 @@ class InferenceViewModel(
         }
         _selectedImage.value = bitmap
         _selectedImageFileName.value = fileName
+    }
+
+    private fun clearSelectedImageReference() {
+        _selectedImage.value = null
+        _selectedImageFileName.value = null
+    }
+
+    private fun saveChatImage(bitmap: Bitmap, messageId: String): String? {
+        return runCatching {
+            val directory = File(getApplication<Application>().filesDir, "chat_images").apply {
+                mkdirs()
+            }
+            val file = File(directory, "$messageId.jpg")
+            FileOutputStream(file).use { output ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+            }
+            file.absolutePath
+        }.getOrNull()
     }
 
     private fun resolveDisplayName(uri: Uri): String {
@@ -413,6 +515,22 @@ class InferenceViewModel(
         persistState()
     }
 
+    private fun removeMessages(conversationId: String, messageIds: Set<String>) {
+        _conversations.value = _conversations.value.map { conversation ->
+            if (conversation.id == conversationId) {
+                val messages = conversation.messages.filterNot { it.id in messageIds }
+                conversation.copy(
+                    title = conversationTitle(messages),
+                    messages = messages,
+                    updatedAt = System.currentTimeMillis()
+                )
+            } else {
+                conversation
+            }
+        }.sortedByDescending { it.updatedAt }
+        persistState()
+    }
+
     private fun markModelBusy(modelId: String, status: String) {
         _modelStorage.value = _modelStorage.value.map { info ->
             if (info.model.id == modelId) {
@@ -450,24 +568,6 @@ class InferenceViewModel(
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
-    }
-
-    private fun prepareSelectedModel() {
-        val selected = _selectedModel.value
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                responseClient.prepare(
-                    context = getApplication(),
-                    model = selected,
-                    onStatus = { status ->
-                        _uiState.value = InferenceUiState.Loading(status)
-                    }
-                )
-                _uiState.value = InferenceUiState.Idle
-            } catch (e: RuntimeException) {
-                _uiState.value = InferenceUiState.Error(e.message ?: "Model initialization failed")
-            }
-        }
     }
 
     private fun currentConversationHistory(conversationId: String): List<LlmChatTurn> {
@@ -514,48 +614,3 @@ sealed class InferenceUiState {
     data class ResponseReady(val response: LlmResponse) : InferenceUiState()
     data class Error(val message: String) : InferenceUiState()
 }
-
-data class LlmResponse(
-    val modelId: String,
-    val modelName: String,
-    val content: String,
-    val latencyMs: Long
-)
-
-enum class ChatRole {
-    User,
-    Assistant
-}
-
-data class ChatMessage(
-    val id: String,
-    val role: ChatRole,
-    val content: String,
-    val modelName: String? = null,
-    val latencyMs: Long? = null,
-    val hasImage: Boolean = false,
-    val imageFileName: String? = null,
-    val isStreaming: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
-)
-
-data class ChatConversation(
-    val id: String,
-    val title: String,
-    val messages: List<ChatMessage>,
-    val createdAt: Long,
-    val updatedAt: Long
-)
-
-data class ModelStorageInfo(
-    val model: LlmModelOption,
-    val isStored: Boolean,
-    val sizeBytes: Long,
-    val filePath: String,
-    val status: String? = null,
-    val isBusy: Boolean = false
-)
-
-data class AppSettings(
-    val keepImageAfterSend: Boolean = true
-)

@@ -35,7 +35,8 @@ import com.fada.ultrasound.viewmodel.InferenceViewModel
 @Composable
 fun SettingsScreen(
     viewModel: InferenceViewModel,
-    onNavigateToModels: () -> Unit
+    onNavigateToModels: () -> Unit,
+    onNavigateToSystemPrompt: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
@@ -59,6 +60,12 @@ fun SettingsScreen(
                     onCheckedChange = viewModel::updateKeepImageAfterSend
                 )
             }
+        )
+        SettingsRow(
+            icon = { Icon(Icons.Default.Info, contentDescription = null) },
+            title = "System prompt",
+            subtitle = systemPromptSummary(settings.useDefaultSystemPrompt, settings.customSystemPrompt),
+            onClick = onNavigateToSystemPrompt
         )
 
         SectionHeader("Models")
@@ -89,6 +96,15 @@ fun SettingsScreen(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+private fun systemPromptSummary(useDefault: Boolean, customPrompt: String): String {
+    return when {
+        useDefault && customPrompt.isNotBlank() -> "Default prompt plus custom instructions"
+        useDefault -> "Default prompt enabled"
+        customPrompt.isNotBlank() -> "Custom prompt only"
+        else -> "No system prompt"
     }
 }
 

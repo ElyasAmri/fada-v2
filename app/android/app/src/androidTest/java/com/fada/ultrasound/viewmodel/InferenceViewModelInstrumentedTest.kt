@@ -33,6 +33,7 @@ class InferenceViewModelInstrumentedTest {
                 image: Bitmap?,
                 imageFileName: String?,
                 prompt: String,
+                systemPrompt: String,
                 onStatus: (String) -> Unit,
                 onPartialResponse: (String) -> Unit
             ): String {
@@ -44,6 +45,8 @@ class InferenceViewModelInstrumentedTest {
             }
 
             override fun release() = Unit
+
+            override fun releaseModel(modelId: String) = Unit
         }
         val viewModel = InferenceViewModel(application, fakeClient)
         val sampleImage = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
@@ -79,6 +82,7 @@ class InferenceViewModelInstrumentedTest {
                 image: Bitmap?,
                 imageFileName: String?,
                 prompt: String,
+                systemPrompt: String,
                 onStatus: (String) -> Unit,
                 onPartialResponse: (String) -> Unit
             ): String {
@@ -88,6 +92,8 @@ class InferenceViewModelInstrumentedTest {
             }
 
             override fun release() = Unit
+
+            override fun releaseModel(modelId: String) = Unit
         }
         val viewModel = InferenceViewModel(application, fakeClient)
 
