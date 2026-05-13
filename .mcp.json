@@ -1,34 +1,5 @@
 {
   "mcpServers": {
-    "context7": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "MCP_TRANSPORT=stdio",
-        "mcp/context7"
-      ]
-    },
-    "paper-search": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "mcp/paper-search"
-      ]
-    },
-    "playwright": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "mcp/playwright"
-      ]
-    },
     "fada-rccg": {
       "command": "bun",
       "args": ["run", "experiments/rccg/fada-channel/server.ts"],

@@ -49,6 +49,11 @@ tmpclaude-*/
 
 # Environment
 .env*
+/bin/
+/lib/
+/lib64/
+/lib64
+/pyvenv.cfg
 
 # Cache
 .cache/
@@ -89,6 +94,7 @@ experiments/framework_comparison/runs/
 test_output/
 benchmark_summary.json
 unsloth_compiled_cache/
+/default.profraw
 
 # Vast.ai benchmark state (contains volume IDs)
 experiments/vastai/benchmark_state.json
